@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode MVP</title>
+    <title>Progranimate V5.1 - Bug Fixes</title>
     
     <!-- 1. GOOGLE FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +30,6 @@
             background-color: #fff;
         }
 
-        /* --- LAYOUT OVERRIDES --- */
         .wrapper { height: 100vh; display: flex; flex-direction: column; }
         .main-area { flex: 1; display: flex; overflow: hidden; }
 
@@ -55,7 +54,6 @@
             margin-bottom: 10px;
         }
 
-        /* Palette Items (Visual representation in sidebar) */
         .palette-item {
             cursor: grab;
             user-select: none;
@@ -97,7 +95,7 @@
             display: flex;
             flex-direction: column;
             border-left: 1px solid #dee2e6;
-            background: #212529; /* Dark Mode */
+            background: #212529;
         }
         
         .panel-toolbar {
@@ -126,23 +124,22 @@
             line-height: 1.6;
         }
         
-        /* Syntax Highlighting Sim */
-        .keyword { color: #d63384; font-weight: bold; } /* Pink for if/else */
-        .func { color: #0d6efd; } /* Blue for print/input */
-        .string { color: #198754; } /* Green */
+        .keyword { color: #d63384; font-weight: bold; }
+        .func { color: #0d6efd; }
+        .string { color: #198754; }
         .comment { color: #6c757d; font-style: italic; }
 
         #console {
             height: 180px;
             background: #000;
-            color: #20c997; /* Teal */
+            color: #20c997;
             padding: 10px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
             overflow-y: auto;
         }
 
-        /* --- NODES ON CANVAS --- */
+        /* --- NODES --- */
         .node {
             position: absolute;
             background: white;
@@ -152,7 +149,7 @@
             font-weight: 500;
             user-select: none;
             cursor: pointer;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); /* Pop style shadow */
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
             z-index: 2;
             display: flex;
             align-items: center;
@@ -173,17 +170,12 @@
             width: 110px; height: 90px; 
             background: #fff; 
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
-            /* Note: Clip-path cuts border, so we fake border with drop-shadow or SVG in a real app, 
-               but for CSS pure, we use a trick or accept simple bg color. 
-               Let's add a pseudo-element border trick for V5 */
         }
-        /* Visual trick for decision border since clip-path cuts standard borders */
         .shape-decision::before {
             content:''; position: absolute; inset:0; background:var(--node-border); 
             z-index:-1; clip-path: inherit; margin:-2px;
         }
 
-        /* IO Shapes */
         .shape-io, .shape-input, .shape-output { 
             transform: skew(-20deg); 
             background: #fff; 
@@ -213,7 +205,6 @@
         }
         .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
         
-        /* Skew Fixes */
         .shape-input .dot, .shape-output .dot { transform: skew(20deg); } 
         .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.3); }
 
@@ -235,7 +226,7 @@
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
                 <i class="fa-solid fa-diagram-project text-primary"></i>
-                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5</span>
+                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5.1</span>
             </a>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
@@ -340,7 +331,7 @@
         </div>
     </div>
 
-    <!-- SCRIPTS: Bootstrap Bundle -->
+    <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
@@ -354,8 +345,6 @@
         const nodesLayer = document.getElementById('nodes-layer');
         const svgLayer = document.getElementById('connections-layer');
         const consoleDiv = document.getElementById('console');
-        
-        // Bootstrap Modal Instance
         const bsInputModal = new bootstrap.Modal(document.getElementById('inputModal'));
 
         // --- DRAG & DROP CREATION ---
@@ -407,7 +396,6 @@
             el.style.top = node.y + 'px';
 
             let innerHtml = node.text;
-            // Wrap text for skewed shapes
             if(['decision','io','input','output'].includes(node.type)) {
                 innerHtml = `<div class="inner-text">${node.text}</div>`;
             }
@@ -526,7 +514,6 @@
         }
 
         function drawConnections() {
-            // keep defs
             const defs = svgLayer.querySelector('defs');
             svgLayer.innerHTML = '';
             svgLayer.appendChild(defs);
@@ -731,17 +718,23 @@
                 let nextId = null;
                 
                 try {
+                    // --- PROCESS NODE (Assignment) ---
                     if(node.type === 'process') {
-                        const parts = node.text.split('=');
-                        if(parts.length === 2) {
-                            const varName = parts[0].trim();
-                            const val = evaluateExpression(parts[1].trim());
+                        // FIX 1: Split on the first '=' only to support logic in RHS (e.g. check = x >= 5)
+                        const eqIndex = node.text.indexOf('=');
+                        if(eqIndex !== -1) {
+                            const varName = node.text.substring(0, eqIndex).trim();
+                            const exprText = node.text.substring(eqIndex + 1).trim();
+                            
+                            // FIX 2: Evaluate raw expression (no auto == replacement)
+                            const val = evaluateExpression(exprText);
                             runtimeScope[varName] = val;
                             log(`${varName} = ${val}`);
                         }
                         const conn = connections.find(c => c.from === node.id);
                         if(conn) nextId = conn.to;
                     } 
+                    
                     else if (node.type === 'input') {
                         const varName = node.text.replace('Input', '').trim();
                         const userInput = await showInputModal(`Enter value for ${varName}:`);
@@ -751,6 +744,7 @@
                         const conn = connections.find(c => c.from === node.id);
                         if(conn) nextId = conn.to;
                     }
+                    
                     else if (node.type === 'output') {
                         const expr = node.text.replace('Print', '').replace('print', '').replace(/[()]/g,'').trim();
                         if(expr.startsWith('"') || expr.startsWith("'")) log(expr.replace(/['"]/g, ''));
@@ -758,10 +752,19 @@
                         const conn = connections.find(c => c.from === node.id);
                         if(conn) nextId = conn.to;
                     }
+                    
+                    // --- DECISION NODE ---
                     else if (node.type === 'decision') {
-                        const condition = node.text;
+                        let condition = node.text;
+                        
+                        // FIX 3: Smart Replacement only for Decision Nodes
+                        // Replaces '=' with '==' only if not preceded by <,>,!, and not followed by =
+                        // Matches "x = 5" -> "x == 5"
+                        // Ignores "x >= 5", "x <= 5", "x != 5", "x == 5"
+                        condition = condition.replace(/(?<![<>!=])=(?![=])/g, '==');
+
                         const result = evaluateExpression(condition);
-                        log(`Condition (${condition}) is ${result}`);
+                        log(`Condition (${node.text}) is ${result}`);
                         const conn = connections.find(c => c.from === node.id && c.port === (result ? 'yes' : 'no'));
                         if(conn) nextId = conn.to;
                         else {
@@ -788,14 +791,15 @@
             stopSimulation();
         }
 
+        // FIX 4: Generic evaluator no longer replaces = with ==
         function evaluateExpression(expr) {
             let parsed = expr;
+            // Variable substitution
             Object.keys(runtimeScope).sort((a,b)=>b.length-a.length).forEach(key => {
                 const val = runtimeScope[key];
                 const regex = new RegExp(`\\b${key}\\b`, 'g');
                 parsed = parsed.replace(regex, typeof val === 'string' ? `'${val}'` : val);
             });
-            parsed = parsed.replace(/=/g, '==').replace(/====/g, '=='); 
             return Function('"use strict";return (' + parsed + ')')();
         }
 
@@ -810,7 +814,6 @@
                 
                 bsInputModal.show();
                 
-                // Focus input after modal animation
                 document.getElementById('inputModal').addEventListener('shown.bs.modal', () => {
                     input.focus();
                 }, { once: true });
@@ -821,7 +824,6 @@
                     resolve(val);
                 };
                 
-                // Remove old listeners to prevent stacking
                 const newSubmit = submit.cloneNode(true);
                 submit.parentNode.replaceChild(newSubmit, submit);
                 newSubmit.onclick = confirm;
