@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progranimate V2.1 (Fixed)</title>
+    <style>
+        :root {
+            --bg-canvas: #f4f7f6;
+            --bg-panel: #2b2b2b;
+            --accent: #3498db;
+            --text-light: #ecf0f1;
+            --node-border: #34495e;
+        }
+
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- SIDEBAR PALETTE --- */
+        #palette {
+            width: 200px;
+            background: #fff;
+            border-right: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 10;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        .palette-label { font-size: 12px; color: #666; margin-bottom: 5px; width: 100%; text-align: center; margin-top: 15px; }
+
+        /* Palette items must be RELATIVE, not ABSOLUTE like canvas nodes */
+        .palette-item {
+            position: relative; 
+            margin-bottom: 10px;
+            cursor: grab;
+            user-select: none;
+            text-align: center;
+            border: 2px solid var(--node-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            transition: transform 0.1s;
+        }
+        .palette-item:hover { transform: scale(1.05); border-color: var(--accent); }
+        .palette-item:active { cursor: grabbing; }
+
+        /* --- CANVAS --- */
+        #canvas {
+            flex: 1;
+            background-color: var(--bg-canvas);
+            position: relative;
+            overflow: hidden;
+            background-image: radial-gradient(#d1d1d1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* --- CODE PANELS --- */
+        #output-panel {
+            width: 350px;
+            background: var(--bg-panel);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            border-left: 2px solid #000;
+        }
+        .panel-header {
+            padding: 10px 15px;
+            background: #1a1a1a;
+            font-weight: bold;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .code-box {
+            flex: 1;
+            padding: 15px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            overflow-y: auto;
+            white-space: pre;
+            border-bottom: 1px solid #444;
+        }
+        .code-line { display: block; padding: 2px 4px; border-radius: 3px; }
+        .code-line.highlight { background: rgba(231, 76, 60, 0.5); border-left: 3px solid #e74c3c; }
+
+        /* --- NODES ON CANVAS --- */
+        .node {
+            position: absolute; /* Canvas nodes can float anywhere */
+            background: white;
+            border: 2px solid var(--node-border);
+            text-align: center;
+            font-size: 13px;
+            user-select: none;
+            cursor: pointer;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.1);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+        }
+        .node:hover { border-color: var(--accent); }
+        .node.selected { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
+        
+        /* SHAPE STYLES (Shared by Palette and Canvas) */
+        .shape-start, .shape-end { border-radius: 20px; background: #d4edda; width: 80px; height: 40px; }
+        .shape-end { background: #f8d7da; }
+        .shape-process { border-radius: 4px; background: #fff3cd; width: 100px; height: 50px; }
+        .shape-decision { 
+            width: 100px; height: 80px; 
+            background: #d1ecf1; 
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
+        }
+
+        /* --- CONNECTION POINTS (DOTS) --- */
+        .dot {
+            width: 10px; height: 10px;
+            background: #555;
+            border-radius: 50%;
+            position: absolute;
+            cursor: crosshair;
+            z-index: 5;
+            transition: transform 0.2s;
+        }
+        .dot:hover { background: var(--accent); transform: scale(1.3); }
+        
+        .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
+        .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
+        .dot.out-yes { bottom: -6px; left: 50%; transform: translateX(-50%); background: #27ae60; }
+        .dot.out-no { right: -6px; top: 50%; transform: translateY(-50%); background: #c0392b; }
+
+        /* --- SVG LINES --- */
+        svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        path { fill: none; stroke: #555; stroke-width: 2px; }
+        path.selected { stroke: #e74c3c; stroke-width: 3px; }
+        
+        #helper { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+    </style>
+</head>
+<body>
+
+    <!-- 1. LEFT PALETTE -->
+    <div id="palette">
+        <div class="palette-label">Start / End</div>
+        <!-- Note: removed class 'node' to fix stacking bug -->
+        <div class="palette-item shape-start" draggable="true" data-type="start">Start</div>
+        <div class="palette-item shape-end" draggable="true" data-type="end">End</div>
+        
+        <div class="palette-label">Action</div>
+        <div class="palette-item shape-process" draggable="true" data-type="process">x = x + 1</div>
+        
+        <div class="palette-label">Logic</div>
+        <div class="palette-item shape-decision" draggable="true" data-type="decision" style="display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:10px;">x < 10</span>
+        </div>
+    </div>
+
+    <!-- 2. MAIN CANVAS -->
+    <div id="canvas">
+        <div id="helper">
+            1. Drag <b>Start</b> to canvas.<br>
+            2. Drag other nodes.<br>
+            3. Click dots to connect.<br>
+            4. Double-click nodes to edit.
+        </div>
+        <svg id="connections-layer">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+                </marker>
+            </defs>
+        </svg>
+        <div id="nodes-layer"></div>
+    </div>
+
+    <!-- 3. RIGHT CODE PANEL -->
+    <div id="output-panel">
+        <div class="panel-header">Python <button onclick="generateCode()" style="font-size:10px; cursor:pointer;">Refresh</button></div>
+        <div id="code-python" class="code-box"></div>
+        <div class="panel-header">Pseudocode</div>
+        <div id="code-pseudo" class="code-box"></div>
+    </div>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        let nodes = [];
+        let connections = []; 
+        let nextId = 1;
+        let selectedNodeId = null;
+        let selectedConnId = null;
+        let isDrawing = false;
+        let drawStart = null; 
+
+        const canvas = document.getElementById('canvas');
+        const nodesLayer = document.getElementById('nodes-layer');
+        const svgLayer = document.getElementById('connections-layer');
+
+        // --- 1. DRAG & DROP FROM PALETTE ---
+        document.querySelectorAll('.palette-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('type', item.dataset.type);
+            });
+        });
+
+        canvas.addEventListener('dragover', (e) => e.preventDefault());
+        
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('type');
+            if(!type) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            createNode(type, x - 50, y - 25); // center on mouse
+        });
+
+        // --- 2. NODE CREATION ---
+        function createNode(type, x, y) {
+            const id = `node-${nextId++}`;
+            const nodeData = { 
+                id, type, x, y, 
+                text: type === 'start' ? 'Start' : (type === 'end' ? 'End' : (type === 'decision' ? 'x < 5' : 'print("Hi")')) 
+            };
+            nodes.push(nodeData);
+            renderNode(nodeData);
+            generateCode();
+        }
+
+        function renderNode(data) {
+            const el = document.createElement('div');
+            el.className = `node shape-${data.type}`;
+            el.id = data.id;
+            el.style.left = `${data.x}px`;
+            el.style.top = `${data.y}px`;
+
+            if(data.type === 'decision') {
+                el.innerHTML = `<div class="inner-text" style="width:70%; pointer-events:none;">${data.text}</div>`;
+            } else {
+                el.innerText = data.text;
+            }
+
+            el.onmousedown = (e) => startDragNode(e, data.id);
+            el.ondblclick = () => editNode(data.id);
+            el.onclick = (e) => { e.stopPropagation(); selectNode(data.id); };
+
+            // Input Dot (All except Start)
+            if(data.type !== 'start') {
+                createDot(el, 'in', data.id, 'in');
+            }
+
+            // Output Dots
+            if(data.type === 'decision') {
+                createDot(el, 'out-yes', data.id, 'yes');
+                createDot(el, 'out-no', data.id, 'no');
+            } else if (data.type !== 'end') {
+                createDot(el, 'out', data.id, 'next');
+            }
+
+            nodesLayer.appendChild(el);
+        }
+
+        function createDot(parent, className, nodeId, portType) {
+            const dot = document.createElement('div');
+            dot.className = `dot ${className}`;
+            dot.title = portType === 'yes' ? 'True/Yes' : (portType === 'no' ? 'False/No' : 'Next');
+            
+            dot.onmousedown = (e) => {
+                e.stopPropagation();
+                startConnection(nodeId, portType, e);
+            };
+            dot.onmouseup = (e) => {
+                e.stopPropagation();
+                finishConnection(nodeId);
+            }
+            parent.appendChild(dot);
+        }
+
+        // --- 3. EDITING & INTERACTIONS ---
+        function editNode(id) {
+            const node = nodes.find(n => n.id === id);
+            const newText = prompt("Edit Logic/Text:", node.text);
+            if(newText !== null && newText.trim() !== "") {
+                node.text = newText;
+                // Update DOM directly to avoid full re-render flickering
+                const el = document.getElementById(id);
+                if(node.type === 'decision') el.querySelector('.inner-text').innerText = newText;
+                else el.innerText = newText;
+                
+                // Re-add dots because innerText wipes children
+                if(node.type !== 'start') createDot(el, 'in', node.id, 'in');
+                if(node.type === 'decision') {
+                    createDot(el, 'out-yes', node.id, 'yes');
+                    createDot(el, 'out-no', node.id, 'no');
+                } else if (node.type !== 'end') {
+                    createDot(el, 'out', node.id, 'next');
+                }
+                
+                generateCode();
+            }
+        }
+
+        function selectNode(id) {
+            selectedNodeId = id;
+            selectedConnId = null;
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            document.getElementById(id).classList.add('selected');
+            drawLines(); 
+        }
+
+        // --- 4. CONNECTIONS (WIRES) ---
+        let tempLine = null;
+
+        function startConnection(nodeId, portType, e) {
+            isDrawing = true;
+            drawStart = { nodeId, portType };
+            
+            tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempLine.setAttribute('stroke', '#555');
+            tempLine.setAttribute('stroke-dasharray', '5,5');
+            tempLine.setAttribute('fill', 'none');
+            svgLayer.appendChild(tempLine);
+
+            document.addEventListener('mousemove', updateDragLine);
+            document.addEventListener('mouseup', abortConnection);
+        }
+
+        function updateDragLine(e) {
+            if(!isDrawing) return;
+            const startNode = nodes.find(n => n.id === drawStart.nodeId);
+            const startEl = document.getElementById(drawStart.nodeId);
+            
+            let sx = startNode.x + startEl.offsetWidth/2;
+            let sy = startNode.y + startEl.offsetHeight; 
+            if(drawStart.portType === 'no') { sx = startNode.x + startEl.offsetWidth; sy = startNode.y + startEl.offsetHeight/2; }
+
+            const rect = canvas.getBoundingClientRect();
+            const ex = e.clientX - rect.left;
+            const ey = e.clientY - rect.top;
+
+            // Simple Bezier for dragging
+            const d = `M ${sx} ${sy} C ${sx} ${sy+50}, ${ex} ${ey-50}, ${ex} ${ey}`;
+            tempLine.setAttribute('d', d);
+        }
+
+        function finishConnection(targetId) {
+            if(!isDrawing) return;
+            if(drawStart.nodeId === targetId) return; 
+
+            // Remove existing connection from source port (One output per port)
+            connections = connections.filter(c => !(c.fromNode === drawStart.nodeId && c.fromPort === drawStart.portType));
+
+            connections.push({
+                id: Date.now(),
+                fromNode: drawStart.nodeId,
+                fromPort: drawStart.portType,
+                toNode: targetId
+            });
+
+            endDrawing();
+            updateConnections();
+            generateCode();
+        }
+
+        function abortConnection() {
+            endDrawing();
+        }
+
+        function endDrawing() {
+            isDrawing = false;
+            if(tempLine) tempLine.remove();
+            document.removeEventListener('mousemove', updateDragLine);
+            document.removeEventListener('mouseup', abortConnection);
+        }
+
+        function updateConnections() {
+            drawLines();
+        }
+
+        function drawLines() {
+            const paths = svgLayer.querySelectorAll('path');
+            paths.forEach(p => p.remove());
+
+            connections.forEach(conn => {
+                const n1 = nodes.find(n => n.id === conn.fromNode);
+                const n2 = nodes.find(n => n.id === conn.toNode);
+                const el1 = document.getElementById(conn.fromNode);
+                const el2 = document.getElementById(conn.toNode);
+                
+                if(!el1 || !el2) return;
+
+                let x1 = n1.x + el1.offsetWidth/2;
+                let y1 = n1.y + el1.offsetHeight; 
+                if(conn.fromPort === 'no') { x1 = n1.x + el1.offsetWidth; y1 = n1.y + el1.offsetHeight/2; }
+
+                let x2 = n2.x + el2.offsetWidth/2;
+                let y2 = n2.y;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${x1} ${y1} C ${x1} ${y1+30}, ${x2} ${y2-30}, ${x2} ${y2}`;
+                
+                path.setAttribute('d', d);
+                path.setAttribute('marker-end', 'url(#arrowhead)');
+                path.style.cursor = 'pointer';
+                path.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedConnId = conn.id;
+                    selectedNodeId = null;
+                    drawLines(); 
+                };
+
+                if(selectedConnId === conn.id) path.classList.add('selected');
+
+                svgLayer.appendChild(path);
+            });
+        }
+
+        // --- 5. NODE DRAGGING ---
+        let dragNodeId = null;
+        let dragOffset = { x:0, y:0 };
+
+        function startDragNode(e, id) {
+            if(e.target.classList.contains('dot')) return; 
+            dragNodeId = id;
+            const node = nodes.find(n => n.id === id);
+            dragOffset.x = e.clientX - node.x;
+            dragOffset.y = e.clientY - node.y;
+            document.addEventListener('mousemove', onDragNode);
+            document.addEventListener('mouseup', stopDragNode);
+        }
+
+        function onDragNode(e) {
+            if(!dragNodeId) return;
+            const rect = canvas.getBoundingClientRect();
+            const node = nodes.find(n => n.id === dragNodeId);
+            node.x = e.clientX - rect.left - dragOffset.x;
+            node.y = e.clientY - rect.top - dragOffset.y;
+            
+            const el = document.getElementById(dragNodeId);
+            el.style.left = `${node.x}px`;
+            el.style.top = `${node.y}px`;
+            
+            updateConnections();
+        }
+
+        function stopDragNode() {
+            dragNodeId = null;
+            document.removeEventListener('mousemove', onDragNode);
+            document.removeEventListener('mouseup', stopDragNode);
+            generateCode(); // regenerate on move (for loop detection based on Y pos)
+        }
+
+        // --- 6. DELETE ---
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'Delete' || e.key === 'Backspace') {
+                if(selectedNodeId) {
+                    nodes = nodes.filter(n => n.id !== selectedNodeId);
+                    connections = connections.filter(c => c.fromNode !== selectedNodeId && c.toNode !== selectedNodeId);
+                    document.getElementById(selectedNodeId).remove();
+                    selectedNodeId = null;
+                    updateConnections();
+                    generateCode();
+                }
+                if(selectedConnId) {
+                    connections = connections.filter(c => c.id !== selectedConnId);
+                    selectedConnId = null;
+                    updateConnections();
+                    generateCode();
+                }
+            }
+        });
+
+        // --- 7. THE LOGIC ENGINE ---
+        function generateCode() {
+            const pyBox = document.getElementById('code-python');
+            const psBox = document.getElementById('code-pseudo');
+            pyBox.innerHTML = '';
+            psBox.innerHTML = '';
+
+            const startNode = nodes.find(n => n.type === 'start');
+            if(!startNode) {
+                pyBox.innerHTML = '<span style="color:#777">// Drag a "Start" node to begin</span>';
+                return;
+            }
+
+            let output = [];
+            const maxSteps = 200; 
+            let steps = 0;
+            
+            function safeTraverse(nodeId, indent, history) {
+                if(steps++ > maxSteps) { output.push("... (Loop limit reached)"); return; }
+                if(!nodeId) return;
+                
+                // If we hit a node already in our ANCESTOR chain, it's a loop closing. Stop recursion.
+                if(history.includes(nodeId)) return; 
+
+                const node = nodes.find(n => n.id === nodeId);
+                if(!node) return;
+
+                let line = "";
+                
+                if(node.type === 'start') {
+                    line = "# Start Program";
+                } else if (node.type === 'process') {
+                    line = node.text;
+                } else if (node.type === 'end') {
+                    line = "exit()";
+                } else if (node.type === 'decision') {
+                    const yesConn = connections.find(c => c.fromNode === node.id && c.fromPort === 'yes');
+                    const targetYes = yesConn ? nodes.find(n=>n.id===yesConn.toNode) : null;
+                    
+                    // HEURISTIC: If 'Yes' target is PHYSICALLY HIGHER, it's a WHILE loop
+                    if(targetYes && targetYes.y < node.y) {
+                        line = `while ${node.text}:`;
+                    } else {
+                        line = `if ${node.text}:`;
+                    }
+                }
+
+                // Add to output
+                output.push(`<div class="code-line" id="code-${node.id}" onmouseenter="highlight('${node.id}')" onmouseleave="unhighlight('${node.id}')">${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent)}${line}</div>`);
+
+                // Recurse
+                if(node.type === 'decision') {
+                    const yesConn = connections.find(c => c.fromNode === node.id && c.fromPort === 'yes');
+                    const noConn = connections.find(c => c.fromNode === node.id && c.fromPort === 'no');
+
+                    if(line.startsWith('if')) {
+                        // IF BLOCK
+                        if(yesConn) safeTraverse(yesConn.toNode, indent + 1, [...history, nodeId]);
+                        else output.push(`<div class="code-line">${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent+1)}pass</div>`);
+
+                        if(noConn) {
+                            output.push(`<div class="code-line" onmouseenter="highlight('${node.id}')" onmouseleave="unhighlight('${node.id}')">${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent)}else:</div>`);
+                            safeTraverse(noConn.toNode, indent + 1, [...history, nodeId]);
+                        }
+                    } else {
+                        // WHILE BLOCK
+                        if(yesConn) safeTraverse(yesConn.toNode, indent + 1, [...history, nodeId]);
+                        // The 'No' path is exit of loop
+                        if(noConn) safeTraverse(noConn.toNode, indent, [...history, nodeId]); 
+                    }
+                } else {
+                    const next = connections.find(c => c.fromNode === node.id);
+                    if(next) safeTraverse(next.toNode, indent, [...history, nodeId]);
+                }
+            }
+
+            safeTraverse(startNode.id, 0, []);
+            pyBox.innerHTML = output.join('');
+            
+            // Generate Pseudocode from Python output (simple logic for MVP)
+            psBox.innerHTML = output.map(s => 
+                s.replace('if ', 'IF ').replace('else:', 'ELSE').replace('while ', 'WHILE ').replace('exit()', 'END').replace('# Start Program', 'BEGIN')
+                 .replace('id="code-', 'id="pseudo-') 
+            ).join('');
+        }
+
+        // --- 8. HIGHLIGHTING ---
+        window.highlight = function(id) {
+            const node = document.getElementById(id);
+            const code = document.getElementById(`code-${id}`);
+            const pseudo = document.getElementById(`pseudo-${id}`);
+            if(node) node.style.borderColor = '#e74c3c';
+            if(code) code.style.background = '#444';
+            if(pseudo) pseudo.style.background = '#444';
+        }
+
+        window.unhighlight = function(id) {
+            const node = document.getElementById(id);
+            const code = document.getElementById(`code-${id}`);
+            const pseudo = document.getElementById(`pseudo-${id}`);
+            if(node && id !== selectedNodeId) node.style.borderColor = '#34495e'; 
+            if(code) code.style.background = 'transparent';
+            if(pseudo) pseudo.style.background = 'transparent';
+        }
+
+    </script>
+</body>
+</html>
