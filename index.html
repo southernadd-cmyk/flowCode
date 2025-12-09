@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progranimate V5.2 - Fixed Input</title>
+    <title>Progranimate V5.3 - Loop Logic</title>
     
     <!-- GOOGLE FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -154,7 +154,7 @@
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
                 <i class="fa-solid fa-diagram-project text-primary"></i>
-                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5.2</span>
+                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5.3</span>
             </a>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
@@ -455,8 +455,11 @@
             }
         });
 
-        // --- CODE ---
+        // --- CODE GEN (UPDATED FOR LOOPS) ---
+        let visited = new Set(); // Global visited to prevent recursion loops
+        
         function updateCode() {
+            visited.clear();
             const pyBox = document.getElementById('code-python');
             let lines = [];
             let startNode = nodes.find(n => n.type === 'start');
@@ -466,6 +469,13 @@
 
             function traverse(id, indent, isElif = false) {
                 if(!id) return;
+                
+                // --- LOOP PROTECTION ---
+                // If we hit a node we've already generated code for in this chain, stop.
+                // This prevents the infinite loop while generating code for the 'while' body.
+                if(visited.has(id)) return; 
+                visited.add(id);
+
                 const node = nodes.find(n => n.id === id); if(!node) return;
                 let spaces = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent);
                 let htmlLine = "";
@@ -487,21 +497,53 @@
                     let val = node.text.replace('Print', '').trim();
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="func">print</span>(${val})</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent);
-                } else if(node.type === 'decision') {
+                } 
+                
+                // --- DECISION (IF vs WHILE) ---
+                else if(node.type === 'decision') {
                     let condition = node.text;
-                    let keyword = isElif ? "elif" : "if";
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
-                    lines.push(htmlLine);
-                    const trueNodeId = getNext(node.id, 'yes');
-                    if(trueNodeId) traverse(trueNodeId, indent + 1);
-                    else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
-                    const falseNodeId = getNext(node.id, 'no');
-                    if(falseNodeId) {
-                        const falseNode = nodes.find(n => n.id === falseNodeId);
-                        if(falseNode.type === 'decision') traverse(falseNodeId, indent, true);
-                        else {
-                            lines.push(`<div class="code-line" id="else-${node.id}">${spaces}<span class="keyword">else</span>:</div>`);
-                            traverse(falseNodeId, indent + 1);
+                    condition = condition.replace(/(?<![<>!=])=(?![=])/g, '==');
+                    
+                    const yesConn = connections.find(c => c.from === node.id && c.port === 'yes');
+                    const noConn = connections.find(c => c.from === node.id && c.port === 'no');
+                    
+                    // CHECK FOR WHILE LOOP
+                    // Logic: If 'Yes' target is PHYSICALLY HIGHER than current node, assume loop.
+                    let isLoop = false;
+                    if(yesConn) {
+                        const target = nodes.find(n => n.id === yesConn.to);
+                        if(target && target.y < node.y) isLoop = true;
+                    }
+
+                    if(isLoop) {
+                        // WHILE LOOP
+                        htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">while</span> ${condition}:</div>`;
+                        lines.push(htmlLine);
+                        
+                        // Body (Yes Path)
+                        if(yesConn) traverse(yesConn.to, indent + 1);
+                        else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
+                        
+                        // After Loop (No Path) - We reset visited for this branch? No, linear flow.
+                        if(noConn) traverse(noConn.to, indent);
+                    } else {
+                        // IF / ELIF
+                        let keyword = isElif ? "elif" : "if";
+                        htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
+                        lines.push(htmlLine);
+                        
+                        // Yes Path
+                        if(yesConn) traverse(yesConn.to, indent + 1);
+                        else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
+                        
+                        // No Path (Else)
+                        if(noConn) {
+                            const falseNode = nodes.find(n => n.id === noConn.to);
+                            if(falseNode && falseNode.type === 'decision') traverse(noConn.to, indent, true);
+                            else {
+                                lines.push(`<div class="code-line" id="else-${node.id}">${spaces}<span class="keyword">else</span>:</div>`);
+                                traverse(noConn.to, indent + 1);
+                            }
                         }
                     }
                 }
@@ -611,31 +653,19 @@
         function showInputModal(msg) {
             return new Promise(resolve => {
                 const prompt = document.getElementById('modal-prompt');
-                const input = document.getElementById('modal-input'); // This is the single source of truth now
+                const input = document.getElementById('modal-input');
                 const submit = document.getElementById('modal-submit');
                 
                 prompt.textContent = msg;
-                input.value = ""; // Clear active input
-                
+                input.value = "";
                 bsInputModal.show();
                 
-                // Focus hack
-                document.getElementById('inputModal').addEventListener('shown.bs.modal', () => {
-                    input.focus();
-                }, { once: true });
-
-                const confirm = () => {
-                    const val = input.value; // Read from the ACTIVE input
-                    bsInputModal.hide();
-                    resolve(val);
-                };
+                document.getElementById('inputModal').addEventListener('shown.bs.modal', () => { input.focus(); }, { once: true });
+                const confirm = () => { const val = input.value; bsInputModal.hide(); resolve(val); };
                 
-                // Replace ONLY the submit button to clear listeners, keep input intact
                 const newSubmit = submit.cloneNode(true);
                 submit.parentNode.replaceChild(newSubmit, submit);
                 newSubmit.onclick = confirm;
-
-                // For input Enter key, we just overwrite the property, no need to clone/replace the input element itself
                 input.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
             });
         }
