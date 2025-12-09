@@ -3,187 +3,345 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progranimate V4.1 - Fixed Shapes</title>
+    <title>FlowCode MVP</title>
+    
+    <!-- 1. GOOGLE FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- 2. BOOTSTRAP 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- 3. FONT AWESOME -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
         :root {
-            --bg-canvas: #f4f7f6;
-            --bg-panel: #2b2b2b;
-            --accent: #3498db;
-            --run-color: #2ecc71;
-            --node-border: #34495e;
+            --bg-canvas: #f8f9fa;
+            --node-border: #495057;
+            --accent: #0d6efd;
         }
 
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            height: 100vh; 
+            overflow: hidden; 
+            background-color: #fff;
+        }
 
-        /* --- SIDEBAR --- */
+        /* --- LAYOUT OVERRIDES --- */
+        .wrapper { height: 100vh; display: flex; flex-direction: column; }
+        .main-area { flex: 1; display: flex; overflow: hidden; }
+
+        /* --- SIDEBAR PALETTE --- */
         #palette {
-            width: 200px; background: #fff; border-right: 1px solid #ccc;
-            display: flex; flex-direction: column; align-items: center; padding-top: 10px; z-index: 10;
+            width: 240px;
+            background: #fff;
+            border-right: 1px solid #dee2e6;
+            padding: 20px;
+            z-index: 10;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
         }
-        .palette-label { font-size: 11px; color: #888; margin-top: 10px; margin-bottom: 5px; width: 100%; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
         
-        .palette-item {
-            position: relative; margin-bottom: 5px; cursor: grab; user-select: none;
-            text-align: center; border: 2px solid var(--node-border);
-            display: flex; align-items: center; justify-content: center; font-size: 13px;
-            transition: transform 0.1s;
+        .palette-header {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #adb5bd;
+            font-weight: 700;
+            margin-top: 20px;
+            margin-bottom: 10px;
         }
-        .palette-item:hover { transform: scale(1.05); border-color: var(--accent); }
+
+        /* Palette Items (Visual representation in sidebar) */
+        .palette-item {
+            cursor: grab;
+            user-select: none;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: white;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+        .palette-item:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            color: var(--accent);
+        }
+        .palette-item i { width: 20px; text-align: center; color: #6c757d; }
+        .palette-item:hover i { color: var(--accent); }
 
         /* --- CANVAS --- */
         #canvas {
-            flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
-            background-image: radial-gradient(#d1d1d1 1px, transparent 1px); background-size: 20px 20px;
+            flex: 1;
+            background-color: var(--bg-canvas);
+            position: relative;
+            overflow: hidden;
+            background-image: radial-gradient(#ced4da 1px, transparent 1px);
+            background-size: 20px 20px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* --- RIGHT PANEL --- */
+        /* --- RIGHT PANEL (CODE) --- */
         #output-panel {
-            width: 350px; background: var(--bg-panel); color: #ecf0f1; display: flex; flex-direction: column; border-left: 2px solid #000;
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #dee2e6;
+            background: #212529; /* Dark Mode */
         }
-        .panel-header { padding: 10px; background: #1a1a1a; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         
-        .btn-run { background: var(--run-color); border: none; color: white; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-run:hover { opacity: 0.9; }
-        .btn-stop { background: #e74c3c; display: none; }
+        .panel-toolbar {
+            padding: 10px 15px;
+            background: #151719;
+            border-bottom: 1px solid #343a40;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-title {
+            color: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+        }
 
-        .code-box { flex: 1; padding: 15px; font-family: 'Consolas', monospace; font-size: 13px; overflow-y: auto; white-space: pre; border-bottom: 1px solid #444; }
-        .code-line { min-height: 15px; }
+        .code-display {
+            flex: 1;
+            padding: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #e9ecef;
+            overflow-y: auto;
+            border-bottom: 1px solid #343a40;
+            line-height: 1.6;
+        }
         
-        #console { height: 150px; background: #000; color: #0f0; padding: 10px; font-family: 'Consolas', monospace; overflow-y: auto; border-top: 2px solid #555; }
-        .console-line { margin: 2px 0; }
+        /* Syntax Highlighting Sim */
+        .keyword { color: #d63384; font-weight: bold; } /* Pink for if/else */
+        .func { color: #0d6efd; } /* Blue for print/input */
+        .string { color: #198754; } /* Green */
+        .comment { color: #6c757d; font-style: italic; }
 
-        /* --- NODES --- */
+        #console {
+            height: 180px;
+            background: #000;
+            color: #20c997; /* Teal */
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            overflow-y: auto;
+        }
+
+        /* --- NODES ON CANVAS --- */
         .node {
-            position: absolute; background: white; border: 2px solid var(--node-border);
-            text-align: center; font-size: 13px; user-select: none; cursor: pointer;
-            box-shadow: 2px 4px 6px rgba(0,0,0,0.1); z-index: 2;
-            display: flex; align-items: center; justify-content: center; padding: 5px;
+            position: absolute;
+            background: white;
+            border: 2px solid var(--node-border);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            user-select: none;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); /* Pop style shadow */
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            transition: border-color 0.2s;
         }
-        .node.selected { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
-        .node.running { border-color: #2ecc71; background-color: #e8f8f5; box-shadow: 0 0 15px #2ecc71; transform: scale(1.05); transition: all 0.2s; }
+        .node:hover { border-color: var(--accent); }
+        .node.selected { border-color: #dc3545; box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.2); }
+        .node.running { border-color: #198754; background-color: #d1e7dd; box-shadow: 0 0 15px #198754; transform: scale(1.05); transition: all 0.2s; }
 
-        /* Shapes */
-        .shape-start, .shape-end { border-radius: 20px; background: #d4edda; width: 80px; height: 40px; }
-        .shape-end { background: #f8d7da; }
-        .shape-process { border-radius: 4px; background: #fff3cd; width: 120px; height: 50px; }
-        .shape-decision { width: 100px; height: 80px; background: #d1ecf1; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+        /* SHAPES */
+        .shape-start, .shape-end { border-radius: 25px; background: #fff; border-color: #198754; width: 90px; height: 45px; }
+        .shape-end { border-color: #dc3545; }
+        .shape-process { border-radius: 4px; background: #fff; width: 140px; height: 55px; }
         
-        /* FIXED: Apply parallelogram style to both sidebar class (.shape-io) and canvas classes (.shape-input, .shape-output) */
+        .shape-decision { 
+            width: 110px; height: 90px; 
+            background: #fff; 
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
+            /* Note: Clip-path cuts border, so we fake border with drop-shadow or SVG in a real app, 
+               but for CSS pure, we use a trick or accept simple bg color. 
+               Let's add a pseudo-element border trick for V5 */
+        }
+        /* Visual trick for decision border since clip-path cuts standard borders */
+        .shape-decision::before {
+            content:''; position: absolute; inset:0; background:var(--node-border); 
+            z-index:-1; clip-path: inherit; margin:-2px;
+        }
+
+        /* IO Shapes */
         .shape-io, .shape-input, .shape-output { 
             transform: skew(-20deg); 
-            background: #e2e6ea; 
+            background: #fff; 
             border-radius: 4px; 
-            width: 110px; 
-            height: 50px; 
-            margin-left: 10px; /* Offset slightly to account for skew */
+            width: 130px; 
+            height: 55px; 
+            margin-left: 10px; 
         }
         
-        /* FIXED: Counter-skew text so it stands straight */
         .shape-io .inner-text, 
         .shape-input .inner-text, 
         .shape-output .inner-text { 
             transform: skew(20deg); 
-            width: 100%; 
-            text-align: center; 
-            pointer-events: none;
+            width: 100%; text-align: center; pointer-events: none;
         }
 
-        /* Dots */
-        .dot { width: 10px; height: 10px; background: #555; border-radius: 50%; position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s; }
-        .dot:hover { background: var(--accent); transform: scale(1.3); }
-        /* Reset skew for dots on IO nodes so they don't look squashed */
+        /* DOTS */
+        .dot { 
+            width: 14px; height: 14px; 
+            background: #fff; 
+            border: 2px solid #495057;
+            border-radius: 50%; 
+            position: absolute; 
+            cursor: crosshair; 
+            z-index: 5; 
+            transition: transform 0.2s; 
+        }
+        .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
+        
+        /* Skew Fixes */
         .shape-input .dot, .shape-output .dot { transform: skew(20deg); } 
         .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.3); }
 
-        .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
-        .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
-        .dot.out-yes { bottom: -6px; left: 50%; transform: translateX(-50%); background: #27ae60; }
-        .dot.out-no { right: -6px; top: 50%; transform: translateY(-50%); background: #c0392b; }
+        .dot.in { top: -8px; left: 50%; transform: translateX(-50%); }
+        .dot.out { bottom: -8px; left: 50%; transform: translateX(-50%); }
+        .dot.out-yes { bottom: -8px; left: 50%; transform: translateX(-50%); background: #198754; border-color: #198754; }
+        .dot.out-no { right: -8px; top: 50%; transform: translateY(-50%); background: #dc3545; border-color: #dc3545; }
 
-        /* SVG */
+        /* SVG LINES */
         svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-        path { fill: none; stroke: #555; stroke-width: 2px; }
-        text { font-family: sans-serif; font-size: 11px; font-weight: bold; fill: #555; pointer-events: none; text-shadow: 1px 1px 0 #fff; }
+        text { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; fill: #495057; pointer-events: none; text-shadow: 0px 0px 4px #fff; }
 
-        /* --- MODAL --- */
-        #modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000; display: none;
-            justify-content: center; align-items: center;
-        }
-        #input-modal {
-            background: white; padding: 20px; border-radius: 8px; width: 300px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center;
-        }
-        #modal-prompt { margin-bottom: 15px; font-weight: bold; font-size: 1.1em; }
-        #modal-input { width: 80%; padding: 8px; font-size: 16px; margin-bottom: 15px; }
-        #modal-submit { padding: 8px 20px; background: var(--accent); color: white; border: none; cursor: pointer; font-size: 16px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-    <!-- PALETTE -->
-    <div id="palette">
-        <div class="palette-label">Flow</div>
-        <div class="palette-item shape-start" draggable="true" data-type="start">Start</div>
-        <div class="palette-item shape-end" draggable="true" data-type="end">End</div>
-        
-        <div class="palette-label">I/O</div>
-        <div class="palette-item shape-io" draggable="true" data-type="input">
-            <div class="inner-text">Input x</div>
-        </div>
-        <div class="palette-item shape-io" draggable="true" data-type="output">
-            <div class="inner-text">Print x</div>
-        </div>
-
-        <div class="palette-label">Logic</div>
-        <div class="palette-item shape-process" draggable="true" data-type="process">x = x + 1</div>
-        <div class="palette-item shape-decision" draggable="true" data-type="decision" style="display:flex;align-items:center;justify-content:center;">
-            <span style="font-size:10px;">x < 5</span>
-        </div>
-    </div>
-
-    <!-- CANVAS -->
-    <div id="canvas">
-        <svg id="connections-layer">
-            <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
-                </marker>
-                <marker id="arrow-yes" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#27ae60" />
-                </marker>
-                <marker id="arrow-no" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#c0392b" />
-                </marker>
-            </defs>
-        </svg>
-        <div id="nodes-layer"></div>
-    </div>
-
-    <!-- CODE & CONSOLE -->
-    <div id="output-panel">
-        <div class="panel-header">
-            <span>Generated Python</span>
-            <div>
-                <button id="btn-run" class="btn-run" onclick="runSimulation()">RUN ▶</button>
-                <button id="btn-stop" class="btn-run btn-stop" onclick="stopSimulation()">STOP ■</button>
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="fa-solid fa-diagram-project text-primary"></i>
+                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5</span>
+            </a>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
+                    <i class="fa-solid fa-trash"></i> Clear
+                </button>
             </div>
         </div>
-        <div id="code-python" class="code-box"></div>
-        <div style="background:#333; color:#aaa; font-size:11px; padding:2px 5px;">CONSOLE OUTPUT</div>
-        <div id="console"></div>
-    </div>
+    </nav>
 
-    <!-- INPUT MODAL -->
-    <div id="modal-overlay">
-        <div id="input-modal">
-            <div id="modal-prompt">Enter Value:</div>
-            <input type="text" id="modal-input" autocomplete="off">
-            <br>
-            <button id="modal-submit">Submit</button>
+    <div class="wrapper">
+        <div class="main-area">
+            
+            <!-- SIDEBAR -->
+            <div id="palette">
+                <div class="palette-header">Start / End</div>
+                <div class="palette-item" draggable="true" data-type="start">
+                    <i class="fa-regular fa-circle-play"></i> Start
+                </div>
+                <div class="palette-item" draggable="true" data-type="end">
+                    <i class="fa-regular fa-circle-stop"></i> End
+                </div>
+                
+                <div class="palette-header">I/O</div>
+                <div class="palette-item" draggable="true" data-type="input">
+                    <i class="fa-solid fa-keyboard"></i> Input
+                </div>
+                <div class="palette-item" draggable="true" data-type="output">
+                    <i class="fa-solid fa-terminal"></i> Print
+                </div>
+
+                <div class="palette-header">Logic</div>
+                <div class="palette-item" draggable="true" data-type="process">
+                    <i class="fa-solid fa-gear"></i> Process
+                </div>
+                <div class="palette-item" draggable="true" data-type="decision">
+                    <i class="fa-solid fa-diamond"></i> Decision
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <small class="text-muted" style="font-size:11px;">
+                        Drag items to canvas<br>Double-click to edit<br>Del key to delete
+                    </small>
+                </div>
+            </div>
+
+            <!-- CANVAS -->
+            <div id="canvas">
+                <svg id="connections-layer">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+                        </marker>
+                        <marker id="arrow-yes" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#198754" />
+                        </marker>
+                        <marker id="arrow-no" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#dc3545" />
+                        </marker>
+                    </defs>
+                </svg>
+                <div id="nodes-layer"></div>
+            </div>
+
+            <!-- CODE PANEL -->
+            <div id="output-panel">
+                <div class="panel-toolbar">
+                    <span class="panel-title"><i class="fa-brands fa-python"></i> Python Code</span>
+                    <div>
+                        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
+                            <i class="fa-solid fa-play"></i> RUN
+                        </button>
+                        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
+                            <i class="fa-solid fa-stop"></i> STOP
+                        </button>
+                    </div>
+                </div>
+                <div id="code-python" class="code-display"></div>
+                <div class="bg-black text-white px-2 py-1 small border-top border-secondary d-flex justify-content-between">
+                    <span>TERMINAL</span>
+                    <i class="fa-solid fa-terminal text-muted"></i>
+                </div>
+                <div id="console"></div>
+            </div>
         </div>
     </div>
+
+    <!-- BOOTSTRAP MODAL FOR INPUT -->
+    <div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title"><i class="fa-solid fa-keyboard text-primary"></i> User Input</h5>
+                </div>
+                <div class="modal-body">
+                    <p id="modal-prompt" class="fw-bold mb-2">Enter value:</p>
+                    <input type="text" id="modal-input" class="form-control form-control-lg" autocomplete="off" placeholder="Type here...">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary w-100" id="modal-submit">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS: Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // --- DATA ---
@@ -196,6 +354,9 @@
         const nodesLayer = document.getElementById('nodes-layer');
         const svgLayer = document.getElementById('connections-layer');
         const consoleDiv = document.getElementById('console');
+        
+        // Bootstrap Modal Instance
+        const bsInputModal = new bootstrap.Modal(document.getElementById('inputModal'));
 
         // --- DRAG & DROP CREATION ---
         document.querySelectorAll('.palette-item').forEach(item => {
@@ -210,6 +371,16 @@
             const rect = canvas.getBoundingClientRect();
             createNode(type, e.clientX - rect.left - 50, e.clientY - rect.top - 25);
         });
+
+        function clearCanvas() {
+            if(confirm("Clear all nodes?")) {
+                nodes = [];
+                connections = [];
+                nodesLayer.innerHTML = '';
+                drawConnections();
+                updateCode();
+            }
+        }
 
         // --- NODE FACTORY ---
         function createNode(type, x, y) {
@@ -236,7 +407,7 @@
             el.style.top = node.y + 'px';
 
             let innerHtml = node.text;
-            // Use inner text wrapper for shapes that need skewed text correction
+            // Wrap text for skewed shapes
             if(['decision','io','input','output'].includes(node.type)) {
                 innerHtml = `<div class="inner-text">${node.text}</div>`;
             }
@@ -244,27 +415,34 @@
 
             el.onmousedown = (e) => startDragNode(e, node.id);
             el.ondblclick = () => editNode(node.id);
+            el.onclick = (e) => { e.stopPropagation(); selectNode(node.id); };
             
-            // Ports
+            addPorts(el, node);
+            nodesLayer.appendChild(el);
+        }
+
+        function addPorts(el, node) {
             if(node.type !== 'start') addDot(el, 'in', node.id, 'in');
-            
             if(node.type === 'decision') {
                 addDot(el, 'out-yes', node.id, 'yes');
                 addDot(el, 'out-no', node.id, 'no');
             } else if (node.type !== 'end') {
                 addDot(el, 'out', node.id, 'next');
             }
-
-            nodesLayer.appendChild(el);
         }
 
         function addDot(parent, className, nodeId, portType) {
             const dot = document.createElement('div');
             dot.className = `dot ${className}`;
-            dot.title = portType; 
+            dot.title = portType === 'yes' ? 'True' : (portType==='no'?'False':'Next'); 
             dot.onmousedown = (e) => { e.stopPropagation(); startConnection(nodeId, portType); };
             dot.onmouseup = (e) => { e.stopPropagation(); finishConnection(nodeId); };
             parent.appendChild(dot);
+        }
+
+        function selectNode(id) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            document.getElementById(id).classList.add('selected');
         }
 
         // --- EDITING ---
@@ -283,6 +461,8 @@
                 if(el.querySelector('.inner-text')) el.querySelector('.inner-text').innerText = node.text;
                 else el.innerText = node.text;
 
+                el.querySelectorAll('.dot').forEach(d => d.remove());
+                addPorts(el, node);
                 updateCode();
             }
         }
@@ -296,7 +476,9 @@
             isConnecting = true;
             connStart = { nodeId, portType };
             dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            dragLine.setAttribute('stroke', '#555'); dragLine.setAttribute('stroke-dasharray', '5,5');
+            dragLine.setAttribute('stroke', '#495057'); 
+            dragLine.setAttribute('stroke-dasharray', '5,5');
+            dragLine.setAttribute('stroke-width', '2');
             svgLayer.appendChild(dragLine);
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', abortConnection);
@@ -344,10 +526,10 @@
         }
 
         function drawConnections() {
-            const children = Array.from(svgLayer.childNodes);
-            children.forEach(child => {
-                if(child.tagName !== 'defs') child.remove();
-            });
+            // keep defs
+            const defs = svgLayer.querySelector('defs');
+            svgLayer.innerHTML = '';
+            svgLayer.appendChild(defs);
 
             connections.forEach(c => {
                 const n1 = nodes.find(n=>n.id===c.from);
@@ -363,15 +545,18 @@
                 let x2 = n2.x + el2.offsetWidth/2; 
                 let y2 = n2.y;
 
-                let color = '#555';
+                let color = '#495057';
                 let marker = 'url(#arrowhead)';
-                if(c.port === 'yes') { color = '#27ae60'; marker = 'url(#arrow-yes)'; }
-                if(c.port === 'no') { color = '#c0392b'; marker = 'url(#arrow-no)'; }
+                if(c.port === 'yes') { color = '#198754'; marker = 'url(#arrow-yes)'; }
+                if(c.port === 'no') { color = '#dc3545'; marker = 'url(#arrow-no)'; }
 
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`);
                 path.setAttribute('stroke', color);
+                path.setAttribute('stroke-width', '2');
                 path.setAttribute('marker-end', marker);
+                path.setAttribute('fill', 'none');
+                path.style.cursor = 'pointer';
                 path.onclick = (e) => {
                     e.stopPropagation();
                     if(confirm("Delete this connection?")) {
@@ -407,9 +592,22 @@
                 document.removeEventListener('mousemove', onMouseMove);
                 updateCode(); 
             });
+            selectNode(id);
         }
 
-        window.addEventListener('keydown', (e) => { if(e.key === 'Delete') { /* Todo: impl delete */ } });
+        window.addEventListener('keydown', (e) => {
+            if(e.key === 'Delete' || e.key === 'Backspace') {
+                const selected = document.querySelector('.node.selected');
+                if(selected) {
+                    const id = selected.id;
+                    nodes = nodes.filter(n => n.id !== id);
+                    connections = connections.filter(c => c.from !== id && c.to !== id);
+                    selected.remove();
+                    drawConnections();
+                    updateCode();
+                }
+            }
+        });
 
         // --- CODE GENERATION ---
         function updateCode() {
@@ -418,7 +616,7 @@
             let startNode = nodes.find(n => n.type === 'start');
             
             if(!startNode) {
-                pyBox.innerHTML = "// Add a Start Node"; 
+                pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; 
                 return;
             }
 
@@ -432,16 +630,16 @@
                 const node = nodes.find(n => n.id === id);
                 if(!node) return;
 
-                let spaces = "    ".repeat(indent);
+                let spaces = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent);
                 let htmlLine = "";
 
                 if(node.type === 'start') {
-                    htmlLine = `<div class="code-line" id="code-${node.id}"># Start</div>`;
+                    htmlLine = `<div class="code-line" id="code-${node.id}"><span class="comment"># Program Start</span></div>`;
                     lines.push(htmlLine);
                     traverse(getNext(node.id), indent);
                 }
                 else if(node.type === 'end') {
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}exit()</div>`;
+                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">exit</span>()</div>`;
                     lines.push(htmlLine);
                 }
                 else if(node.type === 'process') {
@@ -451,13 +649,13 @@
                 }
                 else if(node.type === 'input') {
                     let varName = node.text.replace('Input', '').trim();
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${varName} = input()</div>`;
+                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${varName} = <span class="func">input</span>()</div>`;
                     lines.push(htmlLine);
                     traverse(getNext(node.id), indent);
                 }
                 else if(node.type === 'output') {
                     let val = node.text.replace('Print', '').trim();
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}print(${val})</div>`;
+                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="func">print</span>(${val})</div>`;
                     lines.push(htmlLine);
                     traverse(getNext(node.id), indent);
                 }
@@ -465,12 +663,12 @@
                     let condition = node.text;
                     let keyword = isElif ? "elif" : "if";
                     
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${keyword} ${condition}:</div>`;
+                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
                     lines.push(htmlLine);
 
                     const trueNodeId = getNext(node.id, 'yes');
                     if(trueNodeId) traverse(trueNodeId, indent + 1);
-                    else lines.push(`<div class="code-line">${spaces}    pass</div>`);
+                    else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
 
                     const falseNodeId = getNext(node.id, 'no');
                     if(falseNodeId) {
@@ -478,7 +676,7 @@
                         if(falseNode.type === 'decision') {
                             traverse(falseNodeId, indent, true); 
                         } else {
-                            lines.push(`<div class="code-line" id="else-${node.id}">${spaces}else:</div>`);
+                            lines.push(`<div class="code-line" id="else-${node.id}">${spaces}<span class="keyword">else</span>:</div>`);
                             traverse(falseNodeId, indent + 1);
                         }
                     }
@@ -496,7 +694,7 @@
         function log(msg, type='info') {
             const div = document.createElement('div');
             div.className = 'console-line';
-            div.style.color = type==='error'?'#ff4444' : (type==='input'?'#3498db':'#0f0');
+            div.style.color = type==='error'?'#ff4444' : (type==='input'?'#0d6efd':'#20c997');
             div.textContent = `> ${msg}`;
             consoleDiv.appendChild(div);
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
@@ -516,7 +714,7 @@
             document.getElementById('btn-stop').style.display = 'inline-block';
             consoleDiv.innerHTML = ''; 
             runtimeScope = {}; 
-            log("Program Started...");
+            log("Running...");
 
             let currentId = nodes.find(n => n.type === 'start')?.id;
             
@@ -567,8 +765,8 @@
                         const conn = connections.find(c => c.from === node.id && c.port === (result ? 'yes' : 'no'));
                         if(conn) nextId = conn.to;
                         else {
-                            if(result) log("No 'True' path connected!", "error");
-                            else log("No 'False' path connected!", "error");
+                            if(result) log("No 'True' path!", "error");
+                            else log("No 'False' path!", "error");
                             isRunning = false; 
                         }
                     }
@@ -577,7 +775,7 @@
                         if(conn) nextId = conn.to;
                     }
                     else if (node.type === 'end') {
-                        log("Program Ended.");
+                        log("Program Finished.");
                         isRunning = false;
                     }
 
@@ -603,21 +801,34 @@
 
         function showInputModal(msg) {
             return new Promise(resolve => {
-                const overlay = document.getElementById('modal-overlay');
                 const prompt = document.getElementById('modal-prompt');
                 const input = document.getElementById('modal-input');
                 const submit = document.getElementById('modal-submit');
+                
                 prompt.textContent = msg;
                 input.value = "";
-                overlay.style.display = 'flex';
-                input.focus();
+                
+                bsInputModal.show();
+                
+                // Focus input after modal animation
+                document.getElementById('inputModal').addEventListener('shown.bs.modal', () => {
+                    input.focus();
+                }, { once: true });
+
                 const confirm = () => {
                     const val = input.value;
-                    overlay.style.display = 'none';
+                    bsInputModal.hide();
                     resolve(val);
                 };
-                submit.onclick = confirm;
-                input.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
+                
+                // Remove old listeners to prevent stacking
+                const newSubmit = submit.cloneNode(true);
+                submit.parentNode.replaceChild(newSubmit, submit);
+                newSubmit.onclick = confirm;
+
+                const newInput = input.cloneNode(true);
+                input.parentNode.replaceChild(newInput, input);
+                newInput.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
             });
         }
         
