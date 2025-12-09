@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progranimate V5.1 - Bug Fixes</title>
+    <title>Progranimate V5.2 - Fixed Input</title>
     
-    <!-- 1. GOOGLE FONTS -->
+    <!-- GOOGLE FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- 2. BOOTSTRAP 5 CSS -->
+    <!-- BOOTSTRAP 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
-    <!-- 3. FONT AWESOME -->
+    <!-- FONT AWESOME -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -33,7 +33,7 @@
         .wrapper { height: 100vh; display: flex; flex-direction: column; }
         .main-area { flex: 1; display: flex; overflow: hidden; }
 
-        /* --- SIDEBAR PALETTE --- */
+        /* --- SIDEBAR --- */
         #palette {
             width: 240px;
             background: #fff;
@@ -43,132 +43,77 @@
             overflow-y: auto;
             box-shadow: 2px 0 10px rgba(0,0,0,0.05);
         }
-        
         .palette-header {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #adb5bd;
-            font-weight: 700;
-            margin-top: 20px;
-            margin-bottom: 10px;
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
+            color: #adb5bd; font-weight: 700; margin-top: 20px; margin-bottom: 10px;
         }
-
         .palette-item {
-            cursor: grab;
-            user-select: none;
-            margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            background: white;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.9rem;
-            color: #495057;
+            cursor: grab; user-select: none; margin-bottom: 10px; padding: 10px;
+            border: 1px solid #dee2e6; border-radius: 6px; background: white;
+            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+            font-size: 0.9rem; color: #495057;
         }
         .palette-item:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            color: var(--accent);
+            border-color: var(--accent); transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: var(--accent);
         }
         .palette-item i { width: 20px; text-align: center; color: #6c757d; }
         .palette-item:hover i { color: var(--accent); }
 
         /* --- CANVAS --- */
         #canvas {
-            flex: 1;
-            background-color: var(--bg-canvas);
-            position: relative;
-            overflow: hidden;
+            flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
             background-image: radial-gradient(#ced4da 1px, transparent 1px);
             background-size: 20px 20px;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* --- RIGHT PANEL (CODE) --- */
+        /* --- RIGHT PANEL --- */
         #output-panel {
-            width: 400px;
-            display: flex;
-            flex-direction: column;
-            border-left: 1px solid #dee2e6;
-            background: #212529;
+            width: 400px; display: flex; flex-direction: column;
+            border-left: 1px solid #dee2e6; background: #212529;
         }
-        
         .panel-toolbar {
-            padding: 10px 15px;
-            background: #151719;
-            border-bottom: 1px solid #343a40;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 10px 15px; background: #151719; border-bottom: 1px solid #343a40;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        .panel-title {
-            color: #f8f9fa;
-            font-weight: 600;
-            font-size: 0.9rem;
-            letter-spacing: 0.5px;
-        }
-
+        .panel-title { color: #f8f9fa; font-weight: 600; font-size: 0.9rem; letter-spacing: 0.5px; }
         .code-display {
-            flex: 1;
-            padding: 15px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: #e9ecef;
-            overflow-y: auto;
-            border-bottom: 1px solid #343a40;
-            line-height: 1.6;
+            flex: 1; padding: 15px; font-family: 'JetBrains Mono', monospace;
+            font-size: 13px; color: #e9ecef; overflow-y: auto;
+            border-bottom: 1px solid #343a40; line-height: 1.6;
         }
-        
         .keyword { color: #d63384; font-weight: bold; }
         .func { color: #0d6efd; }
         .string { color: #198754; }
         .comment { color: #6c757d; font-style: italic; }
 
         #console {
-            height: 180px;
-            background: #000;
-            color: #20c997;
-            padding: 10px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            overflow-y: auto;
+            height: 180px; background: #000; color: #20c997;
+            padding: 10px; font-family: 'JetBrains Mono', monospace;
+            font-size: 12px; overflow-y: auto;
         }
 
         /* --- NODES --- */
         .node {
-            position: absolute;
-            background: white;
-            border: 2px solid var(--node-border);
-            text-align: center;
-            font-size: 13px;
-            font-weight: 500;
-            user-select: none;
-            cursor: pointer;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
-            z-index: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 5px;
+            position: absolute; background: white; border: 2px solid var(--node-border);
+            text-align: center; font-size: 13px; font-weight: 500;
+            user-select: none; cursor: pointer;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); z-index: 2;
+            display: flex; align-items: center; justify-content: center; padding: 5px;
             transition: border-color 0.2s;
         }
         .node:hover { border-color: var(--accent); }
         .node.selected { border-color: #dc3545; box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.2); }
         .node.running { border-color: #198754; background-color: #d1e7dd; box-shadow: 0 0 15px #198754; transform: scale(1.05); transition: all 0.2s; }
 
-        /* SHAPES */
+        /* Shapes */
         .shape-start, .shape-end { border-radius: 25px; background: #fff; border-color: #198754; width: 90px; height: 45px; }
         .shape-end { border-color: #dc3545; }
         .shape-process { border-radius: 4px; background: #fff; width: 140px; height: 55px; }
         
         .shape-decision { 
-            width: 110px; height: 90px; 
-            background: #fff; 
+            width: 110px; height: 90px; background: #fff; 
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
         }
         .shape-decision::before {
@@ -177,34 +122,19 @@
         }
 
         .shape-io, .shape-input, .shape-output { 
-            transform: skew(-20deg); 
-            background: #fff; 
-            border-radius: 4px; 
-            width: 130px; 
-            height: 55px; 
-            margin-left: 10px; 
+            transform: skew(-20deg); background: #fff; border-radius: 4px; 
+            width: 130px; height: 55px; margin-left: 10px; 
         }
-        
-        .shape-io .inner-text, 
-        .shape-input .inner-text, 
-        .shape-output .inner-text { 
-            transform: skew(20deg); 
-            width: 100%; text-align: center; pointer-events: none;
+        .shape-io .inner-text, .shape-input .inner-text, .shape-output .inner-text { 
+            transform: skew(20deg); width: 100%; text-align: center; pointer-events: none;
         }
 
-        /* DOTS */
+        /* Dots */
         .dot { 
-            width: 14px; height: 14px; 
-            background: #fff; 
-            border: 2px solid #495057;
-            border-radius: 50%; 
-            position: absolute; 
-            cursor: crosshair; 
-            z-index: 5; 
-            transition: transform 0.2s; 
+            width: 14px; height: 14px; background: #fff; border: 2px solid #495057;
+            border-radius: 50%; position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s; 
         }
         .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
-        
         .shape-input .dot, .shape-output .dot { transform: skew(20deg); } 
         .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.3); }
 
@@ -213,7 +143,6 @@
         .dot.out-yes { bottom: -8px; left: 50%; transform: translateX(-50%); background: #198754; border-color: #198754; }
         .dot.out-no { right: -8px; top: 50%; transform: translateY(-50%); background: #dc3545; border-color: #dc3545; }
 
-        /* SVG LINES */
         svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
         text { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; fill: #495057; pointer-events: none; text-shadow: 0px 0px 4px #fff; }
 
@@ -221,12 +150,11 @@
 </head>
 <body>
 
-    <!-- NAVBAR -->
     <nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
                 <i class="fa-solid fa-diagram-project text-primary"></i>
-                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5.1</span>
+                Progranimate <span class="badge bg-primary text-white" style="font-size:0.6rem;">V5.2</span>
             </a>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
@@ -238,82 +166,48 @@
 
     <div class="wrapper">
         <div class="main-area">
-            
-            <!-- SIDEBAR -->
             <div id="palette">
                 <div class="palette-header">Start / End</div>
-                <div class="palette-item" draggable="true" data-type="start">
-                    <i class="fa-regular fa-circle-play"></i> Start
-                </div>
-                <div class="palette-item" draggable="true" data-type="end">
-                    <i class="fa-regular fa-circle-stop"></i> End
-                </div>
-                
+                <div class="palette-item" draggable="true" data-type="start"><i class="fa-regular fa-circle-play"></i> Start</div>
+                <div class="palette-item" draggable="true" data-type="end"><i class="fa-regular fa-circle-stop"></i> End</div>
                 <div class="palette-header">I/O</div>
-                <div class="palette-item" draggable="true" data-type="input">
-                    <i class="fa-solid fa-keyboard"></i> Input
-                </div>
-                <div class="palette-item" draggable="true" data-type="output">
-                    <i class="fa-solid fa-terminal"></i> Print
-                </div>
-
+                <div class="palette-item" draggable="true" data-type="input"><i class="fa-solid fa-keyboard"></i> Input</div>
+                <div class="palette-item" draggable="true" data-type="output"><i class="fa-solid fa-terminal"></i> Print</div>
                 <div class="palette-header">Logic</div>
-                <div class="palette-item" draggable="true" data-type="process">
-                    <i class="fa-solid fa-gear"></i> Process
-                </div>
-                <div class="palette-item" draggable="true" data-type="decision">
-                    <i class="fa-solid fa-diamond"></i> Decision
-                </div>
-                
-                <div class="mt-4 text-center">
-                    <small class="text-muted" style="font-size:11px;">
-                        Drag items to canvas<br>Double-click to edit<br>Del key to delete
-                    </small>
-                </div>
+                <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-gear"></i> Process</div>
+                <div class="palette-item" draggable="true" data-type="decision"><i class="fa-solid fa-diamond"></i> Decision</div>
+                <div class="mt-4 text-center"><small class="text-muted" style="font-size:11px;">Drag items to canvas<br>Double-click to edit<br>Del key to delete</small></div>
             </div>
 
-            <!-- CANVAS -->
             <div id="canvas">
                 <svg id="connections-layer">
                     <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
-                        </marker>
-                        <marker id="arrow-yes" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#198754" />
-                        </marker>
-                        <marker id="arrow-no" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#dc3545" />
-                        </marker>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker>
+                        <marker id="arrow-yes" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#198754" /></marker>
+                        <marker id="arrow-no" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#dc3545" /></marker>
                     </defs>
                 </svg>
                 <div id="nodes-layer"></div>
             </div>
 
-            <!-- CODE PANEL -->
             <div id="output-panel">
                 <div class="panel-toolbar">
                     <span class="panel-title"><i class="fa-brands fa-python"></i> Python Code</span>
                     <div>
-                        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
-                            <i class="fa-solid fa-play"></i> RUN
-                        </button>
-                        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
-                            <i class="fa-solid fa-stop"></i> STOP
-                        </button>
+                        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()"><i class="fa-solid fa-play"></i> RUN</button>
+                        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop"></i> STOP</button>
                     </div>
                 </div>
                 <div id="code-python" class="code-display"></div>
                 <div class="bg-black text-white px-2 py-1 small border-top border-secondary d-flex justify-content-between">
-                    <span>TERMINAL</span>
-                    <i class="fa-solid fa-terminal text-muted"></i>
+                    <span>TERMINAL</span><i class="fa-solid fa-terminal text-muted"></i>
                 </div>
                 <div id="console"></div>
             </div>
         </div>
     </div>
 
-    <!-- BOOTSTRAP MODAL FOR INPUT -->
+    <!-- MODAL -->
     <div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -331,7 +225,6 @@
         </div>
     </div>
 
-    <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
@@ -340,14 +233,13 @@
         let connections = [];
         let nextId = 1;
         
-        // --- UI REFS ---
         const canvas = document.getElementById('canvas');
         const nodesLayer = document.getElementById('nodes-layer');
         const svgLayer = document.getElementById('connections-layer');
         const consoleDiv = document.getElementById('console');
         const bsInputModal = new bootstrap.Modal(document.getElementById('inputModal'));
 
-        // --- DRAG & DROP CREATION ---
+        // --- DRAG & DROP ---
         document.querySelectorAll('.palette-item').forEach(item => {
             item.addEventListener('dragstart', (e) => e.dataTransfer.setData('type', item.dataset.type));
         });
@@ -363,15 +255,11 @@
 
         function clearCanvas() {
             if(confirm("Clear all nodes?")) {
-                nodes = [];
-                connections = [];
-                nodesLayer.innerHTML = '';
-                drawConnections();
-                updateCode();
+                nodes = []; connections = []; nodesLayer.innerHTML = ''; drawConnections(); updateCode();
             }
         }
 
-        // --- NODE FACTORY ---
+        // --- NODES ---
         function createNode(type, x, y) {
             const id = `node-${nextId++}`;
             let text = "";
@@ -396,9 +284,7 @@
             el.style.top = node.y + 'px';
 
             let innerHtml = node.text;
-            if(['decision','io','input','output'].includes(node.type)) {
-                innerHtml = `<div class="inner-text">${node.text}</div>`;
-            }
+            if(['decision','io','input','output'].includes(node.type)) innerHtml = `<div class="inner-text">${node.text}</div>`;
             el.innerHTML = innerHtml;
 
             el.onmousedown = (e) => startDragNode(e, node.id);
@@ -422,7 +308,7 @@
         function addDot(parent, className, nodeId, portType) {
             const dot = document.createElement('div');
             dot.className = `dot ${className}`;
-            dot.title = portType === 'yes' ? 'True' : (portType==='no'?'False':'Next'); 
+            dot.title = portType; 
             dot.onmousedown = (e) => { e.stopPropagation(); startConnection(nodeId, portType); };
             dot.onmouseup = (e) => { e.stopPropagation(); finishConnection(nodeId); };
             parent.appendChild(dot);
@@ -433,7 +319,6 @@
             document.getElementById(id).classList.add('selected');
         }
 
-        // --- EDITING ---
         function editNode(id) {
             const node = nodes.find(n => n.id === id);
             let promptText = "Edit Text:";
@@ -456,17 +341,12 @@
         }
 
         // --- CONNECTIONS ---
-        let dragLine = null;
-        let isConnecting = false;
-        let connStart = null;
+        let dragLine = null; let isConnecting = false; let connStart = null;
 
         function startConnection(nodeId, portType) {
-            isConnecting = true;
-            connStart = { nodeId, portType };
+            isConnecting = true; connStart = { nodeId, portType };
             dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            dragLine.setAttribute('stroke', '#495057'); 
-            dragLine.setAttribute('stroke-dasharray', '5,5');
-            dragLine.setAttribute('stroke-width', '2');
+            dragLine.setAttribute('stroke', '#495057'); dragLine.setAttribute('stroke-dasharray', '5,5'); dragLine.setAttribute('stroke-width', '2');
             svgLayer.appendChild(dragLine);
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', abortConnection);
@@ -477,13 +357,9 @@
                 const rect = canvas.getBoundingClientRect();
                 const startNode = nodes.find(n => n.id === connStart.nodeId);
                 const el = document.getElementById(connStart.nodeId);
-                
-                let sx = startNode.x + el.offsetWidth/2;
-                let sy = startNode.y + el.offsetHeight;
+                let sx = startNode.x + el.offsetWidth/2; let sy = startNode.y + el.offsetHeight;
                 if(connStart.portType === 'no') { sx = startNode.x + el.offsetWidth; sy = startNode.y + el.offsetHeight/2; }
-                
-                const ex = e.clientX - rect.left;
-                const ey = e.clientY - rect.top;
+                const ex = e.clientX - rect.left; const ey = e.clientY - rect.top;
                 dragLine.setAttribute('d', `M ${sx} ${sy} L ${ex} ${ey}`);
             } else if (dragNodeId) {
                 const rect = canvas.getBoundingClientRect();
@@ -500,8 +376,7 @@
             if(isConnecting && connStart.nodeId !== targetId) {
                 connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
                 connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
-                drawConnections();
-                updateCode();
+                drawConnections(); updateCode();
             }
             abortConnection();
         }
@@ -515,35 +390,25 @@
 
         function drawConnections() {
             const defs = svgLayer.querySelector('defs');
-            svgLayer.innerHTML = '';
-            svgLayer.appendChild(defs);
+            svgLayer.innerHTML = ''; svgLayer.appendChild(defs);
 
             connections.forEach(c => {
-                const n1 = nodes.find(n=>n.id===c.from);
-                const n2 = nodes.find(n=>n.id===c.to);
-                const el1 = document.getElementById(c.from);
-                const el2 = document.getElementById(c.to);
+                const n1 = nodes.find(n=>n.id===c.from); const n2 = nodes.find(n=>n.id===c.to);
+                const el1 = document.getElementById(c.from); const el2 = document.getElementById(c.to);
                 if(!el1 || !el2) return;
 
-                let x1 = n1.x + el1.offsetWidth/2; 
-                let y1 = n1.y + el1.offsetHeight;
+                let x1 = n1.x + el1.offsetWidth/2; let y1 = n1.y + el1.offsetHeight;
                 if(c.port === 'no') { x1 = n1.x + el1.offsetWidth; y1 = n1.y + el1.offsetHeight/2; }
+                let x2 = n2.x + el2.offsetWidth/2; let y2 = n2.y;
 
-                let x2 = n2.x + el2.offsetWidth/2; 
-                let y2 = n2.y;
-
-                let color = '#495057';
-                let marker = 'url(#arrowhead)';
+                let color = '#495057'; let marker = 'url(#arrowhead)';
                 if(c.port === 'yes') { color = '#198754'; marker = 'url(#arrow-yes)'; }
                 if(c.port === 'no') { color = '#dc3545'; marker = 'url(#arrow-no)'; }
 
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`);
-                path.setAttribute('stroke', color);
-                path.setAttribute('stroke-width', '2');
-                path.setAttribute('marker-end', marker);
-                path.setAttribute('fill', 'none');
-                path.style.cursor = 'pointer';
+                path.setAttribute('stroke', color); path.setAttribute('stroke-width', '2');
+                path.setAttribute('marker-end', marker); path.setAttribute('fill', 'none'); path.style.cursor = 'pointer';
                 path.onclick = (e) => {
                     e.stopPropagation();
                     if(confirm("Delete this connection?")) {
@@ -564,9 +429,7 @@
             });
         }
 
-        // --- NODE DRAGGING ---
-        let dragNodeId = null;
-        let dragOffset = {x:0, y:0};
+        let dragNodeId = null; let dragOffset = {x:0, y:0};
         function startDragNode(e, id) {
             if(e.target.classList.contains('dot')) return;
             dragNodeId = id;
@@ -575,9 +438,7 @@
             dragOffset.y = e.clientY - node.y - canvas.getBoundingClientRect().top;
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', () => {
-                dragNodeId = null; 
-                document.removeEventListener('mousemove', onMouseMove);
-                updateCode(); 
+                dragNodeId = null; document.removeEventListener('mousemove', onMouseMove); updateCode();
             });
             selectNode(id);
         }
@@ -589,87 +450,62 @@
                     const id = selected.id;
                     nodes = nodes.filter(n => n.id !== id);
                     connections = connections.filter(c => c.from !== id && c.to !== id);
-                    selected.remove();
-                    drawConnections();
-                    updateCode();
+                    selected.remove(); drawConnections(); updateCode();
                 }
             }
         });
 
-        // --- CODE GENERATION ---
+        // --- CODE ---
         function updateCode() {
             const pyBox = document.getElementById('code-python');
             let lines = [];
             let startNode = nodes.find(n => n.type === 'start');
-            
-            if(!startNode) {
-                pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; 
-                return;
-            }
+            if(!startNode) { pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; return; }
 
-            function getNext(id, port) {
-                const c = connections.find(cx => cx.from === id && (!port || cx.port === port));
-                return c ? c.to : null;
-            }
+            function getNext(id, port) { const c = connections.find(cx => cx.from === id && (!port || cx.port === port)); return c ? c.to : null; }
 
             function traverse(id, indent, isElif = false) {
                 if(!id) return;
-                const node = nodes.find(n => n.id === id);
-                if(!node) return;
-
+                const node = nodes.find(n => n.id === id); if(!node) return;
                 let spaces = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent);
                 let htmlLine = "";
 
                 if(node.type === 'start') {
                     htmlLine = `<div class="code-line" id="code-${node.id}"><span class="comment"># Program Start</span></div>`;
-                    lines.push(htmlLine);
-                    traverse(getNext(node.id), indent);
-                }
-                else if(node.type === 'end') {
+                    lines.push(htmlLine); traverse(getNext(node.id), indent);
+                } else if(node.type === 'end') {
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">exit</span>()</div>`;
                     lines.push(htmlLine);
-                }
-                else if(node.type === 'process') {
+                } else if(node.type === 'process') {
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${node.text}</div>`;
-                    lines.push(htmlLine);
-                    traverse(getNext(node.id), indent);
-                }
-                else if(node.type === 'input') {
+                    lines.push(htmlLine); traverse(getNext(node.id), indent);
+                } else if(node.type === 'input') {
                     let varName = node.text.replace('Input', '').trim();
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${varName} = <span class="func">input</span>()</div>`;
-                    lines.push(htmlLine);
-                    traverse(getNext(node.id), indent);
-                }
-                else if(node.type === 'output') {
+                    lines.push(htmlLine); traverse(getNext(node.id), indent);
+                } else if(node.type === 'output') {
                     let val = node.text.replace('Print', '').trim();
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="func">print</span>(${val})</div>`;
-                    lines.push(htmlLine);
-                    traverse(getNext(node.id), indent);
-                }
-                else if(node.type === 'decision') {
+                    lines.push(htmlLine); traverse(getNext(node.id), indent);
+                } else if(node.type === 'decision') {
                     let condition = node.text;
                     let keyword = isElif ? "elif" : "if";
-                    
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
                     lines.push(htmlLine);
-
                     const trueNodeId = getNext(node.id, 'yes');
                     if(trueNodeId) traverse(trueNodeId, indent + 1);
                     else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
-
                     const falseNodeId = getNext(node.id, 'no');
                     if(falseNodeId) {
                         const falseNode = nodes.find(n => n.id === falseNodeId);
-                        if(falseNode.type === 'decision') {
-                            traverse(falseNodeId, indent, true); 
-                        } else {
+                        if(falseNode.type === 'decision') traverse(falseNodeId, indent, true);
+                        else {
                             lines.push(`<div class="code-line" id="else-${node.id}">${spaces}<span class="keyword">else</span>:</div>`);
                             traverse(falseNodeId, indent + 1);
                         }
                     }
                 }
             }
-
             traverse(startNode.id, 0);
             pyBox.innerHTML = lines.join('');
         }
@@ -683,8 +519,7 @@
             div.className = 'console-line';
             div.style.color = type==='error'?'#ff4444' : (type==='input'?'#0d6efd':'#20c997');
             div.textContent = `> ${msg}`;
-            consoleDiv.appendChild(div);
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            consoleDiv.appendChild(div); consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
 
         function stopSimulation() {
@@ -707,94 +542,64 @@
             
             while(currentId && isRunning) {
                 const node = nodes.find(n => n.id === currentId);
-                
                 document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
                 const el = document.getElementById(currentId);
                 if(el) el.classList.add('running');
-
                 await new Promise(r => setTimeout(r, 600));
                 if(!isRunning) break;
 
                 let nextId = null;
-                
                 try {
-                    // --- PROCESS NODE (Assignment) ---
                     if(node.type === 'process') {
-                        // FIX 1: Split on the first '=' only to support logic in RHS (e.g. check = x >= 5)
                         const eqIndex = node.text.indexOf('=');
                         if(eqIndex !== -1) {
                             const varName = node.text.substring(0, eqIndex).trim();
                             const exprText = node.text.substring(eqIndex + 1).trim();
-                            
-                            // FIX 2: Evaluate raw expression (no auto == replacement)
                             const val = evaluateExpression(exprText);
                             runtimeScope[varName] = val;
                             log(`${varName} = ${val}`);
                         }
-                        const conn = connections.find(c => c.from === node.id);
-                        if(conn) nextId = conn.to;
+                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
                     } 
-                    
                     else if (node.type === 'input') {
                         const varName = node.text.replace('Input', '').trim();
                         const userInput = await showInputModal(`Enter value for ${varName}:`);
                         const num = Number(userInput);
                         runtimeScope[varName] = isNaN(num) ? userInput : num;
                         log(`Input: ${runtimeScope[varName]}`, 'input');
-                        const conn = connections.find(c => c.from === node.id);
-                        if(conn) nextId = conn.to;
+                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
                     }
-                    
                     else if (node.type === 'output') {
                         const expr = node.text.replace('Print', '').replace('print', '').replace(/[()]/g,'').trim();
                         if(expr.startsWith('"') || expr.startsWith("'")) log(expr.replace(/['"]/g, ''));
                         else log(evaluateExpression(expr));
-                        const conn = connections.find(c => c.from === node.id);
-                        if(conn) nextId = conn.to;
+                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
                     }
-                    
-                    // --- DECISION NODE ---
                     else if (node.type === 'decision') {
                         let condition = node.text;
-                        
-                        // FIX 3: Smart Replacement only for Decision Nodes
-                        // Replaces '=' with '==' only if not preceded by <,>,!, and not followed by =
-                        // Matches "x = 5" -> "x == 5"
-                        // Ignores "x >= 5", "x <= 5", "x != 5", "x == 5"
                         condition = condition.replace(/(?<![<>!=])=(?![=])/g, '==');
-
                         const result = evaluateExpression(condition);
                         log(`Condition (${node.text}) is ${result}`);
                         const conn = connections.find(c => c.from === node.id && c.port === (result ? 'yes' : 'no'));
                         if(conn) nextId = conn.to;
-                        else {
-                            if(result) log("No 'True' path!", "error");
-                            else log("No 'False' path!", "error");
-                            isRunning = false; 
-                        }
+                        else { isRunning = false; if(result) log("No True path!", "error"); else log("No False path!", "error"); }
                     }
                     else if (node.type === 'start') {
-                        const conn = connections.find(c => c.from === node.id);
-                        if(conn) nextId = conn.to;
+                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
                     }
                     else if (node.type === 'end') {
-                        log("Program Finished.");
-                        isRunning = false;
+                        log("Program Finished."); isRunning = false;
                     }
-
                 } catch (err) {
-                    log(`Error: ${err.message}`, "error");
-                    isRunning = false;
+                    log(`Error: ${err.message}`, "error"); isRunning = false;
                 }
                 currentId = nextId;
             }
             stopSimulation();
         }
 
-        // FIX 4: Generic evaluator no longer replaces = with ==
         function evaluateExpression(expr) {
             let parsed = expr;
-            // Variable substitution
             Object.keys(runtimeScope).sort((a,b)=>b.length-a.length).forEach(key => {
                 const val = runtimeScope[key];
                 const regex = new RegExp(`\\b${key}\\b`, 'g');
@@ -806,31 +611,32 @@
         function showInputModal(msg) {
             return new Promise(resolve => {
                 const prompt = document.getElementById('modal-prompt');
-                const input = document.getElementById('modal-input');
+                const input = document.getElementById('modal-input'); // This is the single source of truth now
                 const submit = document.getElementById('modal-submit');
                 
                 prompt.textContent = msg;
-                input.value = "";
+                input.value = ""; // Clear active input
                 
                 bsInputModal.show();
                 
+                // Focus hack
                 document.getElementById('inputModal').addEventListener('shown.bs.modal', () => {
                     input.focus();
                 }, { once: true });
 
                 const confirm = () => {
-                    const val = input.value;
+                    const val = input.value; // Read from the ACTIVE input
                     bsInputModal.hide();
                     resolve(val);
                 };
                 
+                // Replace ONLY the submit button to clear listeners, keep input intact
                 const newSubmit = submit.cloneNode(true);
                 submit.parentNode.replaceChild(newSubmit, submit);
                 newSubmit.onclick = confirm;
 
-                const newInput = input.cloneNode(true);
-                input.parentNode.replaceChild(newInput, input);
-                newInput.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
+                // For input Enter key, we just overwrite the property, no need to clone/replace the input element itself
+                input.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
             });
         }
         
