@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowchart to Python Builder</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --node-bg: #ffffff;
+            --accent: #2c3e50;
+            --highlight: #e74c3c;
+        }
+        
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- LEFT: CANVAS --- */
+        #canvas-container {
+            flex: 2;
+            background-color: var(--bg-color);
+            position: relative;
+            overflow: hidden;
+            border-right: 2px solid #ccc;
+            background-image: radial-gradient(#ccc 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* SVG Layer for arrows */
+        #svg-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass through to nodes */
+            z-index: 0;
+        }
+
+        /* Flowchart Nodes */
+        .node {
+            position: absolute;
+            min-width: 100px;
+            padding: 10px;
+            background: var(--node-bg);
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            cursor: move;
+            text-align: center;
+            user-select: none;
+            z-index: 1;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+
+        .node.start { border-radius: 20px; background: #d4edda; border-color: #155724; }
+        .node.process { border-radius: 4px; background: #fff3cd; border-color: #856404; }
+        .node.decision { transform: rotate(0deg); border-radius: 0; background: #d1ecf1; border-color: #0c5460; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); padding: 15px 25px; }
+        .node.end { border-radius: 20px; background: #f8d7da; border-color: #721c24; }
+
+        .node:hover { box-shadow: 0 0 10px var(--accent); }
+        .node.active-highlight { border-color: var(--highlight); box-shadow: 0 0 15px var(--highlight); }
+
+        /* --- RIGHT: CODE PANEL --- */
+        #code-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #282c34;
+            color: white;
+            padding: 0;
+        }
+
+        .panel-header { padding: 15px; background: #21252b; font-weight: bold; border-bottom: 1px solid #444; }
+        
+        .code-display {
+            flex: 1;
+            padding: 20px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            overflow-y: auto;
+            white-space: pre;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .code-line { display: block; padding: 2px 5px; border-radius: 4px; }
+        .code-line:hover { background-color: rgba(255,255,255,0.1); cursor: pointer; }
+        .code-line.active-highlight { background-color: rgba(231, 76, 60, 0.4); border-left: 3px solid var(--highlight); }
+
+        .comment { color: #888; font-style: italic; margin-bottom: 10px; display: block; }
+        
+        /* Controls */
+        #controls { position: absolute; top: 10px; left: 10px; z-index: 10; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        button { padding: 5px 10px; cursor: pointer; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Canvas Area -->
+    <div id="canvas-container">
+        <div id="controls">
+            <strong>Drag nodes to move.</strong><br>
+            <small>Logic is hardcoded for this demo to show "Progranimate" style linking.</small>
+        </div>
+        
+        <!-- SVG for Lines -->
+        <svg id="svg-layer">
+            <!-- Lines will be injected here by JS -->
+        </svg>
+
+        <!-- Nodes (Hardcoded for demo, but can be dynamic) -->
+        <div class="node start" id="node-1" style="top: 50px; left: 150px;">Start</div>
+        
+        <div class="node process" id="node-2" style="top: 150px; left: 130px;" 
+             data-code="user_age = int(input('Enter age: '))" 
+             data-pseudo="GET user_age FROM USER">
+             Input Age
+        </div>
+
+        <div class="node decision" id="node-3" style="top: 250px; left: 110px;" 
+             data-code="if user_age >= 18:" 
+             data-pseudo="IF user_age >= 18 THEN">
+             Age >= 18?
+        </div>
+
+        <div class="node process" id="node-4" style="top: 400px; left: 50px;" 
+             data-code="    print('Access Granted')" 
+             data-pseudo="    OUTPUT 'Access Granted'">
+             Print "Yes"
+        </div>
+
+        <div class="node process" id="node-5" style="top: 400px; left: 250px;" 
+             data-code="    print('Access Denied')" 
+             data-pseudo="    OUTPUT 'Access Denied'">
+             Print "No"
+        </div>
+
+        <div class="node end" id="node-6" style="top: 500px; left: 150px;"
+             data-code="# End Program"
+             data-pseudo="END">
+             End
+        </div>
+    </div>
+
+    <!-- Code Output Area -->
+    <div id="code-panel">
+        <div class="panel-header">Python Output</div>
+        <div id="python-output" class="code-display"></div>
+        
+        <div class="panel-header" style="border-top: 1px solid #444;">Pseudocode Output</div>
+        <div id="pseudo-output" class="code-display"></div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION: Define the Logic Flow ---
+        // In a full app, you would calculate this based on arrow connections.
+        // Here, we map the flow explicitly for the MVP.
+        const flowData = [
+            { id: 'node-1', indent: 0, code: '# Program Start', pseudo: 'BEGIN' },
+            { id: 'node-2', indent: 0 },
+            { id: 'node-3', indent: 0 },
+            { id: 'node-4', indent: 1 }, // Indented because it follows decision YES
+            { id: 'node-5', indent: 1, prefixCode: 'else:', prefixPseudo: 'ELSE' }, // Indented, follows decision NO
+            { id: 'node-6', indent: 0 }
+        ];
+
+        // Connection Map (Start Node ID -> End Node ID) for drawing arrows
+        const connections = [
+            { from: 'node-1', to: 'node-2' },
+            { from: 'node-2', to: 'node-3' },
+            { from: 'node-3', to: 'node-4', label: 'Yes' },
+            { from: 'node-3', to: 'node-5', label: 'No' },
+            { from: 'node-4', to: 'node-6' },
+            { from: 'node-5', to: 'node-6' }
+        ];
+
+        // --- 2. GENERATE CODE ---
+        function generateOutput() {
+            const pyContainer = document.getElementById('python-output');
+            const psContainer = document.getElementById('pseudo-output');
+            
+            pyContainer.innerHTML = '';
+            psContainer.innerHTML = '';
+
+            flowData.forEach(item => {
+                const el = document.getElementById(item.id);
+                if(!el) return;
+
+                // 1. Handle "Else" blocks or special prefixes
+                if(item.prefixCode) {
+                    const preDiv = document.createElement('div');
+                    preDiv.className = 'code-line';
+                    preDiv.textContent = item.prefixCode;
+                    // Highlight the PARENT decision node when hovering 'else'
+                    preDiv.onmouseover = () => highlight(item.id, true); 
+                    preDiv.onmouseout = () => highlight(item.id, false);
+                    pyContainer.appendChild(preDiv);
+                }
+                if(item.prefixPseudo) {
+                    const preDiv = document.createElement('div');
+                    preDiv.className = 'code-line';
+                    preDiv.textContent = item.prefixPseudo;
+                    psContainer.appendChild(preDiv);
+                }
+
+                // 2. Get data from HTML attributes
+                let pyText = el.getAttribute('data-code');
+                let psText = el.getAttribute('data-pseudo');
+
+                if(!pyText && !item.code) return; // Skip if no code (e.g. pure connector)
+
+                // 3. Create Python Line
+                const pyLine = document.createElement('span');
+                pyLine.className = 'code-line';
+                pyLine.id = `code-${item.id}`;
+                // Apply Indentation
+                // const indent = "    ".repeat(item.indent);
+                pyLine.textContent = item.code || pyText; // raw text already has indent in data-attr for this demo
+                
+                // 4. Create Pseudocode Line
+                const psLine = document.createElement('span');
+                psLine.className = 'code-line';
+                psLine.id = `pseudo-${item.id}`;
+                psLine.textContent = item.pseudo || psText;
+
+                // 5. Add Interactions (The Progranimate Effect)
+                const addHover = (domLine) => {
+                    domLine.onmouseover = () => highlight(item.id, true);
+                    domLine.onmouseout = () => highlight(item.id, false);
+                    
+                    // Allow clicking code to flash the node
+                    domLine.onclick = () => {
+                        highlight(item.id, true);
+                        setTimeout(() => highlight(item.id, false), 500);
+                    };
+                };
+
+                addHover(pyLine);
+                addHover(psLine);
+
+                pyContainer.appendChild(pyLine);
+                psContainer.appendChild(psLine);
+            });
+        }
+
+        // --- 3. BI-DIRECTIONAL HIGHLIGHTING ---
+        function highlight(nodeId, isActive) {
+            const node = document.getElementById(nodeId);
+            const code = document.getElementById(`code-${nodeId}`);
+            const pseudo = document.getElementById(`pseudo-${nodeId}`);
+
+            const action = isActive ? 'add' : 'remove';
+            
+            if(node) node.classList[action]('active-highlight');
+            if(code) code.classList[action]('active-highlight');
+            if(pseudo) pseudo.classList[action]('active-highlight');
+        }
+
+        // Attach listeners to graphical nodes
+        document.querySelectorAll('.node').forEach(node => {
+            node.onmouseover = () => highlight(node.id, true);
+            node.onmouseout = () => highlight(node.id, false);
+        });
+
+        // --- 4. DRAG AND DROP LOGIC ---
+        let draggedEl = null;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        document.querySelectorAll('.node').forEach(el => {
+            el.onmousedown = function(e) {
+                draggedEl = el;
+                offsetX = e.clientX - el.getBoundingClientRect().left;
+                offsetY = e.clientY - el.getBoundingClientRect().top;
+                el.style.zIndex = 100;
+            };
+        });
+
+        document.onmousemove = function(e) {
+            if (draggedEl) {
+                draggedEl.style.left = (e.clientX - offsetX) + 'px';
+                draggedEl.style.top = (e.clientY - offsetY) + 'px';
+                drawArrows(); // Update arrows while dragging
+            }
+        };
+
+        document.onmouseup = function() {
+            if(draggedEl) draggedEl.style.zIndex = 1;
+            draggedEl = null;
+        };
+
+        // --- 5. ARROW DRAWING (Simple SVG) ---
+        function drawArrows() {
+            const svg = document.getElementById('svg-layer');
+            svg.innerHTML = ''; // Clear lines
+
+            connections.forEach(conn => {
+                const startEl = document.getElementById(conn.from);
+                const endEl = document.getElementById(conn.to);
+
+                if(startEl && endEl) {
+                    const startRect = startEl.getBoundingClientRect();
+                    const endRect = endEl.getBoundingClientRect();
+
+                    // Calculate centers
+                    const x1 = startRect.left + startRect.width / 2;
+                    const y1 = startRect.top + startRect.height / 2;
+                    const x2 = endRect.left + endRect.width / 2;
+                    const y2 = endRect.top + endRect.height / 2;
+
+                    // Create line
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x1);
+                    line.setAttribute('y1', y1);
+                    line.setAttribute('x2', x2);
+                    line.setAttribute('y2', y2);
+                    line.setAttribute('stroke', '#555');
+                    line.setAttribute('stroke-width', '2');
+                    line.setAttribute('marker-end', 'url(#arrowhead)');
+                    
+                    svg.appendChild(line);
+                }
+            });
+            
+            // Add Arrow Marker Definition
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+                </marker>`;
+            svg.appendChild(defs);
+        }
+
+        // Initialize
+        drawArrows();
+        generateOutput();
+        window.onresize = drawArrows;
+
+    </script>
+</body>
+</html>
