@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progranimate V4 - Logic & Labels</title>
+    <title>Progranimate V4.1 - Fixed Shapes</title>
     <style>
         :root {
             --bg-canvas: #f4f7f6;
@@ -67,12 +67,34 @@
         .shape-end { background: #f8d7da; }
         .shape-process { border-radius: 4px; background: #fff3cd; width: 120px; height: 50px; }
         .shape-decision { width: 100px; height: 80px; background: #d1ecf1; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-        .shape-io { transform: skew(-20deg); background: #e2e6ea; border-radius: 4px; width: 110px; height: 50px; margin-left: 10px; }
-        .shape-io .inner-text { transform: skew(20deg); width: 100%; text-align: center; }
+        
+        /* FIXED: Apply parallelogram style to both sidebar class (.shape-io) and canvas classes (.shape-input, .shape-output) */
+        .shape-io, .shape-input, .shape-output { 
+            transform: skew(-20deg); 
+            background: #e2e6ea; 
+            border-radius: 4px; 
+            width: 110px; 
+            height: 50px; 
+            margin-left: 10px; /* Offset slightly to account for skew */
+        }
+        
+        /* FIXED: Counter-skew text so it stands straight */
+        .shape-io .inner-text, 
+        .shape-input .inner-text, 
+        .shape-output .inner-text { 
+            transform: skew(20deg); 
+            width: 100%; 
+            text-align: center; 
+            pointer-events: none;
+        }
 
         /* Dots */
         .dot { width: 10px; height: 10px; background: #555; border-radius: 50%; position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s; }
         .dot:hover { background: var(--accent); transform: scale(1.3); }
+        /* Reset skew for dots on IO nodes so they don't look squashed */
+        .shape-input .dot, .shape-output .dot { transform: skew(20deg); } 
+        .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.3); }
+
         .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
         .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
         .dot.out-yes { bottom: -6px; left: 50%; transform: translateX(-50%); background: #27ae60; }
@@ -214,8 +236,9 @@
             el.style.top = node.y + 'px';
 
             let innerHtml = node.text;
+            // Use inner text wrapper for shapes that need skewed text correction
             if(['decision','io','input','output'].includes(node.type)) {
-                innerHtml = `<div class="inner-text" style="pointer-events:none;">${node.text}</div>`;
+                innerHtml = `<div class="inner-text">${node.text}</div>`;
             }
             el.innerHTML = innerHtml;
 
@@ -321,7 +344,6 @@
         }
 
         function drawConnections() {
-            // Clear existing lines AND labels
             const children = Array.from(svgLayer.childNodes);
             children.forEach(child => {
                 if(child.tagName !== 'defs') child.remove();
@@ -341,7 +363,6 @@
                 let x2 = n2.x + el2.offsetWidth/2; 
                 let y2 = n2.y;
 
-                // Color coding paths
                 let color = '#555';
                 let marker = 'url(#arrowhead)';
                 if(c.port === 'yes') { color = '#27ae60'; marker = 'url(#arrow-yes)'; }
@@ -360,11 +381,9 @@
                 };
                 svgLayer.appendChild(path);
 
-                // --- ADD LABELS (True/False) ---
                 if(c.port === 'yes' || c.port === 'no') {
                     const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                     label.textContent = c.port === 'yes' ? 'True' : 'False';
-                    // Position label near the start of the line
                     label.setAttribute('x', x1 + (c.port==='no'? 10 : 5));
                     label.setAttribute('y', y1 + (c.port==='yes'? 20 : -5));
                     label.setAttribute('fill', color);
@@ -392,16 +411,11 @@
 
         window.addEventListener('keydown', (e) => { if(e.key === 'Delete') { /* Todo: impl delete */ } });
 
-        // ==========================================
-        // === SMART CODE GENERATION (IF/ELSE/ELIF) ===
-        // ==========================================
+        // --- CODE GENERATION ---
         function updateCode() {
             const pyBox = document.getElementById('code-python');
             let lines = [];
             let startNode = nodes.find(n => n.type === 'start');
-            
-            // To prevent infinite loops in code GEN, we track history in recursion
-            // but we reset it for disjoint branches
             
             if(!startNode) {
                 pyBox.innerHTML = "// Add a Start Node"; 
@@ -421,7 +435,6 @@
                 let spaces = "    ".repeat(indent);
                 let htmlLine = "";
 
-                // 1. GENERATE LINE TEXT
                 if(node.type === 'start') {
                     htmlLine = `<div class="code-line" id="code-${node.id}"># Start</div>`;
                     lines.push(htmlLine);
@@ -455,26 +468,16 @@
                     htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${keyword} ${condition}:</div>`;
                     lines.push(htmlLine);
 
-                    // True Branch
                     const trueNodeId = getNext(node.id, 'yes');
-                    if(trueNodeId) {
-                        traverse(trueNodeId, indent + 1);
-                    } else {
-                        lines.push(`<div class="code-line">${spaces}    pass</div>`);
-                    }
+                    if(trueNodeId) traverse(trueNodeId, indent + 1);
+                    else lines.push(`<div class="code-line">${spaces}    pass</div>`);
 
-                    // False Branch (Handle Else vs Elif)
                     const falseNodeId = getNext(node.id, 'no');
                     if(falseNodeId) {
                         const falseNode = nodes.find(n => n.id === falseNodeId);
-                        
-                        // CHECK FOR ELIF: Is the next node a Decision too?
-                        // (And ensure it's not a loop going back up - rough heuristic by ID or Y pos)
                         if(falseNode.type === 'decision') {
-                            // It is an ELIF!
-                            traverse(falseNodeId, indent, true); // Pass true for isElif
+                            traverse(falseNodeId, indent, true); 
                         } else {
-                            // Standard ELSE
                             lines.push(`<div class="code-line" id="else-${node.id}">${spaces}else:</div>`);
                             traverse(falseNodeId, indent + 1);
                         }
@@ -486,10 +489,7 @@
             pyBox.innerHTML = lines.join('');
         }
 
-
-        // ==========================================
-        // === INTERPRETER (RUN SIMULATION) ===
-        // ==========================================
+        // --- SIMULATION ---
         let isRunning = false;
         let runtimeScope = {}; 
 
@@ -525,10 +525,7 @@
                 
                 document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
                 const el = document.getElementById(currentId);
-                if(el) {
-                    el.classList.add('running');
-                    // Add code highlighting here if desired
-                }
+                if(el) el.classList.add('running');
 
                 await new Promise(r => setTimeout(r, 600));
                 if(!isRunning) break;
@@ -624,9 +621,7 @@
             });
         }
         
-        // Init
         createNode('start', 50, 50);
-
     </script>
 </body>
 </html>
