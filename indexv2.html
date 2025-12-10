@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode - Python Engine</title>
+    <title>FlowCode - Pure Python View</title>
     
     <!-- FONTS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -96,7 +96,7 @@
             background: #fff;
             border-bottom: 1px solid #dee2e6; line-height: 1.6;
             min-height: 100px; 
-            white-space: pre; /* Important for python indentation display */
+            white-space: pre; 
         }
         
         .keyword { color: #d63384; font-weight: bold; }
@@ -223,8 +223,7 @@
                 <div class="mt-auto p-2 bg-light border rounded text-center">
                     <small class="text-muted" style="font-size:10px;">
                         <strong>Engine Features:</strong><br>
-                        Supports <code>import random</code><br>
-                        <code>import math</code>, Lists, etc.
+                        Supports <code>random</code>, Lists, etc.
                     </small>
                 </div>
             </div>
@@ -240,7 +239,7 @@
 
             <div id="output-panel">
                 <div class="panel-toolbar">
-                    <span class="panel-title"><i class="fa-brands fa-python"></i> Python 3 (Skulpt)</span>
+                    <span class="panel-title"><i class="fa-brands fa-python"></i> Python 3</span>
                     <div>
                         <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()"><i class="fa-solid fa-play me-1"></i> RUN</button>
                         <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop me-1"></i> STOP</button>
@@ -292,7 +291,6 @@
         const bsInputModal = new bootstrap.Modal(document.getElementById('inputModal'));
 
         // --- SKULPT CONFIG ---
-        // We define a builtin function for Skulpt to call to highlight nodes
         function builtinRead(x) {
             if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
                 throw "File not found: '" + x + "'";
@@ -598,7 +596,7 @@
             }
         });
 
-        // --- CODE GENERATOR (With Trace Injection) ---
+        // --- CODE GENERATOR (SEPARATE DISPLAY VS EXEC) ---
         let generatedCode = "";
         let visited = new Set();
         let skipNodes = new Set(); 
@@ -607,13 +605,16 @@
             visited.clear();
             skipNodes.clear();
             const pyBox = document.getElementById('code-python');
-            let lines = [];
             
-            // Inject imports for Skulpt
-            lines.push('<span class="keyword">import</span> <span class="func">time</span>');
-            lines.push('<span class="keyword">import</span> <span class="func">random</span>');
-            lines.push('<span class="keyword">import</span> <span class="func">math</span>');
-            lines.push('');
+            // We now build TWO versions of the code
+            let displayHtml = []; // Pure Python for user
+            let execCode = [];    // Python + Trace Logic for Skulpt
+
+            // Execution Preamble (Hidden from User)
+            execCode.push("import time");
+            execCode.push("import random");
+            execCode.push("import math");
+            execCode.push("");
 
             let startNode = nodes.find(n => n.type === 'start');
             if(!startNode) { pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; return; }
@@ -670,10 +671,8 @@
                 return `not (${cond})`;
             }
 
-            // Generate Highlighter Call (Hidden in Python string, visible in execution)
             function getTraceCall(id) {
-                // We use a special function `highlight_node` that we will register in Skulpt
-                return `<span class="func">highlight_node</span>('<span class="string">${id}</span>'); <span class="func">time</span>.<span class="func">sleep</span>(0.5)`;
+                return `highlight_node('${id}'); time.sleep(0.5)`;
             }
 
             function traverse(id, indent, stopNodeId = null) {
@@ -691,29 +690,43 @@
                 let trace = getTraceCall(node.id);
 
                 if(node.type === 'start') {
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
-                    lines.push(`<div class="code-line"><span class="comment"># Flow Start</span></div>`);
+                    // Exec: Trace
+                    execCode.push(`${spaces}${trace}`);
+                    // Display: Comment
+                    displayHtml.push(`<div class="code-line"><span class="comment"># Flow Start</span></div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
                 } 
                 else if(node.type === 'end') {
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
-                    lines.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`);
+                    // Exec: Trace + Exit
+                    execCode.push(`${spaces}${trace}`);
+                    execCode.push(`${spaces}exit()`);
+                    // Display: Exit
+                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`);
                 } 
                 else if(node.type === 'process') {
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
-                    lines.push(`<div class="code-line">${spaces}${node.text}</div>`);
+                    // Exec: Trace + Code
+                    execCode.push(`${spaces}${trace}`);
+                    execCode.push(`${spaces}${node.text}`);
+                    // Display: Code
+                    displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
                 } 
                 else if(node.type === 'input') {
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
+                    // Exec: Trace + Code
+                    execCode.push(`${spaces}${trace}`);
                     let varName = node.text.replace(/Input/i, '').trim();
-                    lines.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>("${varName}: "))</div>`);
+                    execCode.push(`${spaces}${varName} = int(input("${varName}: "))`);
+                    // Display: Code
+                    displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>("${varName}: "))</div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
                 } 
                 else if(node.type === 'output') {
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
+                    // Exec: Trace + Code
+                    execCode.push(`${spaces}${trace}`);
                     let val = node.text.replace(/Print/i, '').trim();
-                    lines.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
+                    execCode.push(`${spaces}print(${val})`);
+                    // Display: Code
+                    displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
                 } 
                 else if(node.type === 'decision') {
@@ -723,8 +736,8 @@
                     let isYesLoop = yesId && pathExists(yesId, node.id);
                     let isNoLoop = noId && pathExists(noId, node.id);
 
-                    // Add trace for decision itself
-                    lines.push(`<div class="code-line">${spaces}${trace}</div>`);
+                    // Exec: Trace the decision node
+                    execCode.push(`${spaces}${trace}`);
 
                     if(isYesLoop || isNoLoop) {
                         let loopCondition = condition;
@@ -734,49 +747,70 @@
                         if(isYesLoop) { forLoopData = detectForLoop(node.id); }
 
                         if(forLoopData) {
-                            // For loop logic
-                            lines.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${forLoopData.varName} <span class="keyword">in</span> <span class="func">range</span>(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):</div>`);
+                            // For Loop
+                            let loopLine = `for ${forLoopData.varName} in range(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):`;
+                            
+                            // Exec
+                            execCode.push(`${spaces}${loopLine}`);
+                            
+                            // Display
+                            displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${forLoopData.varName} <span class="keyword">in</span> <span class="func">range</span>(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):</div>`);
+
                             skipNodes.add(forLoopData.incrementNodeId);
                             if(loopBodyId === forLoopData.incrementNodeId) {
-                                lines.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
+                                execCode.push(`${spaces}    pass`);
+                                displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
                             } else {
                                 traverse(loopBodyId, indent + 1, node.id); 
                             }
                             if(afterLoopId) traverse(afterLoopId, indent, stopNodeId);
                         } else {
-                            // While loop logic
+                            // While Loop
                             if(isNoLoop) {
                                 loopCondition = invertCondition(condition);
                                 loopBodyId = noId;
                                 afterLoopId = yesId;
                             }
-                            lines.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
+                            let loopLine = `while ${loopCondition}:`;
+                            
+                            // Exec
+                            execCode.push(`${spaces}${loopLine}`);
+                            // Display
+                            displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
+                            
                             if(loopBodyId) traverse(loopBodyId, indent + 1, node.id); 
                             if(afterLoopId) traverse(afterLoopId, indent, stopNodeId); 
                         }
                     } else {
                         // If/Else
-                        lines.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`);
+                        // Exec
+                        execCode.push(`${spaces}if ${condition}:`);
+                        // Display
+                        displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`);
+
                         if(yesId) traverse(yesId, indent + 1, stopNodeId);
-                        else lines.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
+                        else {
+                            execCode.push(`${spaces}    pass`);
+                            displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
+                        }
                         
                         if(noId) {
-                            lines.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
+                            // Exec
+                            execCode.push(`${spaces}else:`);
+                            // Display
+                            displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
                             traverse(noId, indent + 1, stopNodeId);
                         }
                     }
                 }
             }
             traverse(startNode.id, 0);
-            pyBox.innerHTML = lines.join('');
             
-            // Generate raw text for execution (strip HTML tags)
-            generatedCode = lines.map(line => {
-                // Create a temporary element to strip HTML
-                let tmp = document.createElement("DIV");
-                tmp.innerHTML = line;
-                return tmp.textContent || tmp.innerText || "";
-            }).join("\n");
+            // 1. Set Display
+            pyBox.innerHTML = displayHtml.join('');
+            
+            // 2. Set Execution Code (Hidden)
+            generatedCode = execCode.join("\n");
         }
 
         // --- SKULPT EXECUTION ---
@@ -786,7 +820,7 @@
             const div = document.createElement('div');
             div.style.marginBottom = '4px';
             div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
-            div.textContent = msg; // Skulpt sends raw text usually
+            div.textContent = msg; 
             consoleDiv.appendChild(div); 
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
@@ -811,9 +845,8 @@
             document.getElementById('btn-stop').style.display = 'inline-block';
             consoleDiv.innerHTML = ''; 
             
-            updateCode(); // Ensure code is fresh
+            updateCode(); 
             
-            // Configure Skulpt
             Sk.configure({
                 output: function(text) { if(text !== '\n') log(text); },
                 read: builtinRead,
@@ -829,14 +862,12 @@
                 inputFunTakesPrompt: true
             });
 
-            // Register our custom highlight function
             Sk.builtins.highlight_node = function(id) {
-                highlightNode(id.v); // .v gets value from Skulpt string object
+                highlightNode(id.v); 
                 return Sk.builtin.none.none$;
             };
 
             try {
-                // Run the code!
                 await Sk.misceval.asyncToPromise(function() {
                     return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
                 });
@@ -875,9 +906,13 @@
             });
         }
         
-        // Initial Nodes
         createNode('start', 50, 40);
         createNode('process', 50, 160); 
+        createNode('output', 300, 260); 
+        connections.push({from: nodes[0].id, port: 'next', to: nodes[1].id});
+        connections.push({from: nodes[1].id, port: 'next', to: nodes[2].id});
+        drawConnections();
+        updateCode();
         
     </script>
 </body>
