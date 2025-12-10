@@ -290,78 +290,80 @@
     const svgLayer = document.getElementById('connections-layer');
     const consoleDiv = document.getElementById('console');
 
-    // --- 2. SKULPT CONFIGURATION (Global & Forced) ---
+    // --- 2. SKULPT CONFIGURATION (GLOBAL) ---
+    // We configure this immediately so Skulpt knows not to use window.prompt
     function builtinRead(x) {
         if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
             throw "File not found: '" + x + "'";
         return Sk.builtinFiles["files"][x];
     }
 
-    // Force Skulpt to use our modal by overriding the defaults directly
-    // This runs immediately when the page loads.
     Sk.configure({
         output: function(text) { 
             if(text !== '\n') log(text); 
         },
         read: builtinRead,
+        // This function overrides the default browser prompt
         inputFun: function(promptText) {
-            // This is the function Skulpt calls for input()
             return new Promise(function(resolve) {
-                // Ensure the prompt text exists
+                // Determine the prompt message
                 const msg = promptText || "Input required:";
-                log(msg, "input"); // Print prompt to console too
+                log(msg, "input"); // Echo prompt to our console
                 
-                // Show our Custom Modal
+                // Call our custom modal function
                 showInputModal(msg).then(function(result) {
-                    log(result, "input"); // Print user answer
-                    resolve(result);      // Give answer back to Python
+                    log(result, "input"); // Echo result to our console
+                    resolve(result);      // Resume Python execution
                 });
             });
         },
-        inputFunTakesPrompt: true // CRITICAL: Tells Skulpt to pass the string to us
+        inputFunTakesPrompt: true // Critical: tells Skulpt to pass the prompt string to us
     });
 
-    // --- 3. MODAL LOGIC (Safe Version) ---
+    // --- 3. MODAL LOGIC (Robust Version) ---
     function showInputModal(msg) {
         return new Promise(resolve => {
-            // Get elements freshly to avoid stale references
             const modalEl = document.getElementById('inputModal');
             const promptEl = document.getElementById('modal-prompt');
             const inputEl = document.getElementById('modal-input');
             const submitEl = document.getElementById('modal-submit');
             
-            // Initialize Bootstrap Modal safely
-            const bsModal = new bootstrap.Modal(modalEl, {backdrop: 'static', keyboard: false});
-
-            // Set Text
+            // 1. Set content
             promptEl.textContent = msg;
             inputEl.value = "";
 
-            // Show
-            bsModal.show();
+            // 2. Manage Bootstrap Instance
+            // We use getOrCreateInstance to avoid "Instance already exists" errors
+            let bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
             
-            // Focus Input (slight delay for animation)
-            setTimeout(() => inputEl.focus(), 200);
-
-            // Handle Submit
-            const finish = () => { 
+            // 3. Define Clean-up & Resolve Function
+            const finish = () => {
                 const val = inputEl.value;
                 bsModal.hide();
-                // Destroy the instance to prevent backdrop glitches
-                bsModal.dispose(); 
-                resolve(val); 
+                resolve(val);
+                // Remove listeners to prevent stacking if called in a loop
+                cleanup(); 
             };
-            
-            // Re-bind buttons (cloning removes old event listeners)
-            const newSubmit = submitEl.cloneNode(true);
-            submitEl.parentNode.replaceChild(newSubmit, submitEl);
-            newSubmit.onclick = finish;
-            
-            const newInput = inputEl.cloneNode(true);
-            inputEl.parentNode.replaceChild(newInput, inputEl);
-            newInput.onkeydown = (e) => { 
-                if(e.key === 'Enter') finish(); 
+
+            const handleKey = (e) => {
+                if(e.key === 'Enter') finish();
+            }
+
+            const cleanup = () => {
+                submitEl.removeEventListener('click', finish);
+                inputEl.removeEventListener('keydown', handleKey);
+                // Focus back on body so keyboard shortcuts don't get stuck in the hidden modal
+                document.body.focus();
             };
+
+            // 4. Bind Events
+            submitEl.addEventListener('click', finish);
+            inputEl.addEventListener('keydown', handleKey);
+
+            // 5. Show and Focus
+            bsModal.show();
+            // Wait for modal transition to finish before focusing input
+            setTimeout(() => inputEl.focus(), 500);
         });
     }
 
@@ -458,7 +460,7 @@
         
         const newText = prompt(promptText, node.text);
         if(newText) {
-            // Auto-correct prefixes
+            // Auto-correct prefixes for display logic
             if(node.type === 'input' && !newText.toLowerCase().startsWith('input')) node.text = "Input " + newText;
             else if (node.type === 'output' && !newText.toLowerCase().startsWith('print')) node.text = "Print " + newText;
             else node.text = newText;
@@ -772,7 +774,6 @@
                 displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
                 traverse(getNext(node.id), indent, stopNodeId);
             } 
-            // UPDATED INPUT LOGIC
             else if(node.type === 'input') {
                 execCode.push(`${spaces}${trace}`);
                 let cleanText = node.text.replace(/^Input\s+/i, '').trim();
@@ -896,9 +897,7 @@
         
         updateCode(); 
         
-        // Note: Sk.configure is now handled globally at the top of the script
-        // to prevent it from being ignored or overwritten.
-
+        // Define internal helper for visualization
         Sk.builtins.highlight_node = function(id) {
             highlightNode(id.v); 
             return Sk.builtin.none.none$;
