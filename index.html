@@ -738,7 +738,7 @@ Sk.configure({
             return false;
         }
 
-    function detectForLoop(decisionId) {
+function detectForLoop(decisionId) {
             const decisionNode = nodes.find(n => n.id === decisionId);
             const cond = decisionNode.text;
             
@@ -747,45 +747,76 @@ Sk.configure({
             if(!matchVar) return null;
             const varName = matchVar[1];
 
-            // 2. Find Initialization (Must be a parent pointing TO the decision)
-            // e.g., "x = 0"
-            const parents = connections.filter(c => c.to === decisionId).map(c => nodes.find(n => n.id === c.from));
-            const initNode = parents.find(p => p.type === 'process' && (p.text.trim().startsWith(varName + ' =') || p.text.trim().startsWith(varName + '=')));
-            
-            if (!initNode) return null;
+            // 2. Identify the Start of the Loop Body
+            // In a loop, the "Yes" branch usually points to the first instruction of the repeated block.
+            const loopStartId = getNext(decisionId, 'yes'); 
+            if (!loopStartId) return null;
 
-            // 3. Find Increment (Search the "Yes" loop path)
-            // We traverse down the "Yes" path to see if we find "x = x + 1" anywhere before hitting the decision again
+            // 3. Find Increment (Search the path from LoopStart -> Decision)
+            // We traverse the loop to find "x = x + 1"
             let incNode = null;
-            
-            // Start following the "Yes" (or loop) path
-            let currentNodeId = getNext(decisionId, 'yes'); 
-            
-            // Safety: Prevent infinite search with a max depth or visited set
+            let curr = loopStartId;
             let visited = new Set();
-            visited.add(decisionId);
-
-            while (currentNodeId && !visited.has(currentNodeId)) {
-                visited.add(currentNodeId);
-                const node = nodes.find(n => n.id === currentNodeId);
-                
-                // Check if this node is the incrementor
-                if (node.type === 'process') {
-                    const parts = node.text.split('=');
-                    if(parts.length > 1) {
-                         const left = parts[0].trim();
-                         const right = parts[1].trim();
-                         // Check for pattern: x = x + ...
-                         if (left === varName && right.includes(varName) && right.includes('+')) {
-                             incNode = node;
-                             break; // Found it!
-                         }
+            
+            // Allow searching up to 10 nodes deep to prevent crashes
+            let steps = 0;
+            while(curr && curr !== decisionId && steps < 10) {
+                const n = nodes.find(n => n.id === curr);
+                // Check if this node looks like an incrementor
+                if(n.type === 'process') {
+                    const parts = n.text.split('=');
+                    if(parts.length > 1 && parts[0].trim() === varName && parts[1].includes(varName) && parts[1].includes('+')) {
+                        incNode = n;
                     }
                 }
-                
-                // Move to next node
-                currentNodeId = getNext(currentNodeId);
+                curr = getNext(curr); 
+                steps++;
             }
+            
+            // Fallback: Sometimes the incrementor IS the parent of the decision (even if we missed it in traverse)
+            if (!incNode) {
+                 const parents = connections.filter(c => c.to === decisionId).map(c=>nodes.find(n=>n.id===c.from));
+                 incNode = parents.find(n => n.type === 'process' && n.text.split('=')[0].trim() === varName && n.text.includes('+'));
+            }
+            
+            if (!incNode) return null;
+
+            // 4. Find Initialization (The tricky part)
+            // Strategy: Look at parents of the Loop Start. One parent is the Decision (loop back), 
+            // the other parent should be the Initialization (coming from outside).
+            
+            // Find all nodes pointing TO the Loop Start
+            const loopStartParents = connections.filter(c => c.to === loopStartId).map(c => nodes.find(n => n.id === c.from));
+            
+            // Find a parent that is NOT the decision node, and sets "x = ..."
+            let initNode = loopStartParents.find(n => 
+                n.id !== decisionId && 
+                n.type === 'process' && 
+                (n.text.trim().startsWith(varName + ' =') || n.text.trim().startsWith(varName + '='))
+            );
+
+            // Special Case: If the loop checks at the top (Init -> Decision -> Body), 
+            // then the Init node is a parent of the Decision, not the Body.
+            if (!initNode) {
+                 const decisionParents = connections.filter(c => c.to === decisionId).map(c => nodes.find(n => n.id === c.from));
+                 initNode = decisionParents.find(n => 
+                    n.id !== incNode.id && // Don't mistake the increment loop-back for the init
+                    n.type === 'process' && 
+                    (n.text.trim().startsWith(varName + ' =') || n.text.trim().startsWith(varName + '='))
+                );
+            }
+
+            if (!initNode) return null;
+
+            // 5. Extract Values for Python range(start, stop, step)
+            const startVal = initNode.text.split('=')[1].trim();
+            const stepParts = incNode.text.split('+');
+            const stepVal = stepParts[1] ? stepParts[1].trim() : '1';
+            const stopParts = cond.match(/[<>=]+\s*(.+)/);
+            const stopVal = stopParts ? stopParts[1].trim() : '10';
+
+            return { varName, start: startVal, stop: stopVal, step: stepVal, incrementNodeId: incNode.id };
+        }
 
             if(!incNode) return null; // No increment found in the loop
 
