@@ -922,26 +922,32 @@ else if(node.type === 'input') {
 
         function showInputModal(msg) {
             return new Promise(resolve => {
-                const prompt = document.getElementById('modal-prompt');
-                const input = document.getElementById('modal-input');
-                const submit = document.getElementById('modal-submit');
+                const promptEl = document.getElementById('modal-prompt');
+                const inputEl = document.getElementById('modal-input');
+                const submitEl = document.getElementById('modal-submit');
                 
-                prompt.textContent = msg || "Enter value:";
-                input.value = "";
-                bsInputModal.show();
+                // SAFETY: Initialize the modal right here, when needed
+                const modalEl = document.getElementById('inputModal');
+                const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl); 
+
+                promptEl.textContent = msg || "Enter value:";
+                inputEl.value = "";
                 
-                const newInput = input.cloneNode(true);
-                input.parentNode.replaceChild(newInput, input);
+                bsModal.show(); // Show it
+                
+                // Clone input to remove old event listeners
+                const newInput = inputEl.cloneNode(true);
+                inputEl.parentNode.replaceChild(newInput, inputEl);
                 setTimeout(() => newInput.focus(), 100);
 
                 const confirm = () => { 
                     const val = newInput.value; 
-                    bsInputModal.hide(); 
+                    bsModal.hide(); 
                     resolve(val); 
                 };
                 
-                const newSubmit = submit.cloneNode(true);
-                submit.parentNode.replaceChild(newSubmit, submit);
+                const newSubmit = submitEl.cloneNode(true);
+                submitEl.parentNode.replaceChild(newSubmit, submitEl);
                 newSubmit.onclick = confirm;
                 newInput.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
             });
