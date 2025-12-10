@@ -43,6 +43,7 @@
             padding: 20px;
             z-index: 10;
             overflow-y: auto;
+            display: flex; flex-direction: column;
             box-shadow: 2px 0 10px rgba(0,0,0,0.05);
         }
         .palette-header {
@@ -75,18 +76,22 @@
             border-left: 1px solid #dee2e6; background: #fff;
             box-shadow: -4px 0 15px rgba(0,0,0,0.05);
             z-index: 10;
+            height: 100%; /* Ensure full height */
         }
         .panel-toolbar {
             padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #dee2e6;
             display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; /* Prevent shrinking */
         }
         .panel-title { color: #212529; font-weight: 700; font-size: 0.9rem; }
         
         .code-display {
-            flex: 1; padding: 15px; font-family: 'JetBrains Mono', monospace;
+            flex: 1; /* Takes available space */
+            padding: 15px; font-family: 'JetBrains Mono', monospace;
             font-size: 13px; color: #212529; overflow-y: auto;
             background: #fff;
             border-bottom: 1px solid #dee2e6; line-height: 1.6;
+            min-height: 100px; /* Minimum height for code */
         }
         
         .keyword { color: #d63384; font-weight: bold; }
@@ -94,19 +99,27 @@
         .string { color: #198754; }
         .comment { color: #6c757d; font-style: italic; }
 
+        /* Fixed Console Layout */
         #console-container {
-            height: 220px; background: var(--console-bg); display: flex; flex-direction: column;
+            height: 250px; /* Fixed height for console area */
+            background: var(--console-bg); 
+            display: flex; flex-direction: column;
+            flex-shrink: 0; /* Don't shrink below 250px */
         }
         #console-header {
             padding: 5px 10px; background: #000; color: #fff; font-size: 11px; font-weight: bold;
             border-top: 1px solid #444; display: flex; justify-content: space-between;
+            flex-shrink: 0;
         }
         #console {
-            flex: 1; color: #f8f9fa;
+            flex: 1; 
+            color: #f8f9fa;
             padding: 10px; 
-            padding-bottom: 40px; 
             font-family: 'JetBrains Mono', monospace;
-            font-size: 12px; overflow-y: auto;
+            font-size: 12px; 
+            overflow-y: auto;
+            /* Ensure bottom text isn't cut off */
+            padding-bottom: 30px; 
         }
 
         /* --- NODES --- */
@@ -126,20 +139,9 @@
         .node.running { background-color: #fff3cd; border-color: #ffc107; box-shadow: 0 0 10px #ffc107; z-index: 100; }
 
         /* --- SHAPES --- */
+        .shape-start, .shape-end { width: 120px; height: 50px; border-radius: 25px; }
+        .shape-process { width: 140px; height: 60px; border-radius: 4px; }
         
-        /* Start/End: Capsule (Rounded Rectangle) */
-        .shape-start, .shape-end { 
-            width: 120px; height: 50px; 
-            border-radius: 25px; 
-        }
-
-        /* Process: Rectangle */
-        .shape-process { 
-            width: 140px; height: 60px; 
-            border-radius: 4px; 
-        }
-        
-        /* Decision: Diamond (Rotated Square) */
         .shape-decision { 
             width: 100px; height: 100px; 
             border-radius: 0px; 
@@ -151,16 +153,14 @@
             font-size: 12px; line-height: 1.2;
         }
 
-        /* Input/Output: Parallelogram (Skewed) */
         .shape-io, .shape-input, .shape-output { 
             width: 140px; height: 60px; 
             transform: skew(-20deg); 
             border-radius: 2px;
-            margin-left: 10px; /* Offset for visual balance */
+            margin-left: 10px; 
         }
         .shape-io .inner-text, .shape-input .inner-text, .shape-output .inner-text { 
-            transform: skew(20deg); /* Counter skew text */
-            width: 100%; pointer-events: none;
+            transform: skew(20deg); width: 100%; pointer-events: none;
         }
 
         /* Dots/Ports */
@@ -170,25 +170,17 @@
         }
         .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.5); }
 
-        /* Dot Positions - Standard */
-        
-        /* Normal Rects (Process, Start, End) */
+        /* Dot Positions */
         .shape-process .dot.in, .shape-start .dot.in, .shape-end .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
         .shape-process .dot.out, .shape-start .dot.out, .shape-end .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
 
-        /* Skewed Shapes (Input/Output) */
-        /* Note: Parent is skewed -20deg. We skew dots back 20deg so they look round */
         .shape-input .dot, .shape-output .dot { transform: skew(20deg); }
         .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.5); }
         .shape-input .dot.in, .shape-output .dot.in { top: -6px; left: 50%; margin-left: -5px; } 
         .shape-input .dot.out, .shape-output .dot.out { bottom: -6px; left: 50%; margin-left: -5px; }
 
-        /* Decision (Rotated 45deg) */
-        /* Top Left Corner of div = Visual Top */
         .shape-decision .dot.in { top: -6px; left: -6px; } 
-        /* Bottom Right Corner of div = Visual Bottom */
         .shape-decision .dot.out-yes { bottom: -6px; right: -6px; background: #198754; border-color: #198754; } 
-        /* Top Right Corner of div = Visual Right */
         .shape-decision .dot.out-no { top: -6px; right: -6px; background: #dc3545; border-color: #dc3545; }
 
         svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
@@ -225,10 +217,10 @@
                 <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-gear"></i> Process</div>
                 <div class="palette-item" draggable="true" data-type="decision"><i class="fa-solid fa-diamond"></i> Decision</div>
                 
-                <div class="mt-4 p-2 bg-light border rounded text-center">
+                <div class="mt-auto p-2 bg-light border rounded text-center">
                     <small class="text-muted" style="font-size:10px;">
                         <strong>For Loop Tip:</strong><br>
-                        Init &rarr; Decision &rarr; Action &rarr; Inc &rarr; Loop back
+                        Init &rarr; Decision &rarr; (Yes) Inc &rarr; Loop back
                     </small>
                 </div>
             </div>
@@ -464,22 +456,17 @@
             let x = node.x; let y = node.y;
 
             if(node.type === 'decision') {
-                // Diamond shape (Rotated 45deg)
-                // Visual Top = Top Left corner of div
-                // Visual Bottom = Bottom Right corner of div
-                // Visual Right = Top Right corner of div
                 const dotClass = (type==='yes'?'out-yes':(type==='no'?'out-no':(type==='next'?'out':'in')));
                 const dot = el.querySelector(`.dot.${dotClass}`);
                 if(!dot) return {x: node.x + w/2, y: node.y + h/2};
                 
                 const r = dot.getBoundingClientRect();
                 const c = canvas.getBoundingClientRect();
-                return { x: r.left - c.left + 5, y: r.top - c.top + 5 }; // +5 center
+                return { x: r.left - c.left + 5, y: r.top - c.top + 5 }; 
             } 
             else {
-                // Rects, Capsules, Parallelograms (Visual center is approx geometric center)
                 if(type === 'in') return { x: x + w/2, y: y };
-                return { x: x + w/2, y: y + h }; // out
+                return { x: x + w/2, y: y + h }; 
             }
         }
 
@@ -547,22 +534,18 @@
             const midY = (p1.y + p2.y) / 2;
 
             if(p2.y > p1.y + 30) {
-                // Downward flow
                 if(portType === 'no') {
-                    // Exit Right -> Down -> Left -> Down
                     d += ` L ${p2.x + 40} ${p1.y}`; 
                     d += ` L ${p2.x + 40} ${midY}`; 
                     d += ` L ${p2.x} ${midY}`;      
                     d += ` L ${p2.x} ${p2.y}`;      
                 } else {
-                    // Exit Bottom -> Down -> Down
                     d += ` L ${p1.x} ${midY}`;
                     d += ` L ${p2.x} ${midY}`;
                     d += ` L ${p2.x} ${p2.y}`;
                 }
             } 
             else {
-                // Upward/Loop flow
                 const buffer = 80;
                 if(portType === 'no') {
                      const rightX = Math.max(p1.x, p2.x) + buffer;
@@ -625,11 +608,6 @@
                 return c ? c.to : null; 
             }
 
-            function getPrev(id) {
-                const c = connections.find(cx => cx.to === id);
-                return c ? c.from : null;
-            }
-
             function pathExists(startId, targetId, seen = new Set()) {
                 if(!startId) return false;
                 if(startId === targetId) return true;
@@ -642,32 +620,46 @@
                 return false;
             }
 
-            function detectForLoop(decisionId, yesId) {
+            // ROBUST FOR-LOOP DETECTOR
+            function detectForLoop(decisionId) {
                 const decisionNode = nodes.find(n => n.id === decisionId);
                 const cond = decisionNode.text;
+                // Extract var name
                 const matchVar = cond.match(/^([a-zA-Z_]\w*)\s*[<>=!]+/);
                 if(!matchVar) return null;
                 const varName = matchVar[1];
 
-                const prevId = getPrev(decisionId);
-                if(!prevId) return null;
-                const prevNode = nodes.find(n => n.id === prevId);
-                if(prevNode.type !== 'process' || !prevNode.text.startsWith(varName)) return null;
+                // Find all parents of the decision node
+                const parents = connections.filter(c => c.to === decisionId).map(c => nodes.find(n => n.id === c.from));
                 
-                const startVal = prevNode.text.split('=')[1].trim();
+                // We need at least 2 inputs (Init and LoopBack)
+                if (parents.length < 2) return null;
 
-                const incoming = connections.filter(c => c.to === decisionId);
-                const loopBackConn = incoming.find(c => c.from !== prevId);
-                if(!loopBackConn) return null;
+                let initNode = null;
+                let incNode = null;
 
-                const incrementNode = nodes.find(n => n.id === loopBackConn.from);
-                if(!incrementNode || incrementNode.type !== 'process') return null;
-                
-                if(!incrementNode.text.includes(varName) || !incrementNode.text.includes('+')) return null;
-                
-                const stepParts = incrementNode.text.split('+');
+                // Analyze parents to find Init and Inc
+                for(let p of parents) {
+                    if(p.type !== 'process') continue;
+                    
+                    // Simple heuristic: 
+                    // Increment usually has "i = i + 1" (contains + and var on right)
+                    // Init usually has "i = 0" (starts with var, usually no + or var on right)
+                    
+                    const rightSide = p.text.split('=')[1] || "";
+                    if(rightSide.includes(varName) && rightSide.includes('+')) {
+                        incNode = p;
+                    } else if (p.text.trim().startsWith(varName)) {
+                        initNode = p;
+                    }
+                }
+
+                if(!initNode || !incNode) return null;
+
+                // Parse Values
+                const startVal = initNode.text.split('=')[1].trim();
+                const stepParts = incNode.text.split('+');
                 const stepVal = stepParts[1] ? stepParts[1].trim() : '1';
-
                 const stopParts = cond.match(/[<>=]+\s*(.+)/);
                 const stopVal = stopParts ? stopParts[1].trim() : '10';
 
@@ -676,7 +668,7 @@
                     start: startVal,
                     stop: stopVal,
                     step: stepVal,
-                    incrementNodeId: incrementNode.id
+                    incrementNodeId: incNode.id
                 };
             }
             
@@ -693,8 +685,10 @@
             function traverse(id, indent, stopNodeId = null) {
                 if(!id) return;
                 if(skipNodes.has(id)) {
-                    traverse(getNext(id), indent, stopNodeId);
-                    return;
+                    // If we skip a node (like increment), verify if it has a next node we should jump to
+                    // In a for loop, the increment loops back to Decision. We stop there anyway.
+                    // But if the loop body was JUST the increment, we might need to print 'pass'
+                    return; 
                 }
                 if(id === stopNodeId) return;
                 
@@ -742,14 +736,27 @@
                         let loopBodyId = yesId;
                         let afterLoopId = noId;
 
+                        // Try to detect For Loop
                         let forLoopData = null;
                         if(isYesLoop) {
-                            forLoopData = detectForLoop(node.id, yesId);
+                            forLoopData = detectForLoop(node.id);
                         }
 
                         if(forLoopData) {
                             htmlLine = `<div class="code-line">${spaces}<span class="keyword">for</span> ${forLoopData.varName} <span class="keyword">in</span> <span class="func">range</span>(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):</div>`;
-                            skipNodes.add(forLoopData.incrementNodeId); 
+                            lines.push(htmlLine);
+                            
+                            skipNodes.add(forLoopData.incrementNodeId);
+                            
+                            // Check if the loop body is JUST the increment
+                            // If yesId == incrementNodeId, body is empty (handled by loop)
+                            if(loopBodyId === forLoopData.incrementNodeId) {
+                                lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
+                            } else {
+                                traverse(loopBodyId, indent + 1, node.id); 
+                            }
+                            
+                            if(afterLoopId) traverse(afterLoopId, indent, stopNodeId);
                         } 
                         else {
                             if(isNoLoop) {
@@ -758,11 +765,10 @@
                                 afterLoopId = yesId;
                             }
                             htmlLine = `<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`;
+                            lines.push(htmlLine);
+                            if(loopBodyId) traverse(loopBodyId, indent + 1, node.id); 
+                            if(afterLoopId) traverse(afterLoopId, indent, stopNodeId); 
                         }
-
-                        lines.push(htmlLine);
-                        if(loopBodyId) traverse(loopBodyId, indent + 1, node.id); 
-                        if(afterLoopId) traverse(afterLoopId, indent, stopNodeId); 
 
                     } else {
                         htmlLine = `<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`;
