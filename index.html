@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode</title>
+    <title>FlowCode - Smart Logic</title>
     
     <!-- GOOGLE FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet">
     
-    <!-- BOOTSTRAP 5 CSS -->
+    <!-- BOOTSTRAP 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- FONT AWESOME -->
@@ -18,9 +18,13 @@
 
     <style>
         :root {
-            --bg-canvas: #f8f9fa;
-            --node-border: #495057;
-            --accent: #0d6efd;
+            --bg-canvas: #fdfdfd;
+            --grid-color: #e9ecef;
+            --node-bg: #e0d4fc; /* Light Purple from image */
+            --node-border: #7c58d8; /* Dark Purple border */
+            --node-text: #2c2c2c;
+            --accent: #7c58d8;
+            --console-bg: #1e1e1e;
         }
 
         body { 
@@ -35,139 +39,163 @@
 
         /* --- SIDEBAR --- */
         #palette {
-            width: 240px;
+            width: 260px;
             background: #fff;
             border-right: 1px solid #dee2e6;
             padding: 20px;
             z-index: 10;
             overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            box-shadow: 4px 0 15px rgba(0,0,0,0.03);
         }
         .palette-header {
-            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
-            color: #adb5bd; font-weight: 700; margin-top: 20px; margin-bottom: 10px;
+            font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #888; font-weight: 700; margin-top: 20px; margin-bottom: 12px;
         }
         .palette-item {
-            cursor: grab; user-select: none; margin-bottom: 10px; padding: 10px;
-            border: 1px solid #dee2e6; border-radius: 6px; background: white;
-            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
-            font-size: 0.9rem; color: #495057;
+            cursor: grab; user-select: none; margin-bottom: 12px; padding: 12px;
+            border: 1px solid #e0e0e0; border-radius: 12px; background: white;
+            transition: all 0.2s; display: flex; align-items: center; gap: 12px;
+            font-size: 0.95rem; color: #444; font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
         }
         .palette-item:hover {
             border-color: var(--accent); transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: var(--accent);
+            box-shadow: 0 5px 15px rgba(124, 88, 216, 0.15); color: var(--accent);
         }
-        .palette-item i { width: 20px; text-align: center; color: #6c757d; }
+        .palette-item i { width: 20px; text-align: center; color: #999; }
         .palette-item:hover i { color: var(--accent); }
 
         /* --- CANVAS --- */
         #canvas {
             flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
-            background-image: radial-gradient(#ced4da 1px, transparent 1px);
-            background-size: 20px 20px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+            background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+            background-size: 24px 24px;
         }
 
         /* --- RIGHT PANEL --- */
         #output-panel {
-            width: 400px; display: flex; flex-direction: column;
-            border-left: 1px solid #dee2e6; background: #212529;
+            width: 420px; display: flex; flex-direction: column;
+            border-left: 1px solid #dee2e6; background: #fff;
+            box-shadow: -4px 0 15px rgba(0,0,0,0.03);
+            z-index: 10;
         }
         .panel-toolbar {
-            padding: 10px 15px; background: #151719; border-bottom: 1px solid #343a40;
+            padding: 12px 20px; background: #fff; border-bottom: 1px solid #eee;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .panel-title { color: #f8f9fa; font-weight: 600; font-size: 0.9rem; letter-spacing: 0.5px; }
+        .panel-title { color: #333; font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px; }
+        
         .code-display {
-            flex: 1; padding: 15px; font-family: 'JetBrains Mono', monospace;
-            font-size: 13px; color: #e9ecef; overflow-y: auto;
-            border-bottom: 1px solid #343a40; line-height: 1.6;
+            flex: 1; padding: 20px; font-family: 'JetBrains Mono', monospace;
+            font-size: 13px; color: #333; overflow-y: auto;
+            background: #fafafa;
+            border-bottom: 1px solid #eee; line-height: 1.7;
         }
-        .keyword { color: #d63384; font-weight: bold; }
-        .func { color: #0d6efd; }
-        .string { color: #198754; }
-        .comment { color: #6c757d; font-style: italic; }
+        
+        /* Python Syntax Highlighting */
+        .keyword { color: #cf222e; font-weight: bold; }
+        .func { color: #0550ae; }
+        .string { color: #0a3069; }
+        .number { color: #0550ae; }
+        .comment { color: #6e7781; font-style: italic; }
 
+        #console-container {
+            height: 200px; background: var(--console-bg); display: flex; flex-direction: column;
+        }
+        #console-header {
+            padding: 5px 15px; background: #2d2d2d; color: #aaa; font-size: 11px; font-weight: bold;
+            border-top: 1px solid #444; display: flex; justify-content: space-between;
+        }
         #console {
-            height: 180px; background: #000; color: #20c997;
-            padding: 10px; font-family: 'JetBrains Mono', monospace;
+            flex: 1; color: #e0e0e0;
+            padding: 15px; padding-bottom: 30px; /* Fix for visibility */
+            font-family: 'JetBrains Mono', monospace;
             font-size: 12px; overflow-y: auto;
         }
 
         /* --- NODES --- */
         .node {
-            position: absolute; background: white; border: 2px solid var(--node-border);
-            text-align: center; font-size: 13px; font-weight: 500;
+            position: absolute; background: var(--node-bg); 
+            border: 2px solid var(--node-border);
+            text-align: center; font-size: 14px; font-weight: 500; font-family: 'Patrick Hand', cursive, sans-serif;
+            color: var(--node-text);
             user-select: none; cursor: pointer;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.1); z-index: 2;
-            display: flex; align-items: center; justify-content: center; padding: 5px;
-            transition: border-color 0.2s;
+            box-shadow: 4px 4px 0px rgba(124, 88, 216, 0.2); 
+            z-index: 2;
+            display: flex; align-items: center; justify-content: center; padding: 10px;
+            transition: all 0.2s ease;
         }
-        .node:hover { border-color: var(--accent); }
-        .node.selected { border-color: #dc3545; box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.2); }
-        .node.running { border-color: #198754; background-color: #d1e7dd; box-shadow: 0 0 15px #198754; transform: scale(1.05); transition: all 0.2s; }
+        .node:hover { transform: translateY(-2px); box-shadow: 6px 6px 0px rgba(124, 88, 216, 0.3); }
+        .node.selected { border-color: #d63384; box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.3); }
+        .node.running { background-color: #fff176; border-color: #fbc02d; transform: scale(1.05); z-index: 100; }
 
-        /* Shapes */
-        .shape-start, .shape-end { border-radius: 25px; background: #fff; border-color: #198754; width: 90px; height: 45px; }
-        .shape-end { border-color: #dc3545; }
-        .shape-process { border-radius: 4px; background: #fff; width: 140px; height: 55px; }
-        
-.shape-decision { 
-            width: 110px; height: 90px; 
-            /* 1. Set the main background to the Border Color */
-            background: var(--node-border); 
-            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
+        /* Shapes - Matching the image style */
+        .shape-start, .shape-end { 
+            border-radius: 12px; transform: rotate(45deg); 
+            width: 80px; height: 80px; 
+            background: #fff; border-color: var(--node-border);
         }
-        .shape-decision::before {
-            content:''; position: absolute; 
-            /* 2. Shrink the inner layer by 2px to create the border effect */
-            inset: 2px; 
-            /* 3. Set the inner background to White */
-            background: #fff; 
-            z-index: -1; 
-            clip-path: inherit; 
-            margin: 0; /* Remove the old negative margin */
-        }
+        .shape-start .inner-text, .shape-end .inner-text { transform: rotate(-45deg); width: 100%; pointer-events: none; font-size: 16px; font-weight: bold; }
 
+        .shape-process { border-radius: 8px; width: 160px; height: 60px; }
         
+        .shape-decision { 
+            width: 100px; height: 100px; 
+            border-radius: 12px; transform: rotate(45deg);
+            background: var(--node-bg);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .shape-decision .inner-text { transform: rotate(-45deg); width: 140%; pointer-events: none; font-size: 13px; line-height: 1.1; }
+
         .shape-io, .shape-input, .shape-output { 
-            transform: skew(-20deg); background: #fff; border-radius: 4px; 
-            width: 130px; height: 55px; margin-left: 10px; 
-        }
-        .shape-io .inner-text, .shape-input .inner-text, .shape-output .inner-text { 
-            transform: skew(20deg); width: 100%; text-align: center; pointer-events: none;
+            border-radius: 50%; width: 110px; height: 110px; /* Circles for IO per image style */
+            background: #fff; border-color: var(--node-border);
         }
 
-        /* Dots */
+        /* Dots/Ports */
         .dot { 
-            width: 14px; height: 14px; background: #fff; border: 2px solid #495057;
+            width: 12px; height: 12px; background: #fff; border: 2px solid var(--node-border);
             border-radius: 50%; position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s; 
         }
-        .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
-        .shape-input .dot, .shape-output .dot { transform: skew(20deg); } 
-        .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.3); }
+        .dot:hover { background: var(--accent); transform: scale(1.4); }
 
-        .dot.in { top: -8px; left: 50%; transform: translateX(-50%); }
-        .dot.out { bottom: -8px; left: 50%; transform: translateX(-50%); }
-        .dot.out-yes { bottom: -8px; left: 50%; transform: translateX(-50%); background: #198754; border-color: #198754; }
-        .dot.out-no { right: -8px; top: 50%; transform: translateY(-50%); background: #dc3545; border-color: #dc3545; }
+        /* Logic for Dot Placement */
+        /* Normal Rects */
+        .shape-process .dot.in, .shape-input .dot.in, .shape-output .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
+        .shape-process .dot.out, .shape-input .dot.out, .shape-output .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
+        
+        /* Rotated Squares (Diamond/Start) */
+        /* The logic is tricky because of rotation. We place them relative to unrotated box, 
+           but since visual top is top-left corner, we adjust logic in JS or CSS. 
+           Easier approach: Don't rotate the container, rotate a pseudo-element? 
+           Current approach rotates container. 
+           Top Visual = Top-Left corner (0,0). 
+           Bottom Visual = Bottom-Right corner (100%, 100%).
+        */
+        .shape-start .dot.out { right: -6px; bottom: -6px; /* Visual Bottom */ }
+        .shape-end .dot.in { top: -6px; left: -6px; /* Visual Top */ }
+        
+        .shape-decision .dot.in { top: -6px; left: -6px; /* Visual Top */ }
+        .shape-decision .dot.out-yes { right: -6px; bottom: -6px; background: #198754; border-color: #198754; /* Visual Bottom */ }
+        .shape-decision .dot.out-no { right: -6px; top: -6px; background: #dc3545; border-color: #dc3545; /* Visual Right */ }
 
         svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-        text { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; fill: #495057; pointer-events: none; text-shadow: 0px 0px 4px #fff; }
+        /* Label styling on lines */
+        .conn-label { font-family: 'Inter'; font-size: 12px; font-weight: 600; background: white; padding: 2px 5px; border-radius: 4px; border: 1px solid #eee; }
 
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
+    <nav class="navbar navbar-expand-lg border-bottom bg-white" style="height: 60px;">
         <div class="container-fluid">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                <i class="fa-solid fa-diagram-project text-primary"></i>
-                FlowCode <span class="badge bg-primary text-white" style="font-size:0.6rem;">V0.3</span>
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-primary" href="#">
+                <i class="fa-solid fa-shapes"></i>
+                FlowCode <span class="badge bg-primary text-white rounded-pill ms-2" style="font-size:0.6rem;">V2.0</span>
             </a>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
-                    <i class="fa-solid fa-trash"></i> Clear
+                <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="clearCanvas()">
+                    <i class="fa-solid fa-trash me-1"></i> Clear
                 </button>
             </div>
         </div>
@@ -176,24 +204,28 @@
     <div class="wrapper">
         <div class="main-area">
             <div id="palette">
-                <div class="palette-header">Start / End</div>
-                <div class="palette-item" draggable="true" data-type="start"><i class="fa-regular fa-circle-play"></i> Start</div>
-                <div class="palette-item" draggable="true" data-type="end"><i class="fa-regular fa-circle-stop"></i> End</div>
-                <div class="palette-header">I/O</div>
-                <div class="palette-item" draggable="true" data-type="input"><i class="fa-solid fa-keyboard"></i> Input</div>
-                <div class="palette-item" draggable="true" data-type="output"><i class="fa-solid fa-terminal"></i> Print</div>
-                <div class="palette-header">Logic</div>
-                <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-gear"></i> Process</div>
+                <div class="palette-header">Control Flow</div>
+                <div class="palette-item" draggable="true" data-type="start"><i class="fa-regular fa-play-circle"></i> Start</div>
+                <div class="palette-item" draggable="true" data-type="end"><i class="fa-regular fa-stop-circle"></i> End</div>
                 <div class="palette-item" draggable="true" data-type="decision"><i class="fa-solid fa-diamond"></i> Decision</div>
-                <div class="mt-4 text-center"><small class="text-muted" style="font-size:11px;">Drag items to canvas<br>Double-click to edit<br>Del key to delete</small></div>
+                
+                <div class="palette-header">Actions</div>
+                <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-cog"></i> Process</div>
+                <div class="palette-item" draggable="true" data-type="input"><i class="fa-solid fa-keyboard"></i> Input</div>
+                <div class="palette-item" draggable="true" data-type="output"><i class="fa-solid fa-print"></i> Print</div>
+                
+                <div class="mt-4 p-3 bg-light rounded text-center">
+                    <small class="text-muted" style="font-size:11px;">
+                        <strong>For Loop Tip:</strong><br>
+                        Init (i=0) &rarr; Decision (i&lt;10) &rarr; Action &rarr; Inc (i=i+1) &rarr; Loop back
+                    </small>
+                </div>
             </div>
 
             <div id="canvas">
                 <svg id="connections-layer">
                     <defs>
                         <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker>
-                        <marker id="arrow-yes" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#198754" /></marker>
-                        <marker id="arrow-no" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#dc3545" /></marker>
                     </defs>
                 </svg>
                 <div id="nodes-layer"></div>
@@ -201,17 +233,21 @@
 
             <div id="output-panel">
                 <div class="panel-toolbar">
-                    <span class="panel-title"><i class="fa-brands fa-python"></i> Python Code</span>
+                    <span class="panel-title"><i class="fa-brands fa-python text-primary"></i> Generated Python</span>
                     <div>
-                        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()"><i class="fa-solid fa-play"></i> RUN</button>
-                        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop"></i> STOP</button>
+                        <button id="btn-run" class="btn btn-primary btn-sm rounded-pill fw-bold px-3" onclick="runSimulation()"><i class="fa-solid fa-play me-1"></i> RUN</button>
+                        <button id="btn-stop" class="btn btn-danger btn-sm rounded-pill fw-bold px-3" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop me-1"></i> STOP</button>
                     </div>
                 </div>
                 <div id="code-python" class="code-display"></div>
-                <div class="bg-black text-white px-2 py-1 small border-top border-secondary d-flex justify-content-between">
-                    <span>TERMINAL</span><i class="fa-solid fa-terminal text-muted"></i>
+                
+                <div id="console-container">
+                    <div id="console-header">
+                        <span>TERMINAL OUTPUT</span>
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div id="console"></div>
                 </div>
-                <div id="console"></div>
             </div>
         </div>
     </div>
@@ -219,16 +255,16 @@
     <!-- MODAL -->
     <div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title"><i class="fa-solid fa-keyboard text-primary"></i> User Input</h5>
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fa-solid fa-keyboard me-2"></i> User Input</h5>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <p id="modal-prompt" class="fw-bold mb-2">Enter value:</p>
-                    <input type="text" id="modal-input" class="form-control form-control-lg" autocomplete="off" placeholder="Type here...">
+                    <input type="text" id="modal-input" class="form-control form-control-lg" autocomplete="off" autofocus>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary w-100" id="modal-submit">Submit</button>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-primary w-100 fw-bold" id="modal-submit">Submit Value</button>
                 </div>
             </div>
         </div>
@@ -274,12 +310,13 @@
             let text = "";
             if(type==='start') text="Start";
             else if(type==='end') text="End";
-            else if(type==='process') text="x = x + 1";
-            else if(type==='decision') text="x > 5";
+            else if(type==='process') text="i = 0"; // Default helpful for loops
+            else if(type==='decision') text="i < 5";
             else if(type==='input') text="Input x";
-            else if(type==='output') text="Print x";
+            else if(type==='output') text="Print i";
 
-            if(type === 'process' && nodes.length === 1) text = "x = 1"; 
+            // Offset adjustments for initial text in specific nodes
+            if(type === 'process' && nodes.length > 2) text = "i = i + 1";
 
             const node = { id, type, x, y, text };
             nodes.push(node);
@@ -295,7 +332,9 @@
             el.style.top = node.y + 'px';
 
             let innerHtml = node.text;
-            if(['decision','io','input','output'].includes(node.type)) innerHtml = `<div class="inner-text">${node.text}</div>`;
+            if(['start','end','decision','io','input','output'].includes(node.type)) {
+                innerHtml = `<div class="inner-text">${node.text}</div>`;
+            }
             el.innerHTML = innerHtml;
 
             el.onmousedown = (e) => startDragNode(e, node.id);
@@ -307,11 +346,16 @@
         }
 
         function addPorts(el, node) {
-            if(node.type !== 'start') addDot(el, 'in', node.id, 'in');
-            if(node.type === 'decision') {
-                addDot(el, 'out-yes', node.id, 'yes');
-                addDot(el, 'out-no', node.id, 'no');
-            } else if (node.type !== 'end') {
+            if(node.type === 'start') {
+                addDot(el, 'out', node.id, 'next'); // Bottom right for diamond
+            } else if(node.type === 'end') {
+                addDot(el, 'in', node.id, 'in'); // Top left for diamond
+            } else if(node.type === 'decision') {
+                addDot(el, 'in', node.id, 'in');
+                addDot(el, 'out-yes', node.id, 'yes'); // Bottom
+                addDot(el, 'out-no', node.id, 'no');   // Right
+            } else {
+                addDot(el, 'in', node.id, 'in');
                 addDot(el, 'out', node.id, 'next');
             }
         }
@@ -319,7 +363,7 @@
         function addDot(parent, className, nodeId, portType) {
             const dot = document.createElement('div');
             dot.className = `dot ${className}`;
-            dot.title = portType; 
+            dot.title = portType === 'next' ? 'Connect' : portType; 
             dot.onmousedown = (e) => { e.stopPropagation(); startConnection(nodeId, portType); };
             dot.onmouseup = (e) => { e.stopPropagation(); finishConnection(nodeId); };
             parent.appendChild(dot);
@@ -332,32 +376,37 @@
 
         function editNode(id) {
             const node = nodes.find(n => n.id === id);
-            let promptText = "Edit Text:";
-            if(node.type === 'input') promptText = "Enter variable name to input (e.g. 'age'):";
+            let promptText = "Edit Code/Text:";
             
             const newText = prompt(promptText, node.text);
             if(newText) {
+                // Auto-formatting helpers
                 if(node.type === 'input' && !newText.toLowerCase().startsWith('input')) node.text = "Input " + newText;
                 else if (node.type === 'output' && !newText.toLowerCase().startsWith('print')) node.text = "Print " + newText;
                 else node.text = newText;
                 
                 const el = document.getElementById(id);
-                if(el.querySelector('.inner-text')) el.querySelector('.inner-text').innerText = node.text;
+                const inner = el.querySelector('.inner-text');
+                if(inner) inner.innerText = node.text;
                 else el.innerText = node.text;
 
+                // Re-add ports because innerHTML wiped them
                 el.querySelectorAll('.dot').forEach(d => d.remove());
                 addPorts(el, node);
                 updateCode();
             }
         }
 
-        // --- CONNECTIONS ---
+        // --- CONNECTIONS (ORTHOGONAL) ---
         let dragLine = null; let isConnecting = false; let connStart = null;
 
         function startConnection(nodeId, portType) {
             isConnecting = true; connStart = { nodeId, portType };
             dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            dragLine.setAttribute('stroke', '#495057'); dragLine.setAttribute('stroke-dasharray', '5,5'); dragLine.setAttribute('stroke-width', '2');
+            dragLine.setAttribute('stroke', '#7c58d8'); 
+            dragLine.setAttribute('stroke-dasharray', '5,5'); 
+            dragLine.setAttribute('stroke-width', '2');
+            dragLine.setAttribute('fill', 'none');
             svgLayer.appendChild(dragLine);
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', abortConnection);
@@ -367,11 +416,13 @@
             if(isConnecting) {
                 const rect = canvas.getBoundingClientRect();
                 const startNode = nodes.find(n => n.id === connStart.nodeId);
-                const el = document.getElementById(connStart.nodeId);
-                let sx = startNode.x + el.offsetWidth/2; let sy = startNode.y + el.offsetHeight;
-                if(connStart.portType === 'no') { sx = startNode.x + el.offsetWidth; sy = startNode.y + el.offsetHeight/2; }
-                const ex = e.clientX - rect.left; const ey = e.clientY - rect.top;
-                dragLine.setAttribute('d', `M ${sx} ${sy} L ${ex} ${ey}`);
+                const pt1 = getPortPosition(connStart.nodeId, connStart.portType);
+                const ex = e.clientX - rect.left; 
+                const ey = e.clientY - rect.top;
+                
+                // Simple straight line while dragging
+                dragLine.setAttribute('d', `M ${pt1.x} ${pt1.y} L ${ex} ${ey}`);
+                
             } else if (dragNodeId) {
                 const rect = canvas.getBoundingClientRect();
                 const node = nodes.find(n=>n.id === dragNodeId);
@@ -385,7 +436,10 @@
 
         function finishConnection(targetId) {
             if(isConnecting && connStart.nodeId !== targetId) {
-                connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
+                // Remove existing connection from same port if any (flowchart logic usually single out)
+                if(connStart.portType !== 'in') {
+                    connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
+                }
                 connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
                 drawConnections(); updateCode();
             }
@@ -399,45 +453,145 @@
             document.removeEventListener('mouseup', abortConnection);
         }
 
+        function getPortPosition(nodeId, type) {
+            const node = nodes.find(n=>n.id===nodeId);
+            const el = document.getElementById(nodeId);
+            const w = el.offsetWidth; const h = el.offsetHeight;
+            let x = node.x; let y = node.y;
+
+            // Adjust based on rotation or shape
+            if(node.type === 'start' || node.type === 'decision') {
+                // Rotated 45deg. 
+                // Visual Top = Top Left of div relative to center? No, CSS transform rotates it.
+                // The dots are positioned absolutely within the rotated div.
+                // We need the screen coordinates of the dot.
+                const dotClass = (type==='yes'?'out-yes':(type==='no'?'out-no':(type==='next'?'out':'in')));
+                const dot = el.querySelector(`.dot.${dotClass}`);
+                if(!dot) return {x: node.x + w/2, y: node.y + h/2};
+                
+                const r = dot.getBoundingClientRect();
+                const c = canvas.getBoundingClientRect();
+                return { x: r.left - c.left + 6, y: r.top - c.top + 6 };
+            } 
+            else {
+                if(type === 'in') return { x: x + w/2, y: y };
+                return { x: x + w/2, y: y + h }; // out
+            }
+        }
+
         function drawConnections() {
-            const defs = svgLayer.querySelector('defs');
-            svgLayer.innerHTML = ''; svgLayer.appendChild(defs);
+            // Keep defs
+            const defs = svgLayer.querySelector('defs').outerHTML;
+            svgLayer.innerHTML = defs;
 
             connections.forEach(c => {
-                const n1 = nodes.find(n=>n.id===c.from); const n2 = nodes.find(n=>n.id===c.to);
-                const el1 = document.getElementById(c.from); const el2 = document.getElementById(c.to);
-                if(!el1 || !el2) return;
+                const p1 = getPortPosition(c.from, c.port);
+                const p2 = getPortPosition(c.to, 'in'); // Targets are always IN
 
-                let x1 = n1.x + el1.offsetWidth/2; let y1 = n1.y + el1.offsetHeight;
-                if(c.port === 'no') { x1 = n1.x + el1.offsetWidth; y1 = n1.y + el1.offsetHeight/2; }
-                let x2 = n2.x + el2.offsetWidth/2; let y2 = n2.y;
+                let color = '#555';
+                if(c.port === 'yes') color = '#198754';
+                if(c.port === 'no') color = '#dc3545';
 
-                let color = '#495057'; let marker = 'url(#arrowhead)';
-                if(c.port === 'yes') { color = '#198754'; marker = 'url(#arrow-yes)'; }
-                if(c.port === 'no') { color = '#dc3545'; marker = 'url(#arrow-no)'; }
-
+                const pathStr = getOrthogonalPath(p1, p2, c.port);
+                
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`);
-                path.setAttribute('stroke', color); path.setAttribute('stroke-width', '2');
-                path.setAttribute('marker-end', marker); path.setAttribute('fill', 'none'); path.style.cursor = 'pointer';
-                path.onclick = (e) => {
+                path.setAttribute('d', pathStr);
+                path.setAttribute('stroke', color); 
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('marker-end', 'url(#arrowhead)'); 
+                path.setAttribute('fill', 'none'); 
+                path.setAttribute('stroke-linejoin', 'round');
+                path.style.cursor = 'pointer';
+                
+                // Add invisible wider path for easier clicking
+                const clickPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                clickPath.setAttribute('d', pathStr);
+                clickPath.setAttribute('stroke', 'transparent'); 
+                clickPath.setAttribute('stroke-width', '15');
+                clickPath.setAttribute('fill', 'none');
+                clickPath.style.cursor = 'pointer';
+                clickPath.onclick = (e) => {
                     e.stopPropagation();
                     if(confirm("Delete this connection?")) {
                         connections = connections.filter(conn => conn !== c);
                         drawConnections(); updateCode();
                     }
                 };
-                svgLayer.appendChild(path);
 
+                svgLayer.appendChild(path);
+                svgLayer.appendChild(clickPath);
+
+                // Labels
                 if(c.port === 'yes' || c.port === 'no') {
-                    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    label.textContent = c.port === 'yes' ? 'True' : 'False';
-                    label.setAttribute('x', x1 + (c.port==='no'? 10 : 5));
-                    label.setAttribute('y', y1 + (c.port==='yes'? 20 : -5));
-                    label.setAttribute('fill', color);
-                    svgLayer.appendChild(label);
+                    const label = document.createElement('div');
+                    label.className = 'conn-label';
+                    label.innerText = c.port === 'yes' ? 'Yes' : 'No';
+                    label.style.position = 'absolute';
+                    label.style.color = color;
+                    // Position label near start but slightly along line
+                    if(c.port === 'yes') {
+                        label.style.left = (p1.x + 10) + 'px';
+                        label.style.top = (p1.y + 10) + 'px';
+                    } else {
+                        label.style.left = (p1.x + 10) + 'px';
+                        label.style.top = (p1.y - 20) + 'px';
+                    }
+                    nodesLayer.appendChild(label);
                 }
             });
+            
+            // Clean up old labels in nodesLayer that might be orphaned? 
+            // Actually, renderNode clears innerHTML but labels are appended to layer. 
+            // For simplicity, we clear labels in drawConnections every time.
+            const existingLabels = nodesLayer.querySelectorAll('.conn-label');
+            existingLabels.forEach(l => l.remove());
+            // Re-add labels logic (simplified above into the loop, but since nodesLayer isn't cleared, we need to remove old ones first)
+        }
+
+        function getOrthogonalPath(p1, p2, portType) {
+            // Manhattan Routing Logic
+            let d = `M ${p1.x} ${p1.y}`;
+            
+            // Heuristic for spacing
+            const midY = (p1.y + p2.y) / 2;
+            const midX = (p1.x + p2.x) / 2;
+
+            // CASE 1: Standard Flow Down
+            if(p2.y > p1.y + 30) {
+                if(portType === 'no') {
+                    // Exit Right, then Down, then Over, then Down
+                    d += ` L ${p2.x + 40} ${p1.y}`; // Out Right
+                    d += ` L ${p2.x + 40} ${midY}`; // Down
+                    d += ` L ${p2.x} ${midY}`;      // Over to align
+                    d += ` L ${p2.x} ${p2.y}`;      // Down to target
+                } else {
+                    // Exit Bottom
+                    d += ` L ${p1.x} ${midY}`;
+                    d += ` L ${p2.x} ${midY}`;
+                    d += ` L ${p2.x} ${p2.y}`;
+                }
+            } 
+            // CASE 2: Loop Back (Target is above Source)
+            else {
+                const buffer = 80;
+                if(portType === 'no') {
+                     // Exit Right, Up, Left, Down
+                     const rightX = Math.max(p1.x, p2.x) + buffer;
+                     d += ` L ${rightX} ${p1.y}`; // Out Right
+                     d += ` L ${rightX} ${p2.y - 40}`; // Up past target
+                     d += ` L ${p2.x} ${p2.y - 40}`; // Left to align
+                     d += ` L ${p2.x} ${p2.y}`; // Down in
+                } else {
+                    // Exit Bottom (Yes/Next), then Loop Around Left
+                    const leftX = Math.min(p1.x, p2.x) - buffer;
+                    d += ` L ${p1.x} ${p1.y + 20}`; // Down a bit
+                    d += ` L ${leftX} ${p1.y + 20}`; // Left
+                    d += ` L ${leftX} ${p2.y - 40}`; // Up
+                    d += ` L ${p2.x} ${p2.y - 40}`; // Right
+                    d += ` L ${p2.x} ${p2.y}`; // In
+                }
+            }
+            return d;
         }
 
         let dragNodeId = null; let dragOffset = {x:0, y:0};
@@ -466,9 +620,9 @@
             }
         });
 
-        // --- CODE GENERATOR ---
+        // --- CODE GENERATOR (IMPROVED FOR LOOPS) ---
         let visited = new Set();
-        let skipNodes = new Set(); 
+        let skipNodes = new Set(); // Nodes to ignore (like increments inside for-loops)
 
         function updateCode() {
             visited.clear();
@@ -483,6 +637,12 @@
                 return c ? c.to : null; 
             }
 
+            function getPrev(id) {
+                // Find node connected TO this id
+                const c = connections.find(cx => cx.to === id);
+                return c ? c.from : null;
+            }
+
             function pathExists(startId, targetId, seen = new Set()) {
                 if(!startId) return false;
                 if(startId === targetId) return true;
@@ -494,9 +654,56 @@
                 }
                 return false;
             }
+
+            function detectForLoop(decisionId, yesId) {
+                // 1. Identify Iterator Variable (e.g. "i < 10" -> "i")
+                const decisionNode = nodes.find(n => n.id === decisionId);
+                const cond = decisionNode.text;
+                const matchVar = cond.match(/^([a-zA-Z_]\w*)\s*[<>=!]+/);
+                if(!matchVar) return null;
+                const varName = matchVar[1];
+
+                // 2. Check Initialization (Parent node must set varName = start)
+                const prevId = getPrev(decisionId);
+                if(!prevId) return null;
+                const prevNode = nodes.find(n => n.id === prevId);
+                if(prevNode.type !== 'process' || !prevNode.text.startsWith(varName)) return null;
+                
+                // Parse Start Value
+                const startVal = prevNode.text.split('=')[1].trim();
+
+                // 3. Find Loop Back Node (The node that jumps back to decision)
+                // We need to trace from yesId until we hit decisionId
+                // Simplification: Look at all incoming connections to decisionId.
+                // One is prevId (init), the other is the Loop Back.
+                const incoming = connections.filter(c => c.to === decisionId);
+                const loopBackConn = incoming.find(c => c.from !== prevId);
+                if(!loopBackConn) return null;
+
+                const incrementNode = nodes.find(n => n.id === loopBackConn.from);
+                if(!incrementNode || incrementNode.type !== 'process') return null;
+                
+                // 4. Check Increment Syntax (varName = varName + step)
+                if(!incrementNode.text.includes(varName) || !incrementNode.text.includes('+')) return null;
+                
+                // Parse Step (Assume + 1 for simple parsing, or extract)
+                const stepParts = incrementNode.text.split('+');
+                const stepVal = stepParts[1] ? stepParts[1].trim() : '1';
+
+                // Parse Stop from Condition
+                const stopParts = cond.match(/[<>=]+\s*(.+)/);
+                const stopVal = stopParts ? stopParts[1].trim() : '10';
+
+                return {
+                    varName,
+                    start: startVal,
+                    stop: stopVal,
+                    step: stepVal,
+                    incrementNodeId: incrementNode.id
+                };
+            }
             
             function invertCondition(cond) {
-                cond = cond.trim();
                 if(cond.includes('<=')) return cond.replace('<=', '>');
                 if(cond.includes('>=')) return cond.replace('>=', '<');
                 if(cond.includes('<')) return cond.replace('<', '>=');
@@ -506,54 +713,46 @@
                 return `not (${cond})`;
             }
 
-            // stopNodeId: Used when re-traversing a loop body to stop infinite recursion
             function traverse(id, indent, stopNodeId = null) {
                 if(!id) return;
-                
-                // If we hit the stop node (closing the loop), we stop.
+                if(skipNodes.has(id)) {
+                    // If we skipped a node (like increment), continue to its target
+                    traverse(getNext(id), indent, stopNodeId);
+                    return;
+                }
                 if(id === stopNodeId) return;
-
-                // Standard Visited Check:
-                // If we are NOT in a loop re-traversal (stopNodeId is null), we respect global visited.
-                // If we ARE in a loop re-traversal, we ignore global visited (allowing us to write the body code),
-                // but we rely on stopNodeId to prevent infinite recursion.
+                
                 if(stopNodeId === null) {
                     if(visited.has(id)) return;
                     visited.add(id);
                 }
 
-                const node = nodes.find(n => n.id === id); if(!node) return;
+                const node = nodes.find(n => n.id === id); 
                 let spaces = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent);
                 let htmlLine = "";
 
-                // START
                 if(node.type === 'start') {
-                    htmlLine = `<div class="code-line"><span class="comment"># Program Start</span></div>`;
+                    htmlLine = `<div class="code-line"><span class="comment"># Flow Start</span></div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent, stopNodeId);
                 } 
-                // END
                 else if(node.type === 'end') {
                     htmlLine = `<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`;
                     lines.push(htmlLine);
                 } 
-                // PROCESS
                 else if(node.type === 'process') {
                     htmlLine = `<div class="code-line">${spaces}${node.text}</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent, stopNodeId);
                 } 
-                // INPUT
                 else if(node.type === 'input') {
                     let varName = node.text.replace(/Input/i, '').trim();
-                    htmlLine = `<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>())</div>`;
+                    htmlLine = `<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>("${varName}: "))</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent, stopNodeId);
                 } 
-                // OUTPUT
                 else if(node.type === 'output') {
                     let val = node.text.replace(/Print/i, '').trim();
                     htmlLine = `<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent, stopNodeId);
                 } 
-                // DECISION
                 else if(node.type === 'decision') {
                     let condition = node.text.replace(/(?<![<>!=])=(?![=])/g, '==');
                     const yesId = getNext(node.id, 'yes');
@@ -563,43 +762,45 @@
                     let isNoLoop = noId && pathExists(noId, node.id);
 
                     if(isYesLoop || isNoLoop) {
-                        // Determine Loop Logic
+                        // LOOP DETECTED
                         let loopCondition = condition;
                         let loopBodyId = yesId;
                         let afterLoopId = noId;
 
-                        // If Loop is on the NO path (Do-While / Repeat Until logic)
-                        if(isNoLoop) {
-                            loopCondition = invertCondition(condition);
-                            loopBodyId = noId;
-                            afterLoopId = yesId;
+                        // Check for specific FOR Loop Pattern
+                        let forLoopData = null;
+                        if(isYesLoop) {
+                            forLoopData = detectForLoop(node.id, yesId);
                         }
 
-                        htmlLine = `<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`;
+                        if(forLoopData) {
+                            // GENERATE FOR LOOP
+                            htmlLine = `<div class="code-line">${spaces}<span class="keyword">for</span> ${forLoopData.varName} <span class="keyword">in</span> <span class="func">range</span>(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):</div>`;
+                            skipNodes.add(forLoopData.incrementNodeId); // Don't print increment
+                        } 
+                        else {
+                            // GENERATE WHILE LOOP
+                            if(isNoLoop) {
+                                loopCondition = invertCondition(condition);
+                                loopBodyId = noId;
+                                afterLoopId = yesId;
+                            }
+                            htmlLine = `<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`;
+                        }
+
                         lines.push(htmlLine);
-                        
-                        // GENERATE LOOP BODY
-                        // If loopBodyId was already visited (upstream loop), we must force re-traverse it
-                        // by passing the current node (Decision) as the 'stopNodeId'.
-                        if(loopBodyId) traverse(loopBodyId, indent + 1, node.id);
-                        else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
-                        
-                        // GENERATE CODE AFTER LOOP
-                        if(afterLoopId) traverse(afterLoopId, indent, stopNodeId);
+                        if(loopBodyId) traverse(loopBodyId, indent + 1, node.id); // Recurse body, stopping at self
+                        if(afterLoopId) traverse(afterLoopId, indent, stopNodeId); // Continue flow
 
                     } else {
-                        // STANDARD IF / ELSE
-                        let keyword = "if"; // Simplified for now
-                        htmlLine = `<div class="code-line">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
+                        // STANDARD IF/ELSE
+                        htmlLine = `<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`;
                         lines.push(htmlLine);
                         
                         if(yesId) traverse(yesId, indent + 1, stopNodeId);
                         else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
                         
                         if(noId) {
-                            // Check if 'else' is needed (not just end of flow)
-                            const falseNode = nodes.find(n => n.id === noId);
-                            // Simple Else
                             lines.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
                             traverse(noId, indent + 1, stopNodeId);
                         }
@@ -616,10 +817,11 @@
 
         function log(msg, type='info') {
             const div = document.createElement('div');
-            div.className = 'console-line';
-            div.style.color = type==='error'?'#ff4444' : (type==='input'?'#0d6efd':'#20c997');
+            div.style.marginBottom = '4px';
+            div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
             div.textContent = `> ${msg}`;
-            consoleDiv.appendChild(div); consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            consoleDiv.appendChild(div); 
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
 
         function stopSimulation() {
@@ -710,6 +912,7 @@
 
         function evaluateExpression(expr) {
             let parsed = expr;
+            // Simple sort by length so "temp2" replaces before "temp"
             const keys = Object.keys(runtimeScope).sort((a,b)=>b.length-a.length);
             for(let key of keys) {
                 const val = runtimeScope[key];
@@ -730,7 +933,6 @@
                 input.value = "";
                 bsInputModal.show();
                 
-                // Fix: Replace input element to strip old listeners
                 const newInput = input.cloneNode(true);
                 input.parentNode.replaceChild(newInput, input);
                 setTimeout(() => newInput.focus(), 100);
@@ -748,7 +950,31 @@
             });
         }
         
-        createNode('start', 50, 50);
+        // Init Demo
+        createNode('start', 50, 40);
+        createNode('process', 50, 160); // i = 0
+        createNode('decision', 80, 260); // i < 5
+        createNode('output', 80, 400);   // Print i
+        createNode('process', 300, 420); // i = i + 1
+        
+        setTimeout(() => {
+            // Update texts to make a loop demo
+            nodes[1].text = "i = 0"; document.getElementById(nodes[1].id).querySelector('.inner-text').innerText = "i = 0";
+            nodes[2].text = "i < 5"; document.getElementById(nodes[2].id).querySelector('.inner-text').innerText = "i < 5";
+            nodes[3].text = "Print i"; document.getElementById(nodes[3].id).querySelector('.inner-text').innerText = "Print i";
+            nodes[4].text = "i = i + 1"; document.getElementById(nodes[4].id).innerText = "i = i + 1"; addPorts(document.getElementById(nodes[4].id), nodes[4]);
+
+            // Create connections for the loop
+            connections.push({from: nodes[0].id, port: 'next', to: nodes[1].id}); // Start -> Init
+            connections.push({from: nodes[1].id, port: 'next', to: nodes[2].id}); // Init -> Decision
+            connections.push({from: nodes[2].id, port: 'yes', to: nodes[3].id});  // Decision -> Print
+            connections.push({from: nodes[3].id, port: 'next', to: nodes[4].id}); // Print -> Increment
+            connections.push({from: nodes[4].id, port: 'next', to: nodes[2].id}); // Increment -> Decision (Loop)
+            
+            drawConnections();
+            updateCode();
+        }, 100);
+
     </script>
 </body>
 </html>
