@@ -869,13 +869,32 @@ else if(node.type === 'input') {
             
             updateCode(); 
             
+          // 1. Create a variable to capture the last output line
+            let lastOutput = "";
+
             Sk.configure({
-                output: function(text) { if(text !== '\n') log(text); },
+                // 2. Update output to save the text to our buffer
+                output: function(text) { 
+                    if(text) {
+                        lastOutput = text.trim(); // Save it
+                        if(text !== '\n') log(text); // Print to console as normal
+                    }
+                },
                 read: builtinRead,
+                
+                // 3. Smart Input Function
                 inputFun: function(promptText) {
                     return new Promise((resolve) => {
-                        log(promptText || "Input required...", "input");
-                        showInputModal(promptText).then(val => {
+                        // Strategy: Use promptText if it exists. 
+                        // If it's empty, grab the last thing printed to the console (lastOutput).
+                        // If both are empty, default to "Input required".
+                        const finalPrompt = promptText || lastOutput || "Input required:";
+                        
+                        // Clear buffer so it doesn't get reused wrongly
+                        lastOutput = ""; 
+
+                        // Use the Custom Modal
+                        showInputModal(finalPrompt).then(val => {
                             log(val, "input");
                             resolve(val);
                         });
