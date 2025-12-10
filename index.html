@@ -77,49 +77,6 @@
             padding: 10px 15px; background: #151719; border-bottom: 1px solid #343a40;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .panel-title { color:        #palette {
-            width: 240px;
-            background: #fff;
-            border-right: 1px solid #dee2e6;
-            padding: 20px;
-            z-index: 10;
-            overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
-        }
-        .palette-header {
-            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
-            color: #adb5bd; font-weight: 700; margin-top: 20px; margin-bottom: 10px;
-        }
-        .palette-item {
-            cursor: grab; user-select: none; margin-bottom: 10px; padding: 10px;
-            border: 1px solid #dee2e6; border-radius: 6px; background: white;
-            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
-            font-size: 0.9rem; color: #495057;
-        }
-        .palette-item:hover {
-            border-color: var(--accent); transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: var(--accent);
-        }
-        .palette-item i { width: 20px; text-align: center; color: #6c757d; }
-        .palette-item:hover i { color: var(--accent); }
-
-        /* --- CANVAS --- */
-        #canvas {
-            flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
-            background-image: radial-gradient(#ced4da 1px, transparent 1px);
-            background-size: 20px 20px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
-        }
-
-        /* --- RIGHT PANEL --- */
-        #output-panel {
-            width: 400px; display: flex; flex-direction: column;
-            border-left: 1px solid #dee2e6; background: #212529;
-        }
-        .panel-toolbar {
-            padding: 10px 15px; background: #151719; border-bottom: 1px solid #343a40;
-            display: flex; justify-content: space-between; align-items: center;
-        }
         .panel-title { color: #f8f9fa; font-weight: 600; font-size: 0.9rem; letter-spacing: 0.5px; }
         .code-display {
             flex: 1; padding: 15px; font-family: 'JetBrains Mono', monospace;
