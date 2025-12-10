@@ -715,7 +715,7 @@
                     // Exec: Trace + Code
                     execCode.push(`${spaces}${trace}`);
                     let varName = node.text.replace(/Input/i, '').trim();
-                    execCode.push(`${spaces}${varName} = int(input("${varName}: "))`);
+                    execCode.push(`${spaces}${varName} = input("${varName}: ")`);
                     // Display: Code
                     displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>("${varName}: "))</div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
