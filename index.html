@@ -946,11 +946,19 @@ Sk.configure({
         consoleDiv.scrollTop = consoleDiv.scrollHeight;
     }
 
-    function stopSimulation() {
-        isRunning = false;
+function stopSimulation() {
+        isRunning = false; // This triggers the Kill Switch in runSimulation
+        
         document.getElementById('btn-run').style.display = 'inline-block';
         document.getElementById('btn-stop').style.display = 'none';
+        
+        // Immediately clear visual highlights
         document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+
+        // If the Input Modal is open, force close it
+        const modalEl = document.getElementById('inputModal');
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if(bsModal) bsModal.hide();
     }
 
     function highlightNode(nodeId) {
@@ -959,7 +967,7 @@ Sk.configure({
         if(el) el.classList.add('running');
     }
 
-    async function runSimulation() {
+async function runSimulation() {
         if(isRunning) return;
         isRunning = true;
         document.getElementById('btn-run').style.display = 'none';
@@ -970,6 +978,12 @@ Sk.configure({
         
         // Define internal helper for visualization
         Sk.builtins.highlight_node = function(id) {
+            // *** KILL SWITCH ***
+            // If the user pressed Stop, throw an error to break the Skulpt execution loop
+            if (!isRunning) {
+                throw "ExecutionStopped"; 
+            }
+            
             highlightNode(id.v); 
             return Sk.builtin.none.none$;
         };
@@ -980,12 +994,16 @@ Sk.configure({
             });
             log("Program Finished.");
         } catch (e) {
-            log(e.toString(), "error");
+            // Ignore the error if we caused it intentionally by pressing stop
+            if (e.toString() !== "ExecutionStopped") {
+                log(e.toString(), "error");
+            } else {
+                log("Stopped by user.", "error");
+            }
         } finally {
             stopSimulation();
         }
     }
-    
     // --- 9. INIT ---
     createNode('start', 50, 40);
     createNode('process', 50, 160); 
