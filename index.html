@@ -720,7 +720,7 @@
 
 
 
-// --- 6. COMPILER-STYLE GRAPH-TO-CODE GENERATION (with For Loop Detection) ---
+// --- 6. COMPILER-STYLE GRAPH-TO-CODE GENERATION (FINAL & ROBUST) ---
     let generatedCode = "";
 
     function updateCode() {
@@ -734,7 +734,7 @@
             return;
         }
 
-        // --- PASS 1: GRAPH ANALYSIS ---
+        // --- PASS 1: GRAPH & LOOP ANALYSIS ---
         const adj = {};
         const revAdj = {};
         nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
@@ -745,6 +745,7 @@
             revAdj[c.to].push({ from: c.from, port: c.port });
         });
 
+        // 1a. Find all back edges to identify loops.
         const backEdges = [];
         const visited = new Set();
         const recursionStack = new Set();
@@ -752,21 +753,20 @@
             visited.add(u);
             recursionStack.add(u);
             for (let edge of (adj[u] || [])) {
-                if (recursionStack.has(edge.to)) {
-                    backEdges.push({ from: u, to: edge.to });
-                } else if (!visited.has(edge.to)) {
-                    findBackEdges(edge.to);
-                }
+                if (recursionStack.has(edge.to)) backEdges.push({ from: u, to: edge.to });
+                else if (!visited.has(edge.to)) findBackEdges(edge.to);
             }
             recursionStack.delete(u);
         }
         findBackEdges(startNode.id);
 
+        // 1b. Analyze each loop's structure.
         const loopInfo = new Map();
         for (const backEdge of backEdges) {
             const headerId = backEdge.to;
             if (loopInfo.has(headerId)) continue;
 
+            // Find all nodes belonging to this loop.
             const loopNodes = new Set([headerId]);
             const queue = [backEdge.from];
             const visitedInLoop = new Set([backEdge.from, headerId]);
@@ -781,94 +781,74 @@
                 });
             }
             
+            // Find controller and exits.
             let controllerId = null;
             const exits = [];
-            for (const nodeId of loopNodes) {
+            loopNodes.forEach(nodeId => {
                 const node = nodes.find(n => n.id === nodeId);
-                for(const edge of (adj[nodeId] || [])) {
+                (adj[nodeId] || []).forEach(edge => {
                     if (!loopNodes.has(edge.to)) {
                         exits.push({ from: nodeId, to: edge.to, port: edge.port });
                         if (node.type === 'decision') controllerId = nodeId;
                     }
-                }
-            }
+                });
+            });
             if (!controllerId) controllerId = backEdge.from;
 
-            const type = (headerId === controllerId) ? 'pre-tested' : 'post-tested';
-            loopInfo.set(headerId, { controller: controllerId, exits, nodes: loopNodes, type });
-        }
+            // 1c. Classify the loop and find its key components.
+            let analysis = { controller: controllerId, exits, nodes: loopNodes, type: 'while-true' };
+            const controllerNode = nodes.find(n => n.id === controllerId);
 
-        // --- NEW: PASS 1.5: FOR LOOP PATTERN ANALYSIS ---
-        // After identifying loops, check if any pre-tested loops match the for-loop pattern.
-        for (const [headerId, info] of loopInfo.entries()) {
-            if (info.type === 'pre-tested') {
-                const forLoopDetails = analyzeForLoop(headerId, info);
-                if (forLoopDetails) {
-                    info.type = 'for';
-                    info.forDetails = forLoopDetails;
+            // Try to identify a clean 'while' loop.
+            const isPreTested = headerId === controllerId;
+            if (isPreTested) {
+                const predecessors = (revAdj[headerId] || []).filter(e => !loopNodes.has(e.from));
+                if (predecessors.length === 1) { // Has a single entry from outside
+                    analysis.type = 'while';
+                    analysis.predecessor = predecessors[0].from;
                 }
             }
+            
+            // Try to identify a 'for' loop (most specific).
+            const forDetails = analyzeForLoop(headerId, loopNodes);
+            if (forDetails) {
+                analysis.type = 'for';
+                analysis.forDetails = forDetails;
+            }
+
+            loopInfo.set(headerId, analysis);
         }
 
-        function analyzeForLoop(headerId, loop) {
+        function analyzeForLoop(headerId, loopNodesSet) {
             const headerNode = nodes.find(n => n.id === headerId);
-            const conditionMatch = headerNode.text.match(/([a-zA-Z_]\w*)\s*(<|<=|!=)\s*([a-zA-Z_]\w*|\d+)/);
-            if (!conditionMatch) return null; // Condition doesn't match a simple for loop pattern
+            if (headerNode.type !== 'decision') return null;
+            const condMatch = headerNode.text.match(/([a-z_]\w*)\s*(<|<=|!=)\s*(\w+)/);
+            if (!condMatch) return null;
 
-            const [_, varName, op, limit] = conditionMatch;
+            const [_, varName, op, limit] = condMatch;
+            const parents = (revAdj[headerId] || []).filter(e => !loopNodesSet.has(e.from));
+            if (parents.length !== 1) return null;
+            
+            const initNode = nodes.find(n => n.id === parents[0].from);
+            const initMatch = initNode?.text.match(new RegExp(`^${varName}\\s*=\\s*(\\d+)`));
+            if (!initMatch) return null;
 
-            // 1. Find Initialization: Look at the node directly preceding the loop header.
-            let initNode = null;
-            let startValue = null;
-            const parents = revAdj[headerId] || [];
-            for (const parentEdge of parents) {
-                if (!loop.nodes.has(parentEdge.from)) { // Parent must be OUTSIDE the loop
-                    initNode = nodes.find(n => n.id === parentEdge.from);
-                    break;
-                }
-            }
+            const backEdge = backEdges.find(be => be.to === headerId);
+            const incNode = nodes.find(n => n.id === backEdge.from);
+            const incMatch = incNode?.text.match(new RegExp(`^${varName}\\s*=\\s*${varName}\\s*\\+\\s*(\\d+)`));
+            if (!incMatch) return null;
 
-            if (initNode && initNode.type === 'process') {
-                const initMatch = initNode.text.match(new RegExp(`^${varName}\\s*=\\s*(\\d+)`));
-                if (initMatch) {
-                    startValue = initMatch[1];
-                }
-            }
-            if (startValue === null) return null; // No valid initialization found.
-
-            // 2. Find Increment: Look for an increment node at the end of the loop body.
-            let incrementNode = null;
-            let stepValue = '1';
-            const backEdgeSource = backEdges.find(be => be.to === headerId).from;
-            const incNodeCandidate = nodes.find(n => n.id === backEdgeSource);
-
-            if (incNodeCandidate && incNodeCandidate.type === 'process') {
-                const incMatch = incNodeCandidate.text.match(new RegExp(`^${varName}\\s*=\\s*${varName}\\s*\\+\\s*(\\d+)`));
-                 if (incMatch) {
-                    incrementNode = incNodeCandidate;
-                    stepValue = incMatch[1];
-                }
-            }
-            if (incrementNode === null) return null; // No valid increment found.
-
-            // We found all parts!
-            return { varName, startValue, limit, op, stepValue, incrementNodeId: incrementNode.id, initNodeId: initNode.id };
+            return { varName, startValue: initMatch[1], limit, op, stepValue: incMatch[1], initNodeId: initNode.id, incrementNodeId: incNode.id };
         }
-
 
         // --- PASS 2: CODE GENERATION ---
         const processed = new Set();
-        // ... (The rest of the code generation logic)
 
         function generateBlock(nodeId, indentLvl, stopNode = null) {
             if (!nodeId || nodeId === stopNode || processed.has(nodeId)) return;
-
+            
             if (loopInfo.has(nodeId)) {
-                generateLoop(nodeId, indentLvl);
-                const exitNode = loopInfo.get(nodeId).exits[0]?.to;
-                if (exitNode) {
-                    generateBlock(exitNode, indentLvl, stopNode);
-                }
+                generateLoop(nodeId, indentLvl, stopNode);
                 return;
             }
 
@@ -878,20 +858,10 @@
             execCode.push(`${spaces}highlight_node('${nodeId}')`);
 
             switch (node.type) {
-                case 'decision':
-                    generateIfElse(nodeId, indentLvl, stopNode);
-                    return;
-                case 'start':
-                    displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
-                    break;
-                case 'end':
-                    execCode.push(`${spaces}exit()`);
-                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`);
-                    return;
-                case 'process':
-                    execCode.push(`${spaces}${node.text}`);
-                    displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
-                    break;
+                case 'decision': generateIfElse(nodeId, indentLvl, stopNode); return;
+                case 'start': displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`); break;
+                case 'end': execCode.push(`${spaces}exit()`); displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`); return;
+                case 'process': execCode.push(`${spaces}${node.text}`); displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`); break;
                 case 'input':
                     let clean = node.text.replace(/^Input\s+/i, '').trim();
                     let [varName, promptText] = clean.includes('=') ? clean.split('=', 2).map(s => s.trim()) : [clean, `"${clean}"`];
@@ -911,93 +881,66 @@
                     displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
                     break;
             }
-
             const nextEdge = adj[nodeId]?.[0];
-            if (nextEdge) {
-                generateBlock(nextEdge.to, indentLvl, stopNode);
-            }
+            if (nextEdge) generateBlock(nextEdge.to, indentLvl, stopNode);
         }
 
-        function generateLoop(headerId, indentLvl) {
+        function generateLoop(headerId, indentLvl, stopNode) {
             const info = loopInfo.get(headerId);
-            const { controller, exits, nodes: loopNodesSet, type, forDetails } = info;
+            info.nodes.forEach(id => processed.add(id));
             const spaces = "    ".repeat(indentLvl);
-            
-            // Mark all nodes as processed, except for the init node which is outside the loop.
-            loopNodesSet.forEach(id => processed.add(id));
+            const controllerNode = nodes.find(n => n.id === info.controller);
+            let condition = controllerNode.text.replace(/=/g, '==');
 
-            if (type === 'for') {
-                const { varName, startValue, limit, op, stepValue, incrementNodeId, initNodeId } = forDetails;
-                // Mark the init node as processed since we're consuming it here.
-                processed.add(initNodeId);
-                let rangeLimit = limit;
-                // Adjust for Python's exclusive range and <= operator
-                if (op === '<=') {
-                    // Check if limit is a number or variable
-                    if (!isNaN(parseInt(limit))) {
-                        rangeLimit = parseInt(limit) + 1;
-                    } else {
-                        rangeLimit = `${limit} + 1`;
-                    }
-                }
-                
+            if (info.type === 'for') {
+                const { varName, startValue, limit, op, stepValue, initNodeId } = info.forDetails;
+                processed.add(initNodeId); // Consume the init node
+                let rangeLimit = op === '<=' ? (isNaN(parseInt(limit)) ? `${limit} + 1` : parseInt(limit) + 1) : limit;
                 let rangeArgs = `${startValue}, ${rangeLimit}`;
-                if (stepValue !== '1') {
-                    rangeArgs += `, ${stepValue}`;
-                }
-
+                if (stepValue !== '1') rangeArgs += `, ${stepValue}`;
+                
                 execCode.push(`${spaces}for ${varName} in range(${rangeArgs}):`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
-
-                // Generate the loop body, starting from the node after the header.
-                // The stopNode for the body is the increment node, as it's not explicitly written.
-                const bodyStartEdge = adj[headerId].find(e => e.port === 'yes'); // Assuming 'yes' enters a for-loop body
-                if (bodyStartEdge) {
-                    generateBlock(bodyStartEdge.to, indentLvl + 1, incrementNodeId);
-                }
-                return;
-            }
-
-            // ... (existing while and do-while logic remains the same)
-            const controllerNode = nodes.find(n => n.id === controller);
-            if (type === 'pre-tested') {
-                const exitEdge = exits.find(e => e.from === headerId);
-                const loopContinuesPort = adj[headerId].find(e => e.to !== exitEdge.to).port;
-                let condition = controllerNode.text.replace(/=/g, '==');
                 
-                if (loopContinuesPort === 'no') {
-                    execCode.push(`${spaces}while not (${condition}):`);
-                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while not</span> (${condition}):</div>`);
-                } else {
-                    execCode.push(`${spaces}while ${condition}:`);
-                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${condition}:</div>`);
-                }
-                const bodyStartEdge = adj[headerId].find(e => e.port === loopContinuesPort);
-                if (bodyStartEdge) {
-                    generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
-                }
-            } else { 
+                const bodyStartEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
+                generateBlock(bodyStartEdge.to, indentLvl + 1, info.forDetails.incrementNodeId);
+            }
+            else if (info.type === 'while') { // Clean 'while' loop requires unrolling
+                generateBlock(info.predecessor, indentLvl, headerId); // Generate the part before the loop
+                
+                const exitPort = info.exits[0].port;
+                const loopCondition = exitPort === 'no' ? condition : `not (${condition})`;
+                execCode.push(`${spaces}while ${loopCondition}:`);
+                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
+
+                const bodyStartEdge = adj[headerId].find(e => e.port !== exitPort);
+                generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
+            }
+            else { // Fallback to robust 'while True'
                 execCode.push(`${spaces}while True:`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> True:</div>`);
                 
-                generateBlock(headerId, indentLvl + 1, controller);
+                generateBlock(headerId, indentLvl + 1, info.controller);
                 
                 const bodySpaces = "    ".repeat(indentLvl + 1);
-                execCode.push(`${bodySpaces}highlight_node('${controller}')`);
-                let condition = controllerNode.text.replace(/=/g, '==');
-                const exitPort = exits.find(e => e.from === controller)?.port;
+                execCode.push(`${bodySpaces}highlight_node('${info.controller}')`);
                 
-                execCode.push(`${bodySpaces}if ${exitPort === 'no' ? `not (${condition})` : condition}:`);
-                displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">if</span> ${exitPort === 'no' ? `not (${condition})` : condition}:</div>`);
-
+                const exitPort = info.exits[0].port;
+                const breakCondition = exitPort === 'yes' ? condition : `not (${condition})`;
+                execCode.push(`${bodySpaces}if ${breakCondition}:`);
+                displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">if</span> ${breakCondition}:</div>`);
                 execCode.push(`${bodySpaces}    break`);
                 displayHtml.push(`<div class="code-line">${bodySpaces}    <span class="keyword">break</span></div>`);
             }
+
+            // After the loop is fully generated, continue from the exit.
+            const exitNode = info.exits[0]?.to;
+            if (exitNode) generateBlock(exitNode, indentLvl, stopNode);
         }
         
         function generateIfElse(nodeId, indentLvl, stopNode) {
-            // ... (logic remains the same)
-             const node = nodes.find(n => n.id === nodeId);
+            // ... (This function remains largely the same, but benefits from better context)
+            const node = nodes.find(n => n.id === nodeId);
             const spaces = "    ".repeat(indentLvl);
             let condition = node.text.replace(/=/g, '==');
             
@@ -1006,15 +949,9 @@
             
             const yesEdge = adj[nodeId].find(e => e.port === 'yes');
             const noEdge = adj[nodeId].find(e => e.port === 'no');
-
-            const mergePoint = findMergeNode(yesEdge?.to, noEdge?.to);
+            const mergePoint = findMergeNode(yesEdge?.to, noEdge?.to, nodeId);
             
-            if (yesEdge) {
-                generateBlock(yesEdge.to, indentLvl + 1, mergePoint);
-            } else {
-                execCode.push(`${spaces}    pass`);
-                displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
-            }
+            generateBlock(yesEdge?.to, indentLvl + 1, mergePoint);
             
             if (noEdge) {
                 execCode.push(`${spaces}else:`);
@@ -1022,20 +959,29 @@
                 generateBlock(noEdge.to, indentLvl + 1, mergePoint);
             }
 
-            if (mergePoint) {
-                generateBlock(mergePoint, indentLvl, stopNode);
-            }
+            if (mergePoint) generateBlock(mergePoint, indentLvl, stopNode);
         }
 
-        function findMergeNode(branchA, branchB) {
-            // ... (logic remains the same)
+        function findMergeNode(branchA, branchB, decisionId) {
+            // A safer merge node finder
             if (!branchA) return branchB;
             if (!branchB) return branchA;
-            const pathA = new Set();
-            let currA = branchA;
-            while (currA) { pathA.add(currA); currA = adj[currA]?.[0]?.to; if(pathA.has(currA)) break; }
-            let currB = branchB;
-            while (currB) { if (pathA.has(currB)) return currB; currB = adj[currB]?.[0]?.to; if(!currB) break;}
+            if (branchA === branchB) return branchA;
+
+            const q = [branchA, branchB];
+            const paths = { [branchA]: [decisionId, branchA], [branchB]: [decisionId, branchB] };
+
+            while(q.length > 0) {
+                const u = q.shift();
+                for (const edge of (adj[u] || [])) {
+                    const v = edge.to;
+                    if (Object.values(paths).some(p => p.includes(v))) {
+                        return v; // Found merge point
+                    }
+                    paths[v] = [...paths[u], v];
+                    q.push(v);
+                }
+            }
             return null;
         }
 
@@ -1045,8 +991,6 @@
         pyBox.innerHTML = displayHtml.join('');
         generatedCode = execCode.join("\n");
     }
-
-
 
 
 
