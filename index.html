@@ -270,7 +270,6 @@
             else if(type==='input') text="Input x";
             else if(type==='output') text="Print x";
 
-            // Default 'Process' to initialization for easier testing
             if(type === 'process' && nodes.length === 1) text = "i = 0"; 
 
             const node = { id, type, x, y, text };
@@ -377,6 +376,7 @@
 
         function finishConnection(targetId) {
             if(isConnecting && connStart.nodeId !== targetId) {
+                // Remove existing connection from this port if any
                 connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
                 connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
                 drawConnections(); updateCode();
@@ -409,9 +409,12 @@
                 if(c.port === 'no') { color = '#dc3545'; marker = 'url(#arrow-no)'; }
 
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                // Curvy lines
                 path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1+40}, ${x2} ${y2-40}, ${x2} ${y2}`);
                 path.setAttribute('stroke', color); path.setAttribute('stroke-width', '2');
                 path.setAttribute('marker-end', marker); path.setAttribute('fill', 'none'); path.style.cursor = 'pointer';
+                
+                // Click to delete
                 path.onclick = (e) => {
                     e.stopPropagation();
                     if(confirm("Delete this connection?")) {
@@ -458,9 +461,9 @@
             }
         });
 
-        // --- CODE GENERATOR (IMPROVED FOR LOOPS) ---
+        // --- CODE GENERATOR ---
         let visited = new Set();
-        let skipNodes = new Set(); // Nodes to skip (used for For Loop optimization)
+        let skipNodes = new Set(); // For loop optimization
 
         function updateCode() {
             visited.clear();
@@ -470,43 +473,35 @@
             let startNode = nodes.find(n => n.type === 'start');
             if(!startNode) { pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; return; }
 
-            // Helper to find connections
+            // Helpers
             function getNext(id, port) { 
                 const c = connections.find(cx => cx.from === id && (!port || cx.port === port)); 
                 return c ? c.to : null; 
             }
 
-            // Helper: Find what connects INTO this node
             function getPredecessor(id) {
                 const c = connections.find(cx => cx.to === id);
                 return c ? nodes.find(n => n.id === c.from) : null;
             }
 
-            // Helper: Check if a path exists from startId back to targetId
             function pathExists(startId, targetId, seen = new Set()) {
-                if (startId === targetId) return true;
-                if (seen.has(startId) || !startId) return false;
+                if(!startId) return false;
+                if(startId === targetId) return true;
+                if(seen.has(startId)) return false;
                 seen.add(startId);
-                
-                // Get all outgoing connections from startId
-                const outgoing = connections.filter(c => c.from === startId).map(c => c.to);
-                for (let nextId of outgoing) {
-                    if (pathExists(nextId, targetId, seen)) return true;
+                const children = connections.filter(c => c.from === startId).map(c => c.to);
+                for(let child of children) {
+                    if(pathExists(child, targetId, seen)) return true;
                 }
                 return false;
             }
 
-            // Helper: Find the node that loops back to the condition
             function findLoopBackNode(decisionNodeId) {
-                // Find inputs to the decision node
                 const inputs = connections.filter(c => c.to === decisionNodeId);
-                // The loop back node is the one that is NOT the main entry point.
-                // We assume the main entry point is visited "before" the loop starts.
-                // In this context, we check if the input node is reachable from the "Yes" path.
                 const yesTarget = getNext(decisionNodeId, 'yes');
                 if(!yesTarget) return null;
-
                 for(let c of inputs) {
+                    // Check if the input comes from the 'yes' path
                     if(pathExists(yesTarget, c.from)) return nodes.find(n => n.id === c.from);
                 }
                 return null;
@@ -515,14 +510,10 @@
             function traverse(id, indent, isElif = false) {
                 if(!id) return;
                 
-                // If this node is in the skip list (e.g., the incrementor of a for loop), don't print code, but traverse next
-                if(skipNodes.has(id)) {
-                    // But we stop traversing here? No, we shouldn't continue flow from a skipped incrementor 
-                    // because the loop structure handles the flow.
-                    return; 
-                }
+                // If node is optimized away (e.g. incrementor in for loop)
+                if(skipNodes.has(id)) return;
 
-                // Loop protection: If we hit a node already visited in this recursion stack, stop.
+                // Stop if visited to prevent infinite recursion during generation
                 if(visited.has(id)) return;
                 visited.add(id);
 
@@ -530,106 +521,92 @@
                 let spaces = "&nbsp;&nbsp;&nbsp;&nbsp;".repeat(indent);
                 let htmlLine = "";
 
+                // START
                 if(node.type === 'start') {
-                    htmlLine = `<div class="code-line" id="code-${node.id}"><span class="comment"># Program Start</span></div>`;
+                    htmlLine = `<div class="code-line"><span class="comment"># Program Start</span></div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent);
                 } 
+                // END
                 else if(node.type === 'end') {
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">exit</span>()</div>`;
+                    htmlLine = `<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`;
                     lines.push(htmlLine);
                 } 
+                // PROCESS
                 else if(node.type === 'process') {
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${node.text}</div>`;
+                    htmlLine = `<div class="code-line">${spaces}${node.text}</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent);
                 } 
+                // INPUT
                 else if(node.type === 'input') {
                     let varName = node.text.replace(/Input/i, '').trim();
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${varName} = <span class="func">input</span>()</div>`;
+                    htmlLine = `<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>())</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent);
                 } 
+                // OUTPUT
                 else if(node.type === 'output') {
                     let val = node.text.replace(/Print/i, '').trim();
-                    htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="func">print</span>(${val})</div>`;
+                    htmlLine = `<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`;
                     lines.push(htmlLine); traverse(getNext(node.id), indent);
                 } 
+                // DECISION
                 else if(node.type === 'decision') {
                     let condition = node.text.replace(/(?<![<>!=])=(?![=])/g, '==');
-                    
-                    const yesConn = connections.find(c => c.from === node.id && c.port === 'yes');
-                    const noConn = connections.find(c => c.from === node.id && c.port === 'no');
-                    const yesId = yesConn ? yesConn.to : null;
-                    const noId = noConn ? noConn.to : null;
+                    const yesId = getNext(node.id, 'yes');
+                    const noId = getNext(node.id, 'no');
 
-                    // 1. CHECK IF IT IS A LOOP
-                    // Does the 'Yes' path eventually lead back to this node?
+                    // Check for LOOP: Does YES path lead back to this node?
                     let isLoop = yesId && pathExists(yesId, node.id);
 
                     if(isLoop) {
-                        // 2. CHECK FOR 'FOR LOOP' PATTERN
-                        // Pattern: Init (Predecessor) -> Decision -> Body -> Increment (LoopBackNode) -> Decision
+                        // Attempt to detect FOR LOOP pattern
                         let isForLoop = false;
                         let forLoopStr = "";
                         
-                        // Parse Condition (e.g., "i < 10")
                         const condMatch = condition.match(/([a-zA-Z_]\w*)\s*[<]\s*(.+)/);
-                        
                         if(condMatch) {
-                            const varName = condMatch[1]; // "i"
-                            const limit = condMatch[2];   // "10"
-                            
-                            // Find Initializer (Node before this one)
+                            const varName = condMatch[1];
+                            const limit = condMatch[2];
                             const prevNode = getPredecessor(node.id);
-                            // Find Incrementor (Last node in loop body)
                             const loopBackNode = findLoopBackNode(node.id);
 
+                            // Verify structure for 'for' loop
                             if(prevNode && loopBackNode && prevNode.type === 'process' && loopBackNode.type === 'process') {
-                                // Check Init: "i = 0"
-                                const initMatch = prevNode.text.match(new RegExp(`^${varName}\\s*=\s*(.+)`));
-                                // Check Incr: "i = i + 1" or "i += 1"
-                                const incrMatch = loopBackNode.text.match(new RegExp(`^${varName}\\s*=\\s*${varName}\\s*\\+\\s*(.+)`));
+                                const initMatch = prevNode.text.match(new RegExp(`^${varName}\\s*=\\s*(.+)`));
+                                // Relaxed regex for increment: allows i = i + 1 OR i += 1
+                                const incrMatch = loopBackNode.text.match(new RegExp(`^${varName}\\s*(=|\\+=)\\s*.*`));
 
                                 if(initMatch && incrMatch) {
-                                    const startVal = initMatch[1];
-                                    const stepVal = incrMatch[1];
-                                    
+                                    // Extract step - crude check, defaults to 1 if complex
+                                    let stepVal = "1";
+                                    if(loopBackNode.text.includes(varName + " + ")) {
+                                        stepVal = loopBackNode.text.split('+')[1].trim();
+                                    }
+
                                     isForLoop = true;
-                                    forLoopStr = `<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${startVal}, ${limit}, ${stepVal}):`;
-                                    
-                                    // IMPORTANT: Do not generate code for the Increment node inside the body
-                                    skipNodes.add(loopBackNode.id);
-                                    
-                                    // Optional: You might want to hide the init line too, but usually in flowcharts 
-                                    // the init happens before the loop structure, so leaving the "i=0" before the "for i..." is acceptable/safer.
+                                    forLoopStr = `<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${initMatch[1]}, ${limit}, ${stepVal}):`;
+                                    skipNodes.add(loopBackNode.id); // Don't print incrementor line
                                 }
                             }
                         }
 
                         if(isForLoop) {
-                            htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}${forLoopStr}</div>`;
+                            htmlLine = `<div class="code-line">${spaces}${forLoopStr}</div>`;
                             lines.push(htmlLine);
                             if(yesId) traverse(yesId, indent + 1);
-                            // No 'pass' needed for loops usually if empty, but good practice
-                            if(!yesId) lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
                         } else {
-                            // STANDARD WHILE LOOP
-                            htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">while</span> ${condition}:</div>`;
+                            // Fallback to WHILE loop
+                            htmlLine = `<div class="code-line">${spaces}<span class="keyword">while</span> ${condition}:</div>`;
                             lines.push(htmlLine);
                             if(yesId) traverse(yesId, indent + 1);
-                            else lines.push(`<div class="code-line">${spaces}&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">pass</span></div>`);
                         }
-
-                        // After the loop (The 'No' path)
-                        // We reset visited for the linear flow continuing after the loop?
-                        // Actually, 'traverse' stops at visited nodes. Since the loop body visits nodes,
-                        // we need to make sure the "No" path can continue.
-                        // The 'visited' set protects us from infinite recursion *inside* the loop.
-                        // We continue the flow on the 'No' branch.
+                        
+                        // Continue flow on 'No' path
                         if(noId) traverse(noId, indent);
 
                     } else {
-                        // STANDARD IF / ELSE
+                        // IF / ELSE
                         let keyword = isElif ? "elif" : "if";
-                        htmlLine = `<div class="code-line" id="code-${node.id}">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
+                        htmlLine = `<div class="code-line">${spaces}<span class="keyword">${keyword}</span> ${condition}:</div>`;
                         lines.push(htmlLine);
                         
                         if(yesId) traverse(yesId, indent + 1);
@@ -637,11 +614,9 @@
                         
                         if(noId) {
                             const falseNode = nodes.find(n => n.id === noId);
-                            // Check for 'else if' pattern (False path goes directly to another Decision)
-                            if(falseNode && falseNode.type === 'decision') {
-                                traverse(noId, indent, true);
-                            } else {
-                                lines.push(`<div class="code-line" id="else-${node.id}">${spaces}<span class="keyword">else</span>:</div>`);
+                            if(falseNode && falseNode.type === 'decision') traverse(noId, indent, true);
+                            else {
+                                lines.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
                                 traverse(noId, indent + 1);
                             }
                         }
@@ -652,7 +627,7 @@
             pyBox.innerHTML = lines.join('');
         }
 
-        // --- SIMULATION (EXECUTION) ---
+        // --- SIMULATION ---
         let isRunning = false;
         let runtimeScope = {}; 
 
@@ -681,26 +656,23 @@
             log("Running...");
 
             let currentId = nodes.find(n => n.type === 'start')?.id;
-            
-            // Loop limit to prevent browser crash on infinite loops during sim
-            let steps = 0; 
+            let steps = 0;
             
             while(currentId && isRunning) {
-                if(steps++ > 1000) { log("Error: Stack Overflow / Infinite Loop protection", "error"); break; }
+                if(steps++ > 2000) { log("Error: Infinite Loop detected (max steps reached)", "error"); break; }
 
                 const node = nodes.find(n => n.id === currentId);
                 document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
                 const el = document.getElementById(currentId);
                 if(el) el.classList.add('running');
                 
-                // Delay for visual effect
                 await new Promise(r => setTimeout(r, 500));
-                
                 if(!isRunning) break;
 
                 let nextId = null;
                 try {
                     if(node.type === 'process') {
+                        // Handle assignments
                         const eqIndex = node.text.indexOf('=');
                         if(eqIndex !== -1) {
                             const varName = node.text.substring(0, eqIndex).trim();
@@ -709,42 +681,41 @@
                             runtimeScope[varName] = val;
                             log(`${varName} = ${val}`);
                         }
-                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
+                        nextId = getConnection(node.id);
                     } 
                     else if (node.type === 'input') {
                         const varName = node.text.replace(/Input/i, '').trim();
                         const userInput = await showInputModal(`Enter value for ${varName}:`);
+                        // Try parsing as number, otherwise keep string
                         const num = Number(userInput);
-                        runtimeScope[varName] = isNaN(num) ? userInput : num;
+                        runtimeScope[varName] = (userInput === "" || isNaN(num)) ? userInput : num;
                         log(`Input: ${runtimeScope[varName]}`, 'input');
-                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
+                        nextId = getConnection(node.id);
                     }
                     else if (node.type === 'output') {
                         const expr = node.text.replace(/Print/i, '').replace(/[()]/g,'').trim();
+                        // Check if it's a string literal or variable
                         if(expr.startsWith('"') || expr.startsWith("'")) log(expr.replace(/['"]/g, ''));
                         else log(evaluateExpression(expr));
-                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
+                        nextId = getConnection(node.id);
                     }
                     else if (node.type === 'decision') {
                         let condition = node.text;
                         condition = condition.replace(/(?<![<>!=])=(?![=])/g, '==');
                         const result = evaluateExpression(condition);
                         log(`Condition (${node.text}) is ${result}`);
+                        
+                        // Find connection based on result
                         const conn = connections.find(c => c.from === node.id && c.port === (result ? 'yes' : 'no'));
                         if(conn) nextId = conn.to;
-                        else { 
-                            // If loop ends naturally (while condition false), find the path
-                            if(!result) {
-                                // If no "False" path, we just look for disconnected flow? 
-                                // Actually in flowcharts if no line, it stops.
-                                // But for loops, the false path usually continues the main program.
-                                isRunning = false; 
-                                log("No False path defined. Stopping.", "error"); 
-                            }
+                        else if(!result) {
+                             // If loop finishes (False) and no explicit 'False' line, logic usually continues to next loose block 
+                             // or ends. In strict flowcharts, if no line, it stops.
+                             log("Loop/Condition ended (False).");
                         }
                     }
                     else if (node.type === 'start') {
-                        const conn = connections.find(c => c.from === node.id); if(conn) nextId = conn.to;
+                        nextId = getConnection(node.id);
                     }
                     else if (node.type === 'end') {
                         log("Program Finished."); isRunning = false;
@@ -757,15 +728,24 @@
             stopSimulation();
         }
 
+        function getConnection(id) {
+            const c = connections.find(cx => cx.from === id);
+            return c ? c.to : null;
+        }
+
         function evaluateExpression(expr) {
+            // Replace variables with their values
             let parsed = expr;
-            // Simple sort by length desc to avoid replacing substrings of variable names
-            Object.keys(runtimeScope).sort((a,b)=>b.length-a.length).forEach(key => {
+            const keys = Object.keys(runtimeScope).sort((a,b)=>b.length-a.length);
+            
+            for(let key of keys) {
                 const val = runtimeScope[key];
-                // Regex to match variable name as a whole word
                 const regex = new RegExp(`\\b${key}\\b`, 'g');
-                parsed = parsed.replace(regex, typeof val === 'string' ? `'${val}'` : val);
-            });
+                // If string, wrap in quotes, if number, leave as is
+                const replacement = typeof val === 'string' ? `'${val}'` : val;
+                parsed = parsed.replace(regex, replacement);
+            }
+            
             try {
                 return Function('"use strict";return (' + parsed + ')')();
             } catch(e) { return "Error"; }
@@ -781,21 +761,23 @@
                 input.value = "";
                 bsInputModal.show();
                 
-                // Focus hack
-                setTimeout(() => input.focus(), 500);
+                // IMPORTANT FIX: Clone the input to remove old listeners, 
+                // BUT make sure we read the value from the NEW input
+                const newInput = input.cloneNode(true);
+                input.parentNode.replaceChild(newInput, input);
                 
-                const confirm = () => { const val = input.value; bsInputModal.hide(); resolve(val); };
+                setTimeout(() => newInput.focus(), 100); // Focus on new input
+
+                const confirm = () => { 
+                    const val = newInput.value; // Read from NEW input
+                    bsInputModal.hide(); 
+                    resolve(val); 
+                };
                 
-                // Remove old listeners
+                // Set listeners on new input
                 const newSubmit = submit.cloneNode(true);
                 submit.parentNode.replaceChild(newSubmit, submit);
                 newSubmit.onclick = confirm;
-                
-                const newInput = input.cloneNode(true);
-                input.parentNode.replaceChild(newInput, input);
-                newInput.id = "modal-input"; 
-                newInput.className = input.className;
-                newInput.placeholder = input.placeholder;
                 newInput.onkeydown = (e) => { if(e.key === 'Enter') confirm(); };
             });
         }
