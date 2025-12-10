@@ -738,27 +738,64 @@ Sk.configure({
             return false;
         }
 
-        function detectForLoop(decisionId) {
+    function detectForLoop(decisionId) {
             const decisionNode = nodes.find(n => n.id === decisionId);
             const cond = decisionNode.text;
+            
+            // 1. Get the variable name (e.g., 'x')
             const matchVar = cond.match(/^([a-zA-Z_]\w*)\s*[<>=!]+/);
             if(!matchVar) return null;
             const varName = matchVar[1];
+
+            // 2. Find Initialization (Must be a parent pointing TO the decision)
+            // e.g., "x = 0"
             const parents = connections.filter(c => c.to === decisionId).map(c => nodes.find(n => n.id === c.from));
-            if (parents.length < 2) return null;
-            let initNode = null, incNode = null;
-            for(let p of parents) {
-                if(p.type !== 'process') continue;
-                const rightSide = p.text.split('=')[1] || "";
-                if(rightSide.includes(varName) && rightSide.includes('+')) { incNode = p; } 
-                else if (p.text.trim().startsWith(varName)) { initNode = p; }
+            const initNode = parents.find(p => p.type === 'process' && (p.text.trim().startsWith(varName + ' =') || p.text.trim().startsWith(varName + '=')));
+            
+            if (!initNode) return null;
+
+            // 3. Find Increment (Search the "Yes" loop path)
+            // We traverse down the "Yes" path to see if we find "x = x + 1" anywhere before hitting the decision again
+            let incNode = null;
+            
+            // Start following the "Yes" (or loop) path
+            let currentNodeId = getNext(decisionId, 'yes'); 
+            
+            // Safety: Prevent infinite search with a max depth or visited set
+            let visited = new Set();
+            visited.add(decisionId);
+
+            while (currentNodeId && !visited.has(currentNodeId)) {
+                visited.add(currentNodeId);
+                const node = nodes.find(n => n.id === currentNodeId);
+                
+                // Check if this node is the incrementor
+                if (node.type === 'process') {
+                    const parts = node.text.split('=');
+                    if(parts.length > 1) {
+                         const left = parts[0].trim();
+                         const right = parts[1].trim();
+                         // Check for pattern: x = x + ...
+                         if (left === varName && right.includes(varName) && right.includes('+')) {
+                             incNode = node;
+                             break; // Found it!
+                         }
+                    }
+                }
+                
+                // Move to next node
+                currentNodeId = getNext(currentNodeId);
             }
-            if(!initNode || !incNode) return null;
+
+            if(!incNode) return null; // No increment found in the loop
+
+            // 4. Extract Values for Python range(start, stop, step)
             const startVal = initNode.text.split('=')[1].trim();
             const stepParts = incNode.text.split('+');
             const stepVal = stepParts[1] ? stepParts[1].trim() : '1';
             const stopParts = cond.match(/[<>=]+\s*(.+)/);
             const stopVal = stopParts ? stopParts[1].trim() : '10';
+
             return { varName, start: startVal, stop: stopVal, step: stepVal, incrementNodeId: incNode.id };
         }
         
