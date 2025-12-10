@@ -930,10 +930,8 @@
         }
         
         createNode('start', 50, 40);
-        createNode('process', 50, 160); 
-        createNode('decision', 80, 260); 
-        createNode('output', 80, 400);   
-        createNode('process', 300, 420); 
+
+        createNode('end', 300, 420); 
         
         setTimeout(() => {
             nodes[1].text = "i = 0"; document.getElementById(nodes[1].id).querySelector('.inner-text').innerText = "i = 0";
