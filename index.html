@@ -668,7 +668,7 @@ Sk.configure({
         }
     });
 
-   // --- 7. CODE GENERATION (Fixed Loop Logic) ---
+  // --- 7. CODE GENERATION (Fixed Loop Logic) ---
     let generatedCode = "";
     
     // We need to track loop headers to create "while True" blocks
@@ -694,6 +694,7 @@ Sk.configure({
         }
 
         // 2. Pre-scan for Unconditional Loops (Cycle Detection)
+        // This identifies nodes that are the start of a loop (visited twice in a stack)
         let stack = [];
         let visitedDFS = new Set();
         
@@ -701,12 +702,11 @@ Sk.configure({
             visitedDFS.add(u);
             stack.push(u);
             
-            // Find all children
             const children = connections.filter(c => c.from === u).map(c => c.to);
             
             for(let v of children) {
                 if(stack.includes(v)) {
-                    loopHeaders.add(v);
+                    loopHeaders.add(v); // Found a loop header
                 } else if(!visitedDFS.has(v)) {
                     detectCycles(v);
                 }
@@ -725,6 +725,7 @@ Sk.configure({
             return `highlight_node('${id}'); time.sleep(0.5)`;
         }
         
+        // Helper to see if a path loops back to the decision node specifically
         function pathExists(startId, targetId, seen = new Set()) {
             if(!startId) return false;
             if(startId === targetId) return true;
@@ -778,7 +779,8 @@ Sk.configure({
         function traverse(id, indent, activeLoopHeader = null) {
             if(!id) return;
             
-            // If we hit the top of the current loop again, STOP.
+            // STOP RECURSION if we hit the top of the current active loop
+            // This prevents infinite recursion in the generator
             if (id === activeLoopHeader) {
                 return;
             }
@@ -793,12 +795,13 @@ Sk.configure({
             let trace = getTraceCall(node.id);
 
             // --- CHECK FOR UNCONDITIONAL LOOP START ---
+            // If this node is a loop header (from step 2), and isn't already handled by a Decision logic
             if(loopHeaders.has(id) && node.type !== 'decision' && activeLoopHeader !== id) {
                 execCode.push(`${spaces}while True:`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> <span class="keyword">True</span>: <span class="comment"># Loop detected</span></div>`);
                 indent++;
                 spaces = "    ".repeat(indent);
-                activeLoopHeader = id; 
+                activeLoopHeader = id; // Set this node as the current loop top
             }
 
             // --- GENERATE NODE CODE ---
@@ -855,11 +858,11 @@ Sk.configure({
 
                 execCode.push(`${spaces}${trace}`);
 
-                // *** FIX: Check if this jumps back to the main 'while True' header ***
+                // *** FIX: Check if either branch jumps back to the main 'while True' header ***
                 const jumpsToHeader = activeLoopHeader && (yesId === activeLoopHeader || noId === activeLoopHeader);
 
+                // Only generate a while/for loop if it's a TIGHT loop (not jumping to main header)
                 if((isYesLoop || isNoLoop) && !jumpsToHeader) {
-                    // (Existing For/While loop logic for tight loops)
                     let loopCondition = condition;
                     let loopBodyId = yesId;
                     let afterLoopId = noId;
@@ -867,6 +870,7 @@ Sk.configure({
                     if(isYesLoop) { forLoopData = detectForLoop(node.id); }
 
                     if(forLoopData) {
+                        // FOR LOOP
                         let loopLine = `for ${forLoopData.varName} in range(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):`;
                         execCode.push(`${spaces}${loopLine}`);
                         displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${forLoopData.varName} <span class="keyword">in</span> <span class="func">range</span>(${forLoopData.start}, ${forLoopData.stop}, ${forLoopData.step}):</div>`);
@@ -879,6 +883,7 @@ Sk.configure({
                         }
                         if(afterLoopId) traverse(afterLoopId, indent, activeLoopHeader);
                     } else {
+                        // WHILE LOOP (Local)
                         if(isNoLoop) {
                             loopCondition = invertCondition(condition);
                             loopBodyId = noId;
@@ -892,7 +897,7 @@ Sk.configure({
                         if(afterLoopId) traverse(afterLoopId, indent, activeLoopHeader); 
                     }
                 } else {
-                    // *** FIX: Standard IF/ELSE logic with 'continue' support ***
+                    // *** FIX: STANDARD IF/ELSE with 'continue' support ***
                     execCode.push(`${spaces}if ${condition}:`);
                     displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`);
                     
