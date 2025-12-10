@@ -667,18 +667,19 @@
         }
     });
 
-    // --- 7. CODE GENERATION ---
+   // --- 7. CODE GENERATION (With Loop Detection) ---
     let generatedCode = "";
-    let visited = new Set();
-    let skipNodes = new Set(); 
+    
+    // We need to track loop headers to create "while True" blocks
+    let loopHeaders = new Set();
 
     function updateCode() {
-        visited.clear();
-        skipNodes.clear();
         const pyBox = document.getElementById('code-python');
         
+        // 1. Reset State
         let displayHtml = [];
         let execCode = [];
+        loopHeaders.clear();
 
         execCode.push("import time");
         execCode.push("import random");
@@ -686,13 +687,47 @@
         execCode.push("");
 
         let startNode = nodes.find(n => n.type === 'start');
-        if(!startNode) { pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; return; }
+        if(!startNode) { 
+            pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; 
+            return; 
+        }
 
+        // 2. Pre-scan for Unconditional Loops (Cycle Detection)
+        // We look for any node that is visited while currently in the recursion stack
+        let stack = [];
+        let visitedDFS = new Set();
+        
+        function detectCycles(u) {
+            visitedDFS.add(u);
+            stack.push(u);
+            
+            // Find all children
+            const children = connections.filter(c => c.from === u).map(c => c.to);
+            
+            for(let v of children) {
+                if(stack.includes(v)) {
+                    // If v is already in the current stack, we found a loop back to v!
+                    // v is the "Header" of a loop.
+                    loopHeaders.add(v);
+                } else if(!visitedDFS.has(v)) {
+                    detectCycles(v);
+                }
+            }
+            stack.pop();
+        }
+        detectCycles(startNode.id);
+
+        // 3. Helpers
         function getNext(id, port) { 
             const c = connections.find(cx => cx.from === id && (!port || cx.port === port)); 
             return c ? c.to : null; 
         }
 
+        function getTraceCall(id) {
+            return `highlight_node('${id}'); time.sleep(0.5)`;
+        }
+        
+        // For decision nodes, we still use the specific logic
         function pathExists(startId, targetId, seen = new Set()) {
             if(!startId) return false;
             if(startId === targetId) return true;
@@ -706,6 +741,7 @@
         }
 
         function detectForLoop(decisionId) {
+            // ... (Keep existing for-loop logic purely for decision nodes)
             const decisionNode = nodes.find(n => n.id === decisionId);
             const cond = decisionNode.text;
             const matchVar = cond.match(/^([a-zA-Z_]\w*)\s*[<>=!]+/);
@@ -713,8 +749,7 @@
             const varName = matchVar[1];
             const parents = connections.filter(c => c.to === decisionId).map(c => nodes.find(n => n.id === c.from));
             if (parents.length < 2) return null;
-            let initNode = null;
-            let incNode = null;
+            let initNode = null, incNode = null;
             for(let p of parents) {
                 if(p.type !== 'process') continue;
                 const rightSide = p.text.split('=')[1] || "";
@@ -740,28 +775,46 @@
             return `not (${cond})`;
         }
 
-        function getTraceCall(id) {
-            return `highlight_node('${id}'); time.sleep(0.5)`;
-        }
+        // 4. Main Traversal
+        // We track 'activeLoopHeader' to know when to STOP recursion (when we hit the top of the loop again)
+        let processedGlobal = new Set();
+        let skipNodes = new Set();
 
-        function traverse(id, indent, stopNodeId = null) {
+        function traverse(id, indent, activeLoopHeader = null) {
             if(!id) return;
-            if(skipNodes.has(id)) return;
-            if(id === stopNodeId) return;
             
-            if(stopNodeId === null) {
-                if(visited.has(id)) return;
-                visited.add(id);
+            // If we hit the top of the current loop again, we stop (implicit goto top)
+            if (id === activeLoopHeader) {
+                return;
             }
+
+            // Standard recursion prevention for non-loops
+            // But we allow re-visiting if we are entering a NEW loop logic
+            if(processedGlobal.has(id) && !loopHeaders.has(id)) return;
+            processedGlobal.add(id);
+            
+            if(skipNodes.has(id)) return;
 
             const node = nodes.find(n => n.id === id); 
             let spaces = "    ".repeat(indent);
             let trace = getTraceCall(node.id);
 
+            // --- CHECK FOR UNCONDITIONAL LOOP START ---
+            // If this node was identified as a loop header, and it's NOT a decision (decisions handle their own loops),
+            // We wrap it in while True.
+            if(loopHeaders.has(id) && node.type !== 'decision' && activeLoopHeader !== id) {
+                execCode.push(`${spaces}while True:`);
+                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> <span class="keyword">True</span>: <span class="comment"># Loop detected</span></div>`);
+                indent++;
+                spaces = "    ".repeat(indent);
+                activeLoopHeader = id; // Set this as the active loop
+            }
+
+            // --- GENERATE NODE CODE ---
             if(node.type === 'start') {
                 execCode.push(`${spaces}${trace}`);
                 displayHtml.push(`<div class="code-line"><span class="comment"># Flow Start</span></div>`);
-                traverse(getNext(node.id), indent, stopNodeId);
+                traverse(getNext(node.id), indent, activeLoopHeader);
             } 
             else if(node.type === 'end') {
                 execCode.push(`${spaces}${trace}`);
@@ -772,7 +825,7 @@
                 execCode.push(`${spaces}${trace}`);
                 execCode.push(`${spaces}${node.text}`);
                 displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
-                traverse(getNext(node.id), indent, stopNodeId);
+                traverse(getNext(node.id), indent, activeLoopHeader);
             } 
             else if(node.type === 'input') {
                 execCode.push(`${spaces}${trace}`);
@@ -792,16 +845,19 @@
                 }
                 execCode.push(`${spaces}${varName} = input(${promptCode})`);
                 displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">input</span>(<span class="string">${promptCode}</span>)</div>`);
-                traverse(getNext(node.id), indent, stopNodeId);
+                traverse(getNext(node.id), indent, activeLoopHeader);
             } 
             else if(node.type === 'output') {
                 execCode.push(`${spaces}${trace}`);
                 let val = node.text.replace(/Print/i, '').trim();
                 execCode.push(`${spaces}print(${val})`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
-                traverse(getNext(node.id), indent, stopNodeId);
+                traverse(getNext(node.id), indent, activeLoopHeader);
             } 
             else if(node.type === 'decision') {
+                // Decision nodes have built-in loop handling (while condition), so we generally
+                // don't wrap them in `while True` above, unless complex nesting occurs.
+                
                 let condition = node.text.replace(/(?<![<>!=])=(?![=])/g, '==');
                 const yesId = getNext(node.id, 'yes');
                 const noId = getNext(node.id, 'no');
@@ -829,7 +885,7 @@
                         } else {
                             traverse(loopBodyId, indent + 1, node.id); 
                         }
-                        if(afterLoopId) traverse(afterLoopId, indent, stopNodeId);
+                        if(afterLoopId) traverse(afterLoopId, indent, activeLoopHeader);
                     } else {
                         if(isNoLoop) {
                             loopCondition = invertCondition(condition);
@@ -841,12 +897,12 @@
                         displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
                         
                         if(loopBodyId) traverse(loopBodyId, indent + 1, node.id); 
-                        if(afterLoopId) traverse(afterLoopId, indent, stopNodeId); 
+                        if(afterLoopId) traverse(afterLoopId, indent, activeLoopHeader); 
                     }
                 } else {
                     execCode.push(`${spaces}if ${condition}:`);
                     displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`);
-                    if(yesId) traverse(yesId, indent + 1, stopNodeId);
+                    if(yesId) traverse(yesId, indent + 1, activeLoopHeader);
                     else {
                         execCode.push(`${spaces}    pass`);
                         displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
@@ -854,11 +910,12 @@
                     if(noId) {
                         execCode.push(`${spaces}else:`);
                         displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
-                        traverse(noId, indent + 1, stopNodeId);
+                        traverse(noId, indent + 1, activeLoopHeader);
                     }
                 }
             }
         }
+        
         traverse(startNode.id, 0);
         pyBox.innerHTML = displayHtml.join('');
         generatedCode = execCode.join("\n");
