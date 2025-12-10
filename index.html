@@ -112,15 +112,24 @@
         .shape-end { border-color: #dc3545; }
         .shape-process { border-radius: 4px; background: #fff; width: 140px; height: 55px; }
         
-        .shape-decision { 
-            width: 110px; height: 90px; background: #fff; 
+.shape-decision { 
+            width: 110px; height: 90px; 
+            /* 1. Set the main background to the Border Color */
+            background: var(--node-border); 
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); 
         }
         .shape-decision::before {
-            content:''; position: absolute; inset:0; background:var(--node-border); 
-            z-index:-1; clip-path: inherit; margin:-2px;
+            content:''; position: absolute; 
+            /* 2. Shrink the inner layer by 2px to create the border effect */
+            inset: 2px; 
+            /* 3. Set the inner background to White */
+            background: #fff; 
+            z-index: -1; 
+            clip-path: inherit; 
+            margin: 0; /* Remove the old negative margin */
         }
 
+        
         .shape-io, .shape-input, .shape-output { 
             transform: skew(-20deg); background: #fff; border-radius: 4px; 
             width: 130px; height: 55px; margin-left: 10px; 
