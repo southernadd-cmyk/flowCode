@@ -818,17 +818,7 @@ function detectForLoop(decisionId) {
             return { varName, start: startVal, stop: stopVal, step: stepVal, incrementNodeId: incNode.id };
         }
 
-            if(!incNode) return null; // No increment found in the loop
 
-            // 4. Extract Values for Python range(start, stop, step)
-            const startVal = initNode.text.split('=')[1].trim();
-            const stepParts = incNode.text.split('+');
-            const stepVal = stepParts[1] ? stepParts[1].trim() : '1';
-            const stopParts = cond.match(/[<>=]+\s*(.+)/);
-            const stopVal = stopParts ? stopParts[1].trim() : '10';
-
-            return { varName, start: startVal, stop: stopVal, step: stepVal, incrementNodeId: incNode.id };
-        }
         
         function invertCondition(cond) {
             if(cond.includes('<=')) return cond.replace('<=', '>');
