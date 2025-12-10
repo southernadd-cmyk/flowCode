@@ -298,27 +298,28 @@
         return Sk.builtinFiles["files"][x];
     }
 
-    Sk.configure({
-        output: function(text) { 
-            if(text !== '\n') log(text); 
-        },
-        read: builtinRead,
-        // This function overrides the default browser prompt
-        inputFun: function(promptText) {
-            return new Promise(function(resolve) {
-                // Determine the prompt message
-                const msg = promptText || "Input required:";
-                log(msg, "input"); // Echo prompt to our console
-                
-                // Call our custom modal function
-                showInputModal(msg).then(function(result) {
-                    log(result, "input"); // Echo result to our console
-                    resolve(result);      // Resume Python execution
-                });
+Sk.configure({
+    output: function(text) { 
+        if(text !== '\n') log(text); 
+    },
+    read: builtinRead,
+    // This function overrides the default browser prompt
+    inputfun: function(promptText) {        
+        return new Promise(function(resolve) {
+            // Determine the prompt message
+            const msg = promptText || "Input required:";
+            log(msg, "input"); // Echo prompt to our console
+            
+            // Call our custom modal function
+            showInputModal(msg).then(function(result) {
+                log(result, "input"); // Echo result to our console
+                resolve(result);      // Resume Python execution
             });
-        },
-        inputFunTakesPrompt: true // Critical: tells Skulpt to pass the prompt string to us
-    });
+        });
+    },
+    inputfunTakesPrompt: true               
+});
+
 
     // --- 3. MODAL LOGIC (Robust Version) ---
     function showInputModal(msg) {
