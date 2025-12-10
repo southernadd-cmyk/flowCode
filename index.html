@@ -707,350 +707,307 @@
         }
     });
 
-    // --- 6. ENHANCED CODE GENERATION WITH LOOP DETECTION ---
+    // --- 6. ROBUST GRAPH-TO-CODE GENERATION ---
     let generatedCode = "";
 
     function updateCode() {
         const pyBox = document.getElementById('code-python');
-        let displayHtml = [];
         let execCode = [];
-        execCode.push("import time", "import random", "import math", "import sys", "");
+        let displayHtml = [];
         
-        let startNode = nodes.find(n => n.type === 'start');
-        if(!startNode) { 
-            pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>'; 
-            return; 
+        // Boilerplate imports
+        execCode.push("import time", "import random", "import math", "import sys", "");
+
+        const startNode = nodes.find(n => n.type === 'start');
+        if (!startNode) {
+            pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>';
+            return;
         }
 
-        // --- GRAPH ANALYSIS FOR LOOP DETECTION ---
-        const adjacency = {};
-        const reverseAdjacency = {};
-        nodes.forEach(n => adjacency[n.id] = []);
+        // 1. Build Graph Helpers
+        const adj = {};      // NodeID -> [{to, port}]
+        const revAdj = {};   // NodeID -> [from]
+        nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
         connections.forEach(c => {
-            if(adjacency[c.from]) adjacency[c.from].push({node: c.to, port: c.port});
-            if(!reverseAdjacency[c.to]) reverseAdjacency[c.to] = [];
-            reverseAdjacency[c.to].push(c.from);
+            if (adj[c.from]) adj[c.from].push({ to: c.to, port: c.port });
+            if (revAdj[c.to]) revAdj[c.to].push(c.from);
         });
 
-        // 1. Detect cycles using DFS
-        const visited = new Set();
-        const recursionStack = new Set();
-        const backEdges = new Set();
+        // 2. Identify Loops (Back Edges)
+        // A back edge connects a node to one of its dominators.
+        // Simple DFS to find nodes currently in recursion stack is sufficient for flowcharts.
         const loopHeaders = new Set();
+        const backEdges = new Set(); // Strings: "from->to"
+        const visited = new Set();
+        const stack = new Set();
 
-        function detectCyclesDFS(nodeId) {
-            visited.add(nodeId);
-            recursionStack.add(nodeId);
-            
-            const neighbors = adjacency[nodeId] || [];
-            for(const neighbor of neighbors) {
-                if(!visited.has(neighbor.node)) {
-                    detectCyclesDFS(neighbor.node);
-                } else if(recursionStack.has(neighbor.node)) {
-                    // Found a back edge
-                    backEdges.add(`${nodeId}->${neighbor.node}`);
-                    loopHeaders.add(neighbor.node);
+        function findBackEdges(u) {
+            visited.add(u);
+            stack.add(u);
+            const neighbors = adj[u] || [];
+            for (let edge of neighbors) {
+                if (stack.has(edge.to)) {
+                    backEdges.add(`${u}->${edge.to}`);
+                    loopHeaders.add(edge.to);
+                } else if (!visited.has(edge.to)) {
+                    findBackEdges(edge.to);
                 }
             }
-            
-            recursionStack.delete(nodeId);
+            stack.delete(u);
         }
-        
-        detectCyclesDFS(startNode.id);
+        findBackEdges(startNode.id);
 
-        // 2. Helper functions
-        function getNext(nodeId, port = null) {
-            const conns = connections.filter(c => c.from === nodeId);
-            if(port) {
-                const conn = conns.find(c => c.port === port);
-                return conn ? conn.to : null;
+        // 3. Helper: Find Merge Node (Immediate Post Dominator approximation)
+        // Where do two branches eventually meet?
+        function findMergeNode(branchA, branchB) {
+            if (!branchA || !branchB) return null;
+            const pathA = getAllSuccessors(branchA);
+            const pathB = getAllSuccessors(branchB);
+            // The first node that appears in both reachable sets (BFS order)
+            // This is a simplified approach sufficient for standard flowcharts
+            for (let id of pathA) {
+                if (pathB.includes(id)) return id;
             }
-            return conns[0] ? conns[0].to : null;
-        }
-
-        function getTraceCall(nodeId) { 
-            return `highlight_node('${nodeId}')`; 
-        }
-
-        // 3. Detect loop type for decision nodes
-        function analyzeLoopType(nodeId) {
-            const node = nodes.find(n => n.id === nodeId);
-            if(node.type !== 'decision') return null;
-            
-            const yesChild = getNext(nodeId, 'yes');
-            const noChild = getNext(nodeId, 'no');
-            
-            // Check if this is a for-loop pattern
-            const condition = node.text;
-            
-            // Pattern for for-loops: variable < operator > limit
-            const forPattern = /^([a-zA-Z_]\w*)\s*([<>]=?|==|!=)\s*([^<>=!]+)$/;
-            const match = condition.match(forPattern);
-            
-            if(match) {
-                const [_, varName, operator, limit] = match;
-                
-                // Check if there's an increment operation in the yes branch
-                const hasIncrement = checkForIncrement(yesChild, varName);
-                
-                if(hasIncrement) {
-                    // Check for initialization before the loop
-                    const initNode = findInitialization(varName, nodeId);
-                    
-                    if(initNode) {
-                        return {
-                            type: 'for',
-                            varName: varName,
-                            initValue: initNode.text.split('=')[1].trim(),
-                            condition: condition,
-                            incrementNode: hasIncrement,
-                            yesBranch: yesChild,
-                            noBranch: noChild
-                        };
-                    }
-                }
-            }
-            
-            // Check if it's a while loop (back edge present)
-            if(loopHeaders.has(nodeId)) {
-                return {
-                    type: 'while',
-                    condition: condition,
-                    yesBranch: yesChild,
-                    noBranch: noChild,
-                    isInfinite: condition.toLowerCase() === 'true' || condition === '1'
-                };
-            }
-            
-            return null;
-        }
-        
-        function checkForIncrement(startId, varName) {
-            const visited = new Set();
-            const queue = [startId];
-            
-            while(queue.length > 0) {
-                const currentId = queue.shift();
-                if(!currentId || visited.has(currentId)) continue;
-                visited.add(currentId);
-                
-                const node = nodes.find(n => n.id === currentId);
-                if(node && node.type === 'process') {
-                    // Check for increment patterns: var = var + 1, var += 1, var = var - 1, etc.
-                    const text = node.text.trim();
-                    const incrementPatterns = [
-                        new RegExp(`^${varName}\\s*=\\s*${varName}\\s*[+-]\\s*\\d+`),
-                        new RegExp(`^${varName}\\s*[+-]=\\s*\\d+`),
-                        new RegExp(`^${varName}\\s*=\\s*${varName}\\s*[+-]\\s*1$`)
-                    ];
-                    
-                    for(const pattern of incrementPatterns) {
-                        if(pattern.test(text)) {
-                            return node.id;
-                        }
-                    }
-                }
-                
-                // Continue exploring
-                const nextId = getNext(currentId);
-                if(nextId) queue.push(nextId);
-            }
-            
-            return null;
-        }
-        
-        function findInitialization(varName, beforeNodeId) {
-            // Trace back to find where variable was initialized
-            const visited = new Set();
-            const queue = [beforeNodeId];
-            
-            while(queue.length > 0) {
-                const currentId = queue.shift();
-                if(!currentId || visited.has(currentId)) continue;
-                visited.add(currentId);
-                
-                const node = nodes.find(n => n.id === currentId);
-                if(node && node.type === 'process') {
-                    // Check for initialization: var = value
-                    const initPattern = new RegExp(`^${varName}\\s*=\\s*[^=]+$`);
-                    if(initPattern.test(node.text.trim())) {
-                        return node;
-                    }
-                }
-                
-                // Check parents
-                const parents = reverseAdjacency[currentId] || [];
-                for(const parent of parents) {
-                    queue.push(parent);
-                }
-            }
-            
             return null;
         }
 
-        // 4. Main traversal with enhanced loop handling
+        function getAllSuccessors(startId) {
+            const list = [];
+            const q = [startId];
+            const seen = new Set([startId]);
+            while (q.length) {
+                const u = q.shift();
+                list.push(u);
+                const neighbors = adj[u] || [];
+                for (let edge of neighbors) {
+                    // Don't follow back edges for successor logic
+                    if (!backEdges.has(`${u}->${edge.to}`) && !seen.has(edge.to)) {
+                        seen.add(edge.to);
+                        q.push(edge.to);
+                    }
+                }
+            }
+            return list;
+        }
+
+        // 4. Code Generation State
         const processed = new Set();
-        const loopStack = [];
-        
-        function traverse(nodeId, indent = 0, inLoopHeader = null) {
-            if(!nodeId || processed.has(nodeId)) return;
-            processed.add(nodeId);
+
+        function generateBlock(nodeId, indentLvl, stopNodeId = null) {
+            if (!nodeId || nodeId === stopNodeId) return;
+            // Prevent infinite recursion in malformed graphs, 
+            // but allow re-visiting loop headers if we are explicitly entering the loop
+            if (processed.has(nodeId) && !loopHeaders.has(nodeId)) return;
             
+            // Mark processed unless it's a loop header we are about to process
+            if (!loopHeaders.has(nodeId)) processed.add(nodeId);
+
             const node = nodes.find(n => n.id === nodeId);
-            if(!node) return;
+            const spaces = "    ".repeat(indentLvl);
             
-            const spaces = "    ".repeat(indent);
-            
-            // Add trace call
-            execCode.push(`${spaces}${getTraceCall(nodeId)}`);
-            
-            switch(node.type) {
-                case 'start':
-                    displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
-                    traverse(getNext(nodeId), indent, inLoopHeader);
-                    break;
+            // Highlight Trace
+            execCode.push(`${spaces}highlight_node('${nodeId}')`);
+
+            // --- A. DECISION NODES (IF vs LOOP) ---
+            if (node.type === 'decision') {
+                const isLoop = loopHeaders.has(nodeId);
+                const yesEdge = adj[nodeId].find(e => e.port === 'yes');
+                const noEdge = adj[nodeId].find(e => e.port === 'no');
+                const yesNode = yesEdge ? yesEdge.to : null;
+                const noNode = noEdge ? noEdge.to : null;
+
+                if (isLoop) {
+                    // processed.add(nodeId); // Mark header processed now
                     
-                case 'end':
-                    execCode.push(`${spaces}exit()`);
-                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`);
-                    break;
+                    // 1. Analyze Loop Type
+                    const loopDetails = analyzeLoop(node, yesNode, noNode);
                     
-                case 'process':
-                    execCode.push(`${spaces}${node.text}`);
-                    displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
-                    traverse(getNext(nodeId), indent, inLoopHeader);
-                    break;
-                    
-                case 'input':
-                    let clean = node.text.replace(/^Input\s+/i, '').trim();
-                    let varName = clean, promptText = `"${clean}: "`;
-                    if(clean.includes('=')) { 
-                        varName = clean.split('=')[0].trim(); 
-                        promptText = clean.split('=')[1].trim(); 
-                    }
-                    if(!promptText.startsWith('"') && !promptText.startsWith("'")) {
-                        promptText = `"${promptText}"`;
-                    }
-                    
-                    if(node.dataType === 'int') {
-                        execCode.push(`${spaces}${varName} = int(input(${promptText}))`);
-                        displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>(<span class="string">${promptText}</span>))</div>`);
-                    } else {
-                        execCode.push(`${spaces}${varName} = input(${promptText})`);
-                        displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">input</span>(<span class="string">${promptText}</span>)</div>`);
-                    }
-                    traverse(getNext(nodeId), indent, inLoopHeader);
-                    break;
-                    
-                case 'output':
-                    let val = node.text.replace(/^Print\s*/i, '').trim();
-                    // Check if it's a variable or expression
-                    if(/^[a-zA-Z_]\w*$/.test(val)) {
-                        // Variable reference
-                        execCode.push(`${spaces}print(${val})`);
-                        displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
-                    } else if(/^".*"$|^'.*'$/.test(val)) {
-                        // String literal
-                        execCode.push(`${spaces}print(${val})`);
-                        displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(<span class="string">${val}</span>)</div>`);
-                    } else if(/^\d+$/.test(val)) {
-                        // Number
-                        execCode.push(`${spaces}print(${val})`);
-                        displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(<span class="number">${val}</span>)</div>`);
-                    } else {
-                        // Expression
-                        execCode.push(`${spaces}print(${val})`);
-                        displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
-                    }
-                    traverse(getNext(nodeId), indent, inLoopHeader);
-                    break;
-                    
-                case 'decision':
-                    const loopAnalysis = analyzeLoopType(nodeId);
-                    
-                    if(loopAnalysis && loopHeaders.has(nodeId)) {
-                        // This is a loop header
-                        loopStack.push(nodeId);
+                    if (loopDetails.type === 'for') {
+                        // FOR LOOP
+                        const { varName, start, end, step } = loopDetails;
+                        const rangeArgs = step === '1' ? `${start}, ${end}` : `${start}, ${end}, ${step}`;
                         
-                        if(loopAnalysis.type === 'for') {
-                            // Generate for loop
-                            const condition = node.text;
-                            const rangeMatch = condition.match(/([a-zA-Z_]\w*)\s*[<>]=?\s*(\d+)/);
-                            if(rangeMatch) {
-                                const [_, varName, limit] = rangeMatch;
-                                const initVal = loopAnalysis.initValue || '0';
-                                const op = condition.includes('<') ? '<' : '>';
-                                
-                                let rangeExpr = `range(${initVal}, ${limit})`;
-                                if(op === '<=') {
-                                    rangeExpr = `range(${initVal}, ${limit}+1)`;
-                                }
-                                
-                                execCode.push(`${spaces}for ${varName} in ${rangeExpr}:`);
-                                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${initVal}, ${limit}):</div>`);
-                                
-                                // Mark increment node as processed
-                                if(loopAnalysis.incrementNode) {
-                                    processed.add(loopAnalysis.incrementNode);
-                                }
-                                
-                                // Traverse loop body
-                                traverse(loopAnalysis.yesBranch, indent + 1, nodeId);
-                                
-                                // Exit path
-                                traverse(loopAnalysis.noBranch, indent, inLoopHeader);
-                            }
-                        } else if(loopAnalysis.type === 'while') {
-                            // Generate while loop
-                            if(loopAnalysis.isInfinite) {
-                                execCode.push(`${spaces}while True:`);
-                                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> <span class="keyword">True</span>:</div>`);
-                            } else {
-                                let cond = node.text.replace(/=/g, '==').replace(/====/g, '==');
-                                execCode.push(`${spaces}while ${cond}:`);
-                                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${cond}:</div>`);
-                            }
-                            
-                            // Traverse loop body (yes branch)
-                            traverse(getNext(nodeId, 'yes'), indent + 1, nodeId);
-                            
-                            // Exit path (no branch)
-                            traverse(getNext(nodeId, 'no'), indent, inLoopHeader);
-                        }
+                        execCode.push(`${spaces}for ${varName} in range(${rangeArgs}):`);
+                        displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
                         
-                        loopStack.pop();
+                        // We must NOT generate the increment node inside the Python loop (range handles it)
+                        // So we pass the increment node ID as a "skip" target to the recursive body generator
+                        processed.add(loopDetails.incrementId); 
+                        
+                        // Body
+                        generateBlock(yesNode, indentLvl + 1, nodeId); // Stop when hitting header
+                        
                     } else {
-                        // Regular if statement
+                        // WHILE LOOP
                         let cond = node.text.replace(/=/g, '==').replace(/====/g, '==');
-                        execCode.push(`${spaces}if ${cond}:`);
-                        displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${cond}:</div>`);
+                        if (cond.toLowerCase() === 'true' || cond === '1') cond = 'True';
                         
-                        const yesId = getNext(nodeId, 'yes');
-                        const noId = getNext(nodeId, 'no');
+                        execCode.push(`${spaces}while ${cond}:`);
+                        displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${cond}:</div>`);
                         
-                        if(yesId) {
-                            traverse(yesId, indent + 1, inLoopHeader);
-                        } else {
-                            execCode.push(`${spaces}    pass`);
-                            displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
-                        }
-                        
-                        if(noId) {
-                            execCode.push(`${spaces}else:`);
-                            displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
-                            traverse(noId, indent + 1, inLoopHeader);
-                        }
+                        // Body (Yes branch usually enters loop)
+                        // Note: If 'No' enters loop, we'd swap logic. Assuming Yes = Enter Loop.
+                        generateBlock(yesNode, indentLvl + 1, nodeId); 
                     }
-                    break;
+
+                    // Continue with the code AFTER the loop (The No branch)
+                    generateBlock(noNode, indentLvl, stopNodeId);
+
+                } else {
+                    // STANDARD IF / ELSE
+                    processed.add(nodeId);
+                    
+                    const mergePoint = findMergeNode(yesNode, noNode);
+                    let cond = node.text.replace(/=/g, '==').replace(/====/g, '==');
+                    
+                    execCode.push(`${spaces}if ${cond}:`);
+                    displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${cond}:</div>`);
+                    
+                    if (yesNode) {
+                        generateBlock(yesNode, indentLvl + 1, mergePoint);
+                    } else {
+                        execCode.push(`${spaces}    pass`);
+                        displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
+                    }
+
+                    if (noNode && noNode !== mergePoint) {
+                        execCode.push(`${spaces}else:`);
+                        displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
+                        generateBlock(noNode, indentLvl + 1, mergePoint);
+                    }
+                    
+                    // Continue from merge point
+                    if (mergePoint) {
+                        // Reset processed for the merge point to ensure it generates
+                        processed.delete(mergePoint); 
+                        generateBlock(mergePoint, indentLvl, stopNodeId);
+                    }
+                }
+                return;
+            }
+
+            // --- B. LINEAR NODES (Start, Process, IO, End) ---
+            
+            // Generate Code for Node
+            if (node.type === 'start') {
+                displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
+            }
+            else if (node.type === 'end') {
+                execCode.push(`${spaces}exit()`);
+                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`);
+                return; // Stop generation
+            }
+            else if (node.type === 'process') {
+                execCode.push(`${spaces}${node.text}`);
+                displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
+            }
+            else if (node.type === 'input') {
+                // ... (Keep existing Input parsing logic)
+                let clean = node.text.replace(/^Input\s+/i, '').trim();
+                let varName = clean, promptText = `"${clean}: "`;
+                if(clean.includes('=')) { 
+                    varName = clean.split('=')[0].trim(); 
+                    promptText = clean.split('=')[1].trim(); 
+                }
+                if(!promptText.startsWith('"') && !promptText.startsWith("'")) promptText = `"${promptText}"`;
+                
+                if(node.dataType === 'int') {
+                    execCode.push(`${spaces}${varName} = int(input(${promptText}))`);
+                    displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>(<span class="string">${promptText}</span>))</div>`);
+                } else {
+                    execCode.push(`${spaces}${varName} = input(${promptText})`);
+                    displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">input</span>(<span class="string">${promptText}</span>)</div>`);
+                }
+            }
+            else if (node.type === 'output') {
+                 // ... (Keep existing Output parsing logic)
+                let val = node.text.replace(/^Print\s*/i, '').trim();
+                let displayVal = val;
+                if (!val.startsWith('"') && !val.startsWith("'") && isNaN(val)) {
+                    // variable
+                } else if (!isNaN(val)) {
+                    displayVal = `<span class="number">${val}</span>`;
+                } else {
+                    displayVal = `<span class="string">${val}</span>`;
+                }
+                execCode.push(`${spaces}print(${val})`);
+                displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${displayVal})</div>`);
+            }
+
+            // Move to next node
+            const nextEdge = adj[nodeId][0]; // Simple nodes only have 1 out
+            if (nextEdge) {
+                generateBlock(nextEdge.to, indentLvl, stopNodeId);
             }
         }
-        
-        // Start traversal
-        traverse(startNode.id);
+
+        // 5. Advanced Loop Analyzer
+        function analyzeLoop(headerNode, yesNode, noNode) {
+            // Regex to parse condition: i < 5, count >= 10
+            const condMatch = headerNode.text.match(/([a-zA-Z_]\w*)\s*([<>=!]+)\s*([^<>=!]+)/);
+            if (!condMatch) return { type: 'while' };
+
+            const [_, varName, op, limit] = condMatch;
+            
+            // Check 1: Find Initialization (Look backwards from header)
+            // We look at the parents of the header (excluding the back-edge parent)
+            const parents = revAdj[headerNode.id] || [];
+            const nonLoopParent = parents.find(pid => !backEdges.has(`${pid}->${headerNode.id}`));
+            
+            let startVal = '0';
+            if (nonLoopParent) {
+                const pNode = nodes.find(n => n.id === nonLoopParent);
+                if (pNode && pNode.type === 'process') {
+                    // Look for varName = value
+                    const initMatch = pNode.text.match(new RegExp(`^${varName}\\s*=\\s*(\\d+)`));
+                    if (initMatch) startVal = initMatch[1];
+                }
+            }
+
+            // Check 2: Find Increment (BFS inside the loop body)
+            let incrementId = null;
+            let stepVal = '1';
+            
+            const q = [yesNode];
+            const seen = new Set();
+            while(q.length) {
+                const curr = q.shift();
+                if(seen.has(curr) || curr === headerNode.id) continue;
+                seen.add(curr);
+                
+                const n = nodes.find(x => x.id === curr);
+                if(n && n.type === 'process') {
+                    // Check for i = i + 1, i += 1, etc.
+                    // Simple regex for standard increment patterns
+                    if(n.text.includes(`${varName} = ${varName} +`) || n.text.includes(`${varName} +=`)) {
+                        incrementId = n.id;
+                        // Try to parse step
+                        const stepMatch = n.text.match(/\+\s*(\d+)/) || n.text.match(/\+=\s*(\d+)/);
+                        if(stepMatch) stepVal = stepMatch[1];
+                        break;
+                    }
+                }
+                
+                // Add neighbors
+                (adj[curr]||[]).forEach(e => q.push(e.to));
+            }
+
+            // If we have an Init, a Condition, and an Increment -> It's a FOR loop
+            if (incrementId) {
+                let pyLimit = limit;
+                if (op.includes('=')) pyLimit = `${limit} + 1`; // inclusive range adjustment
+                return { type: 'for', varName, start: startVal, end: pyLimit, step: stepVal, incrementId };
+            }
+
+            return { type: 'while' };
+        }
+
+        // START GENERATION
+        generateBlock(startNode.id, 0);
+
         pyBox.innerHTML = displayHtml.join('');
         generatedCode = execCode.join("\n");
     }
-
     // --- 7. RUNTIME ---
     function log(msg, type='info') {
         const div = document.createElement('div');
