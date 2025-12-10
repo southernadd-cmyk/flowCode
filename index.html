@@ -711,15 +711,37 @@
                     displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
                     traverse(getNext(node.id), indent, stopNodeId);
                 } 
-                else if(node.type === 'input') {
-                    // Exec: Trace + Code
+else if(node.type === 'input') {
+                    // Exec: Trace
                     execCode.push(`${spaces}${trace}`);
-                    let varName = node.text.replace(/Input/i, '').trim();
-                    execCode.push(`${spaces}${varName} = input("${varName}: ")`);
-                    // Display: Code
-                    displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>("${varName}: "))</div>`);
+
+                    // 1. Remove the word "Input" to get the raw content
+                    let rawContent = node.text.replace(/^Input\s+/i, '').trim();
+                    
+                    let varName = rawContent;
+                    let promptStr = `"${varName}: "`; // Default prompt if none provided
+
+                    // 2. Check if user typed: Input x = "My Prompt"
+                    if (rawContent.includes('=')) {
+                        const parts = rawContent.split('=');
+                        varName = parts[0].trim();
+                        promptStr = parts.slice(1).join('=').trim(); // Grab everything after first =
+                        
+                        // Intelligent Quote Handling:
+                        // If the user forgot quotes (e.g., Input x = Enter Number), add them automatically.
+                        if (!promptStr.startsWith('"') && !promptStr.startsWith("'")) {
+                            promptStr = `"${promptStr}"`;
+                        }
+                    }
+
+                    // 3. Generate the Python Code (No int() wrapper, allows strings)
+                    execCode.push(`${spaces}${varName} = input(${promptStr})`);
+                    
+                    // 4. Update the Display Panel
+                    displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">input</span>(<span class="string">${promptStr}</span>)</div>`);
+                    
                     traverse(getNext(node.id), indent, stopNodeId);
-                } 
+                }
                 else if(node.type === 'output') {
                     // Exec: Trace + Code
                     execCode.push(`${spaces}${trace}`);
