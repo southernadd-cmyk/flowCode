@@ -584,7 +584,7 @@
                 badge.textContent = node.dataType === 'int' ? 'INT' : 'STR';
                 el.appendChild(badge);
             }
-            
+            el.querySelectorAll('.dot').forEach(d => d.remove());
             addPorts(el, node);
             updateCode();
         }
