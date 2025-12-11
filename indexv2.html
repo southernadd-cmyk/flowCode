@@ -359,964 +359,955 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-    // --- 1. SETUP & DATA ---
+    /**************************************************************************************************
+     * FLOWCODE ENGINE — S-A MODE (STRICT SINGLE GRAPH PROGRAM)
+     * Clean rewrite from scratch: UI logic + connections + compiler + runtime
+     * Implements: S2 compiler, strict A validation, M1 merge-detection, MB1 autopass,
+     * for/while/do-while loop detection, safe traversal, stable Python output, FX3 bad-link feedback.
+     **************************************************************************************************/
+    
+    /*=============================================================================
+        0. GLOBAL STATE
+    =============================================================================*/
     let nodes = [];
     let connections = [];
     let nextId = 1;
+    
+    let isConnecting = false;
+    let connStart = null;
+    let dragLine = null;
     let isRunning = false;
-    let editingNodeId = null;
-
-    const canvas = document.getElementById('canvas');
-    const nodesLayer = document.getElementById('nodes-layer');
-    const svgLayer = document.getElementById('connections-layer');
-    const consoleDiv = document.getElementById('console');
-
-    // --- 2. SKULPT CONFIGURATION ---
+    
+    const canvas = document.getElementById("canvas");
+    const nodesLayer = document.getElementById("nodes-layer");
+    const svgLayer = document.getElementById("connections-layer");
+    const consoleDiv = document.getElementById("console");
+    
+    /*=============================================================================
+        1. SKULPT CONFIGURATION
+    =============================================================================*/
     function builtinRead(x) {
-        if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
-            throw "File not found: '" + x + "'";
+        if (!Sk.builtinFiles || !Sk.builtinFiles["files"][x])
+            throw `File not found: '${x}'`;
         return Sk.builtinFiles["files"][x];
     }
-
+    
     Sk.configure({
-        output: function(text) { if(text !== '\n') log(text); },
+        output: txt => { if (txt !== "\n") log(txt); },
         read: builtinRead,
-        inputfun: function(promptText) {        
-            return new Promise(function(resolve) {
-                const msg = promptText || "Input required:";
-                log(msg, "input"); 
-                showInputModal(msg).then(function(result) {
-                    log(result, "input"); 
-                    resolve(result);      
+        inputfun(promptText) {
+            return new Promise(resolve => {
+                const msg = promptText || "Enter value:";
+                showInputModal(msg).then(val => {
+                    log(val, "input");
+                    resolve(val);
                 });
             });
         },
-        inputfunTakesPrompt: true               
+        inputfunTakesPrompt: true
     });
-
-    // --- 3. MODAL LOGIC ---
+    
+    /*=============================================================================
+        2. INPUT MODAL HANDLER
+    =============================================================================*/
     function showInputModal(msg) {
         return new Promise(resolve => {
-            const modalEl = document.getElementById('inputModal');
-            const promptEl = document.getElementById('modal-prompt');
-            const inputEl = document.getElementById('modal-input');
-            const submitEl = document.getElementById('modal-submit');
-            
+            const modalEl = document.getElementById("inputModal");
+            const promptEl = document.getElementById("modal-prompt");
+            const inputEl = document.getElementById("modal-input");
+            const submitEl = document.getElementById("modal-submit");
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    
             promptEl.textContent = msg;
             inputEl.value = "";
-            let bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            
+    
             const finish = () => {
-                const val = inputEl.value;
-                bsModal.hide();
-                resolve(val);
-                cleanup(); 
+                const v = inputEl.value;
+                cleanup();
+                modal.hide();
+                resolve(v);
             };
-            const handleKey = (e) => { if(e.key === 'Enter') finish(); }
             const cleanup = () => {
-                submitEl.removeEventListener('click', finish);
-                inputEl.removeEventListener('keydown', handleKey);
-                document.body.focus();
+                submitEl.removeEventListener("click", finish);
+                inputEl.removeEventListener("keydown", handler);
             };
-            submitEl.addEventListener('click', finish);
-            inputEl.addEventListener('keydown', handleKey);
-            bsModal.show();
-            setTimeout(() => inputEl.focus(), 500);
+            const handler = e => { if (e.key === "Enter") finish(); };
+    
+            submitEl.addEventListener("click", finish);
+            inputEl.addEventListener("keydown", handler);
+    
+            modal.show();
+            setTimeout(() => inputEl.focus(), 350);
         });
     }
-
-    // --- 4. DRAG & DROP & EDIT LOGIC ---
-    document.querySelectorAll('.palette-item').forEach(item => {
-        item.addEventListener('dragstart', (e) => e.dataTransfer.setData('type', item.dataset.type));
+    
+    /*=============================================================================
+        3. PALETTE → CANVAS DRAG & DROP
+    =============================================================================*/
+    document.querySelectorAll(".palette-item").forEach(item => {
+        item.addEventListener("dragstart", e =>
+            e.dataTransfer.setData("type", item.dataset.type)
+        );
     });
-
-    canvas.addEventListener('dragover', (e) => e.preventDefault());
-    canvas.addEventListener('drop', (e) => {
+    
+    canvas.addEventListener("dragover", e => e.preventDefault());
+    
+    canvas.addEventListener("drop", e => {
         e.preventDefault();
-        const type = e.dataTransfer.getData('type');
-        if(!type) return;
+        const type = e.dataTransfer.getData("type");
+        if (!type) return;
+    
         const rect = canvas.getBoundingClientRect();
-        createNode(type, e.clientX - rect.left - 50, e.clientY - rect.top - 25);
+        createNode(
+            type,
+            e.clientX - rect.left - 60,
+            e.clientY - rect.top - 30
+        );
     });
-
+    
+    /*=============================================================================
+        4. NODE CREATION
+    =============================================================================*/
     function createNode(type, x, y) {
         const id = `node-${nextId++}`;
-        let text = "";
-        let dataType = "str"; 
-        
-        if(type==='start') text="Start";
-        else if(type==='end') text="End";
-        else if (type === 'var') {
-            text = "x = 0";
-            dataType = "int"; // default
-        }
-        else if(type==='process') text="x = x + 1"; 
-        else if(type==='decision') text="x < 5";
-        else if(type==='input') { text="Input x = \"Enter Value\""; dataType = "str"; }
-        else if(type==='output') text="Print x";
-
-        const node = { id, type, x, y, text, dataType };
+    
+        const defaults = {
+            start: "Start",
+            end: "End",
+            var: "x = 0",
+            input: "Input x = \"Enter value\"",
+            output: "Print x",
+            process: "x = x + 1",
+            decision: "x < 5"
+        };
+    
+        const node = {
+            id,
+            type,
+            x,
+            y,
+            text: defaults[type] || "",
+            dataType: type === "var" ? "int" : type === "input" ? "str" : null
+        };
+    
         nodes.push(node);
         renderNode(node);
         updateCode();
     }
-
+    
+    /*=============================================================================
+        5. NODE RENDERING
+    =============================================================================*/
     function renderNode(node) {
-        const el = document.createElement('div');
+        const el = document.createElement("div");
         el.className = `node shape-${node.type}`;
         el.id = node.id;
-        el.style.left = node.x + 'px';
-        el.style.top = node.y + 'px';
-
-            
-                    let innerHtml = node.text;
-            
-            if (node.type === 'input') {
-                const parts = node.text.split('=');
-                innerHtml = `<div class="inner-text">${parts[0].trim()}</div>`;
-            }
-            else if (node.type === 'var') {
-                innerHtml = `<div class="inner-text">${node.text}</div>`;
-            }
-            else if (['decision','output'].includes(node.type)) {
-                innerHtml = `<div class="inner-text">${node.text}</div>`;
-            }
-            
-            el.innerHTML = innerHtml;
-
-        
-        if(node.type === 'input' && node.dataType) {
-            const badge = document.createElement('div');
+        el.style.left = `${node.x}px`;
+        el.style.top = `${node.y}px`;
+    
+        el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+    
+        if (node.type === "input") {
+            const badge = document.createElement("div");
             badge.className = `node-badge ${node.dataType}`;
-            badge.textContent = node.dataType === 'int' ? 'INT' : 'STR';
+            badge.textContent = node.dataType.toUpperCase();
             el.appendChild(badge);
         }
-        
-        el.onmousedown = (e) => startDragNode(e, node.id);
+    
+        el.onmousedown = e => startDragNode(e, node.id);
         el.ondblclick = () => editNode(node.id);
-        el.onclick = (e) => { e.stopPropagation(); selectNode(node.id); };
+        el.onclick = e => { e.stopPropagation(); selectNode(node.id); };
+    
         addPorts(el, node);
         nodesLayer.appendChild(el);
     }
-
-function addPorts(el, node) {
-    if (node.type === 'start') {
-        // Start has only OUT
-        addDot(el, 'out', node.id, 'next');
-    } 
-    else if (node.type === 'end') {
-        // End has only IN
-        addDot(el, 'in', node.id, 'in');
-    }
-    else if (node.type === 'decision') {
-        // Decision has 1 IN and 2 OUTs (yes/no)
-        addDot(el, 'in', node.id, 'in');
-        addDot(el, 'out-yes', node.id, 'yes');
-        addDot(el, 'out-no', node.id, 'no');
-    } 
-    else if (
-        node.type === 'process' ||
-        node.type === 'var' ||
-        node.type === 'input' ||
-        node.type === 'output'
-    ) {
-        // Standard blocks: IN + OUT
-        addDot(el, 'in', node.id, 'in');
-        addDot(el, 'out', node.id, 'next');
-    }
-}
-
-
-    function addDot(parent, className, nodeId, portType) {
-        const dot = document.createElement('div');
-        dot.className = `dot ${className}`;
-        dot.title = portType === 'next' ? 'Connect' : portType; 
-        dot.onmousedown = (e) => { e.stopPropagation(); startConnection(nodeId, portType); };
-        dot.onmouseup = (e) => { e.stopPropagation(); finishConnection(nodeId); };
-        parent.appendChild(dot);
-    }
-
-    // --- EDIT MODAL ---
-    function editNode(id) {
-        const node = nodes.find(n => n.id === id);
-        if(!node) return;
-        editingNodeId = id;
-        const modalTitle = document.getElementById('editNodeTitle');
-        const modalBody = document.getElementById('editNodeBody');
-        let html = '';
-
-        if(node.type === 'input') {
-            modalTitle.innerText = "Edit Input Node";
-            let currentText = node.text.replace(/^Input\s+/i, ''); 
-            let varName = currentText; 
-            let promptText = "";
-            if(currentText.includes('=')) {
-                const parts = currentText.split('=');
-                varName = parts[0].trim();
-                promptText = parts.slice(1).join('=').trim();
-                if ((promptText.startsWith('"') && promptText.endsWith('"')) || (promptText.startsWith("'") && promptText.endsWith("'"))) {
-                    promptText = promptText.substring(1, promptText.length - 1);
-                }
-            }
-            html = `<div class="mb-3">
-                        <label class="form-label fw-bold small">Variable Name</label>
-                        <input type="text" id="edit-input-var" class="form-control" value="${varName}">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Prompt Message</label>
-                        <input type="text" id="edit-input-prompt" class="form-control" value="${promptText}">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Data Type</label>
-                        <select id="edit-input-type" class="form-select">
-                            <option value="str" ${node.dataType === 'str' ? 'selected' : ''}>String (Text)</option>
-                            <option value="int" ${node.dataType === 'int' ? 'selected' : ''}>Integer (Number)</option>
-                            <option value="float" ${node.dataType === 'float' ? 'selected' : ''}>Float (Decimal)</option>
-
-                        </select>
-                        <small class="text-muted">Select "Integer" to convert input to number</small>
-                    </div>`;
-        } 
-        
-        else if (node.type === 'var') {
-    modalTitle.innerText = "Edit Variable";
-
-    let parts = node.text.split('=');
-    let varName = parts[0].trim();
-    let value = parts[1].trim();
-
-    html = `
-        <label class="form-label fw-bold small">Variable Name</label>
-        <input id="edit-var-name" class="form-control" value="${varName}">
-
-        <label class="form-label fw-bold small mt-2">Initial Value</label>
-        <input id="edit-var-value" class="form-control" value="${value}">
-
-        <label class="form-label fw-bold small mt-2">Type</label>
-        <select id="edit-var-type" class="form-select">
-            <option value="str" ${node.dataType==="str" ? "selected":""}>String</option>
-            <option value="int" ${node.dataType==="int" ? "selected":""}>Integer</option>
-            <option value="float" ${node.dataType==="float" ? "selected":""}>Float</option>
-        </select>
-    `;
-}
-
-        
-        else if(node.type === 'output') {
-            modalTitle.innerText = "Edit Output Node";
-            let val = node.text.replace(/^Print\s*/i, '').trim();
-            html = `<label class="form-label fw-bold small">Value to Print</label>
-                    <div class="d-flex align-items-center gap-2 p-2 border rounded bg-light">
-                        <span class="font-monospace fw-bold text-primary">print(</span>
-                        <input type="text" id="edit-output-val" class="form-control form-control-sm border-0 shadow-none font-monospace" value="${val}" style="background:transparent;" autofocus>
-                        <span class="font-monospace fw-bold text-primary">)</span>
-                    </div>`;
-        } else {
-            modalTitle.innerText = "Edit " + (node.type.charAt(0).toUpperCase() + node.type.slice(1));
-            html = `<div class="mb-3">
-                        <label class="form-label fw-bold small">Code / Condition</label>
-                        <textarea id="edit-generic-text" class="form-control font-monospace" rows="3">${node.text}</textarea>
-                    </div>`;
-        }
-        modalBody.innerHTML = html;
-        const bsModal = new bootstrap.Modal(document.getElementById('editNodeModal'));
-        bsModal.show();
-        setTimeout(() => {
-            if(document.getElementById('edit-input-var')) document.getElementById('edit-input-var').focus();
-            else if(document.getElementById('edit-output-val')) document.getElementById('edit-output-val').focus();
-            else if(document.getElementById('edit-generic-text')) document.getElementById('edit-generic-text').focus();
-        }, 500);
-    }
-
-
-function saveNodeEdit() {
-    if (!editingNodeId) return;
-
-    const node = nodes.find(n => n.id === editingNodeId);
-    let newText = "";
-
-    if (node.type === 'input') {
-        const v = document.getElementById('edit-input-var').value.trim();
-        const p = document.getElementById('edit-input-prompt').value.trim();
-        const dataType = document.getElementById('edit-input-type').value;
-
-        if (!v) return alert("Variable name required");
-
-        newText = `Input ${v} = "${p}"`;
-        node.dataType = dataType;
-    }
-    else if (node.type === 'output') {
-        const v = document.getElementById('edit-output-val').value.trim();
-        if (!v) return alert("Value required");
-        newText = `Print ${v}`;
-    }
-else if (node.type === 'var') {
-    const newName = document.getElementById("edit-var-name").value.trim();
-    let newValue = document.getElementById("edit-var-value").value.trim();
-    const dtype = document.getElementById("edit-var-type").value;
-
-    if (dtype === "str" && !newValue.startsWith('"'))
-        newValue = `"${newValue}"`;
-
-    node.dataType = dtype;
-    newText = `${newName} = ${newValue}`;
-}
-
-
-        
-    else {
-        newText = document.getElementById('edit-generic-text').value;
-    }
-
-    // Save
-    node.text = newText;
-
-    // Update element
-    const el = document.getElementById(node.id);
-    el.innerHTML = "";
-
-    // Remove ALL existing ports (fixes duplication)
-    el.querySelectorAll('.dot').forEach(dot => dot.remove());
-
-    // Recreate label
-if (node.type === 'input') {
-    const label = node.text.split('=')[0].trim();
-    el.innerHTML = `<div class="inner-text">${label}</div>`;
-} 
-else if (node.type === 'var') {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-}
-else if (['decision', 'output'].includes(node.type)) {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-} 
-else {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-}
-
-
-    // Re-add badge for input types
-    if (node.type === 'input') {
-        const badge = document.createElement('div');
-        badge.className = `node-badge ${node.dataType}`;
-        badge.textContent = node.dataType.toUpperCase();
-        el.appendChild(badge);
-    }
-
-    // Re-add ports (SAFE)
-    addPorts(el, node);
-
-    updateCode();
-
-    bootstrap.Modal.getInstance(document.getElementById('editNodeModal')).hide();
-    editingNodeId = null;
-}
-
-
-
     
-    document.getElementById('editNodeModal').addEventListener('keydown', (e) => { 
-        if(e.key==='Enter' && !e.shiftKey) { 
-            e.preventDefault(); 
-            saveNodeEdit(); 
+    /*=============================================================================
+        6. PORTS FOR EACH NODE TYPE
+    =============================================================================*/
+    function addPorts(el, node) {
+        const add = (cls, port) => {
+            const dot = document.createElement("div");
+            dot.className = `dot ${cls}`;
+            dot.onmousedown = e => { e.stopPropagation(); startConnection(node.id, port); };
+            dot.onmouseup = e => { e.stopPropagation(); finishConnection(node.id); };
+            el.appendChild(dot);
+        };
+    
+        switch (node.type) {
+            case "start":
+                add("out", "next");
+                break;
+    
+            case "end":
+                add("in", "in");
+                break;
+    
+            case "decision":
+                add("in", "in");
+                add("out-yes", "yes");
+                add("out-no", "no");
+                break;
+    
+            default:
+                add("in", "in");
+                add("out", "next");
+        }
+    }
+    
+    /*=============================================================================
+        7. NODE SELECTION & DELETION
+    =============================================================================*/
+    function selectNode(id) {
+        document.querySelectorAll(".node").forEach(n => n.classList.remove("selected"));
+        document.getElementById(id).classList.add("selected");
+    }
+    
+    window.addEventListener("keydown", e => {
+        if ((e.key === "Delete" || e.key === "Backspace") &&
+            !["INPUT", "TEXTAREA"].includes(e.target.tagName)) {
+    
+            const sel = document.querySelector(".node.selected");
+            if (!sel) return;
+    
+            nodes = nodes.filter(n => n.id !== sel.id);
+            connections = connections.filter(c => c.from !== sel.id && c.to !== sel.id);
+    
+            sel.remove();
+            drawConnections();
+            updateCode();
         }
     });
-
-    // --- 5. CONNECTIONS ---
-    function selectNode(id) {
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
-        document.getElementById(id).classList.add('selected');
-    }
     
-    function clearCanvas() {
-        if(confirm("Clear all nodes?")) {
-            nodes = []; connections = []; nodesLayer.innerHTML = ''; drawConnections(); updateCode();
-        }
-    }
-    
-    let dragLine = null; let isConnecting = false; let connStart = null;
-    
-    function startConnection(nodeId, portType) {
-        isConnecting = true; connStart = { nodeId, portType };
-        dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        dragLine.setAttribute('stroke', '#0d6efd'); dragLine.setAttribute('stroke-width', '2'); dragLine.setAttribute('stroke-dasharray', '5,5'); dragLine.setAttribute('fill', 'none');
-        svgLayer.appendChild(dragLine);
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', abortConnection);
-    }
-    
-    function onMouseMove(e) {
-        if(isConnecting) {
-            const rect = canvas.getBoundingClientRect();
-            const pt1 = getPortPosition(connStart.nodeId, connStart.portType);
-            dragLine.setAttribute('d', `M ${pt1.x} ${pt1.y} L ${e.clientX - rect.left} ${e.clientY - rect.top}`);
-        } else if (dragNodeId) {
-            const node = nodes.find(n=>n.id === dragNodeId);
-            const rect = canvas.getBoundingClientRect();
-            node.x = e.clientX - rect.left - dragOffset.x;
-            node.y = e.clientY - rect.top - dragOffset.y;
-            const el = document.getElementById(dragNodeId);
-            el.style.left = node.x+'px'; el.style.top = node.y+'px';
-            drawConnections();
-        }
-    }
-    
-    function finishConnection(targetId) {
-        if(isConnecting && connStart.nodeId !== targetId) {
-            if(connStart.portType !== 'in') connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
-            connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
-            drawConnections(); updateCode();
-        }
-        abortConnection();
-    }
-    
-    function abortConnection() {
-        isConnecting = false; if(dragLine) dragLine.remove();
-        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', abortConnection);
-    }
-    
-    function getPortPosition(nodeId, type) {
-        const node = nodes.find(n=>n.id===nodeId);
-        const el = document.getElementById(nodeId);
-        const w = el.offsetWidth; const h = el.offsetHeight;
-        if(node.type === 'decision') {
-            const dotClass = (type==='yes'?'out-yes':(type==='no'?'out-no':(type==='next'?'out':'in')));
-            const dot = el.querySelector(`.dot.${dotClass}`);
-            if(!dot) return {x: node.x+w/2, y: node.y+h/2};
-            const r = dot.getBoundingClientRect(); const c = canvas.getBoundingClientRect();
-            return { x: r.left - c.left + 5, y: r.top - c.top + 5 }; 
-        } 
-        return { x: node.x + w/2, y: type === 'in' ? node.y : node.y + h };
-    }
-    
-    function drawConnections() {
-        document.querySelectorAll('.conn-label').forEach(e => e.remove());
-const defs = svgLayer.querySelector('defs');
-svgLayer.innerHTML = "";
-svgLayer.appendChild(defs.cloneNode(true));
-        connections.forEach(c => {
-            const p1 = getPortPosition(c.from, c.port);
-            const p2 = getPortPosition(c.to, 'in');
-            let color = c.port === 'yes' ? '#198754' : (c.port === 'no' ? '#dc3545' : '#555');
-            const d = getOrthogonalPath(p1, p2, c.port);
-            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            p.setAttribute('d', d); p.setAttribute('stroke', color); p.setAttribute('stroke-width', '2'); p.setAttribute('marker-end', 'url(#arrowhead)'); p.setAttribute('fill', 'none');
-            const cp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            cp.setAttribute('d', d); cp.setAttribute('stroke', 'transparent'); cp.setAttribute('stroke-width', '15'); cp.style.cursor='pointer'; cp.setAttribute('fill', 'none');
-            cp.onclick = (e) => { e.stopPropagation(); if(confirm("Delete?")) { connections = connections.filter(x=>x!==c); drawConnections(); updateCode(); } };
-            svgLayer.appendChild(p); svgLayer.appendChild(cp);
-            if(['yes','no'].includes(c.port)) {
-                const lbl = document.createElement('div'); lbl.className='conn-label'; lbl.innerText=c.port==='yes'?'Yes':'No'; lbl.style.position='absolute'; lbl.style.color=color;
-                lbl.style.left = (c.port==='yes' ? p1.x+10 : p1.x+10) + 'px';
-                lbl.style.top = (c.port==='yes' ? p1.y+10 : p1.y-20) + 'px';
-                nodesLayer.appendChild(lbl);
-            }
-        });
-    }
-    
-    function getOrthogonalPath(p1, p2, portType) {
-        let d = `M ${p1.x} ${p1.y}`;
-        const midY = (p1.y + p2.y) / 2;
-        if(p2.y > p1.y + 30) {
-            if(portType === 'no') { d += ` L ${p2.x + 40} ${p1.y} L ${p2.x + 40} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`; } 
-            else { d += ` L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`; }
-        } else {
-            const buffer = 80;
-            if(portType === 'no') { const rx = Math.max(p1.x, p2.x) + buffer; d += ` L ${rx} ${p1.y} L ${rx} ${p2.y - 40} L ${p2.x} ${p2.y - 40} L ${p2.x} ${p2.y}`; } 
-            else { const lx = Math.min(p1.x, p2.x) - buffer; d += ` L ${p1.x} ${p1.y + 20} L ${lx} ${p1.y + 20} L ${lx} ${p2.y - 40} L ${p2.x} ${p2.y - 40} L ${p2.x} ${p2.y}`; }
-        }
-        return d;
-    }
-    
-    let dragNodeId = null; let dragOffset = {x:0, y:0};
+    /*=============================================================================
+        8. NODE DRAGGING
+    =============================================================================*/
+    let dragNodeId = null;
+    let dragOffset = { x: 0, y: 0 };
     
     function startDragNode(e, id) {
-        if(e.target.classList.contains('dot')) return;
+        if (e.target.classList.contains("dot")) return;
+    
         dragNodeId = id;
-        const node = nodes.find(n=>n.id===id);
-        dragOffset.x = e.clientX - node.x - canvas.getBoundingClientRect().left;
-        dragOffset.y = e.clientY - node.y - canvas.getBoundingClientRect().top;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', () => { dragNodeId = null; document.removeEventListener('mousemove', onMouseMove); updateCode(); });
+    
+        const node = nodes.find(n => n.id === id);
+        const rect = canvas.getBoundingClientRect();
+    
+        dragOffset.x = e.clientX - rect.left - node.x;
+        dragOffset.y = e.clientY - rect.top - node.y;
+    
+        document.addEventListener("mousemove", dragMove);
+        document.addEventListener("mouseup", dragEnd);
+    
         selectNode(id);
     }
     
-    window.addEventListener('keydown', (e) => {
-        if((e.key === 'Delete' || e.key === 'Backspace') && !['INPUT','TEXTAREA'].includes(e.target.tagName)) {
-            const s = document.querySelector('.node.selected');
-            if(s) { nodes=nodes.filter(n=>n.id!==s.id); connections=connections.filter(c=>c.from!==s.id && c.to!==s.id); s.remove(); drawConnections(); updateCode(); }
-        }
-    });
-
-    // --- 6. CODE GENERATOR (IMPROVED FOR ANIMATION & LOOPS) ---
-
-/**************************************************************************************************
- *  FLOWCODE COMPILER — STRUCTURED, STABLE, AND LOOP-CORRECT
- *  Generates:
- *      • for-loops  (counter pattern)
- *      • while-loops (pre-tested)
- *      • do-while loops (post-tested)
- *  PLUS:
- *      • correct merge detection
- *      • safe traversal (no infinite recursion)
- *      • stable indentation
- **************************************************************************************************/
-
-let generatedCode = "";
-
-/* ---------------------------------------------------------
-   MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
---------------------------------------------------------- */
-function updateCode() {
-    const pyBox = document.getElementById("code-python");
-    let execCode = ["import time", "import sys", ""];
-    let displayHtml = [];
-
-    const startNode = nodes.find(n => n.type === "start");
-    if (!startNode) {
-        pyBox.innerHTML = '<span class="comment"># Drag a Start block to begin</span>';
-        return;
+    function dragMove(e) {
+        if (!dragNodeId) return;
+    
+        const node = nodes.find(n => n.id === dragNodeId);
+        const rect = canvas.getBoundingClientRect();
+    
+        node.x = e.clientX - rect.left - dragOffset.x;
+        node.y = e.clientY - rect.top - dragOffset.y;
+    
+        const el = document.getElementById(node.id);
+        el.style.left = `${node.x}px`;
+        el.style.top = `${node.y}px`;
+    
+        drawConnections();
     }
-
-    /* -----------------------------------------
-       BUILD GRAPH (adj = forward edges, revAdj = backwards)
-    ----------------------------------------- */
-    const adj = {}, revAdj = {};
-    nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
-
-    connections.forEach(c => {
-        adj[c.from].push({ to: c.to, port: c.port });
-        revAdj[c.to].push({ from: c.from, port: c.port });
-    });
-
-    /* ---------------------------------------------------
-       LOOP DETECTION — back edges + loop node sets
-    --------------------------------------------------- */
-    const backEdges = [];
-    const visited = new Set();
-    const recursionStack = new Set();
-
-    function findBackEdges(u) {
-        visited.add(u);
-        recursionStack.add(u);
-
-        for (let edge of adj[u]) {
-            if (recursionStack.has(edge.to)) {
-                backEdges.push({ from: u, to: edge.to });
-            } else if (!visited.has(edge.to)) {
-                findBackEdges(edge.to);
-            }
-        }
-        recursionStack.delete(u);
+    
+    function dragEnd() {
+        dragNodeId = null;
+        document.removeEventListener("mousemove", dragMove);
+        document.removeEventListener("mouseup", dragEnd);
+        updateCode();
     }
-    findBackEdges(startNode.id);
-
-    const loopInfo = new Map();
-
-    /* ---------------------------------------------------------
-       BUILD LOOP SETS, CONTROLLER, TYPE (for/while/do-while)
-    --------------------------------------------------------- */
-    for (const be of backEdges) {
-        const header = be.to;
-        if (loopInfo.has(header)) continue;
-
-        const loopNodes = new Set([header]);
-        const queue = [be.from];
-        const seen = new Set([be.from, header]);
-
-        while (queue.length) {
-            const u = queue.shift();
-            loopNodes.add(u);
-            revAdj[u].forEach(e => {
-                if (!seen.has(e.from)) {
-                    seen.add(e.from);
-                    queue.push(e.from);
-                }
-            });
+    
+    /*=============================================================================
+        9. CONNECTION ENGINE — STRICT MODE
+    =============================================================================*/
+    function startConnection(nodeId, portType) {
+        isConnecting = true;
+        connStart = { nodeId, portType };
+    
+        dragLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        dragLine.setAttribute("stroke", "#0d6efd");
+        dragLine.setAttribute("stroke-width", "2");
+        dragLine.setAttribute("stroke-dasharray", "5,5");
+        dragLine.setAttribute("fill", "none");
+        svgLayer.appendChild(dragLine);
+    
+        document.addEventListener("mousemove", liveDragLine);
+        document.addEventListener("mouseup", abortConnection);
+    }
+    
+    function liveDragLine(e) {
+        if (!isConnecting || !dragLine) return;
+    
+        const rect = canvas.getBoundingClientRect();
+        const p1 = getPortXY(connStart.nodeId, connStart.portType);
+    
+        dragLine.setAttribute(
+            "d",
+            `M ${p1.x} ${p1.y} L ${e.clientX - rect.left} ${e.clientY - rect.top}`
+        );
+    }
+    
+    function finishConnection(targetId) {
+        if (!isConnecting) return;
+    
+        const ok = validateStrict(connStart, targetId);
+    
+        if (!ok) {
+            badLinkFX(connStart.nodeId);
+            abortConnection();
+            return;
         }
-
-        // collect exits
-        let controller = null;
-        const exits = [];
-
-        loopNodes.forEach(id => {
-            const n = nodes.find(x => x.id === id);
-            adj[id].forEach(edge => {
-                if (!loopNodes.has(edge.to)) {
-                    exits.push(edge);
-                    if (n.type === "decision") controller = id;
-                }
-            });
+    
+        connections = connections.filter(
+            c => !(c.from === connStart.nodeId && c.port === connStart.portType)
+        );
+    
+        connections.push({
+            from: connStart.nodeId,
+            port: connStart.portType,
+            to: targetId
         });
-
-        if (!controller) controller = be.from;
-
-        const info = { type: "while-true", header, controller, loopNodes, exits };
-
-        // detect pre-test
-        const isPreTest = header === controller;
-        if (isPreTest) {
-            const preds = revAdj[header].filter(e => !loopNodes.has(e.from));
-            if (preds.length === 1) {
-                info.type = "while";
-                info.entry = preds[0].from;
-            }
-        }
-
-        // detect for-loop pattern
-        const fd = detectForLoop(header, loopNodes);
-        if (fd) { info.type = "for"; info.details = fd; }
-
-        loopInfo.set(header, info);
+    
+        abortConnection();
+        drawConnections();
+        updateCode();
     }
-
-    /* ---------------------------------------------------
-       FOR-LOOP DETECTION (strict counter pattern)
-    --------------------------------------------------- */
-    function detectForLoop(headerId, loopNodes) {
-        const headerNode = nodes.find(n => n.id === headerId);
-        if (!headerNode || headerNode.type !== "decision") return null;
-
-        const cond = headerNode.text.match(/^\s*([a-z_]\w*)\s*([<>]=?)\s*(\w+)\s*$/i);
-        if (!cond) return null;
-
-        let [, varName, op, limit] = cond;
-
-        const preds = revAdj[headerId].filter(e => !loopNodes.has(e.from));
-        if (preds.length !== 1) return null;
-
-        const initNode = nodes.find(n => n.id === preds[0].from);
-        if (!initNode) return null;
-
-        const init = initNode.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*(\\d+)\\s*$`));
-        if (!init) return null;
-
-        const incBE = backEdges.find(be => loopNodes.has(be.from) && be.to === headerId);
-        if (!incBE) return null;
-
-        const incNode = nodes.find(n => n.id === incBE.from);
-        const inc = incNode.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*\\+\\s*(\\d+)\\s*$`));
-        if (!inc) return null;
-
+    
+    function abortConnection() {
+        isConnecting = false;
+        connStart = null;
+    
+        if (dragLine) dragLine.remove();
+        dragLine = null;
+    
+        document.removeEventListener("mousemove", liveDragLine);
+        document.removeEventListener("mouseup", abortConnection);
+    }
+    
+    /*=============================================================================
+        10. STRICT VALIDATION (A-mode)
+    =============================================================================*/
+    function validateStrict(start, targetId) {
+        const from = nodes.find(n => n.id === start.nodeId);
+        const to = nodes.find(n => n.id === targetId);
+    
+        if (!from || !to) return false;
+        if (start.nodeId === targetId) return false;
+        if (to.type === "start") return false;
+        if (from.type === "end") return false;
+        if (start.portType === "in") return false;
+    
+        return true;
+    }
+    
+    /*=============================================================================
+        11. FX3 BAD CONNECTION FEEDBACK (SHAKE + RED)
+    =============================================================================*/
+    function badLinkFX(nodeId) {
+        const el = document.getElementById(nodeId);
+        if (!el) return;
+    
+        el.style.transition = "0.15s";
+        el.style.transform = "translateX(-5px)";
+        el.style.borderColor = "#dc3545";
+    
+        setTimeout(() => { el.style.transform = "translateX(5px)"; }, 100);
+        setTimeout(() => {
+            el.style.transform = "translateX(0)";
+            el.style.borderColor = "";
+        }, 200);
+    }
+    
+    /*=============================================================================
+        12. PORT GEOMETRY
+    =============================================================================*/
+    function getPortXY(nodeId, portType) {
+        const el = document.getElementById(nodeId);
+        const rectCanvas = canvas.getBoundingClientRect();
+    
+        let cls =
+            portType === "yes" ? "out-yes" :
+            portType === "no"  ? "out-no" :
+            portType === "next" ? "out" : portType;
+    
+        const dot = el.querySelector(`.dot.${cls}`);
+    
+        if (dot) {
+            const r = dot.getBoundingClientRect();
+            return { x: r.left - rectCanvas.left + 5, y: r.top - rectCanvas.top + 5 };
+        }
+    
+        const r = el.getBoundingClientRect();
         return {
-            varName,
-            start: init[1],
-            limit,
-            op,
-            step: inc[1],
-            initNode: initNode.id,
-            incrementNode: incNode.id
+            x: r.left - rectCanvas.left + r.width / 2,
+            y: portType === "in"
+                ? r.top - rectCanvas.top
+                : r.bottom - rectCanvas.top
         };
     }
-
-    /* ---------------------------------------------------
-       TRAVERSAL + CODE GENERATION
-    --------------------------------------------------- */
-    const processed = new Set();
-
-    function generateBlock(nodeId, indent, stopNode = null) {
-        if (!nodeId || nodeId === stopNode) return;
-        if (processed.has(nodeId)) return;
-
-        // Loop header?
-        if (loopInfo.has(nodeId)) {
-            generateLoop(nodeId, indent, stopNode);
-            return;
-        }
-
-        processed.add(nodeId);
-
-        const node = nodes.find(n => n.id === nodeId);
-        const sp = "    ".repeat(indent);
-
-        execCode.push(`${sp}highlight_node('${nodeId}')`);
-
-        /* ----------------------------------------
-           EMIT CODE FOR REGULAR BLOCK
-        ---------------------------------------- */
-        switch (node.type) {
-            case "start":
-                displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
-                break;
-
-            case "end":
-                execCode.push(`${sp}exit()`);
-                displayHtml.push(`<div class="code-line">${sp}exit()</div>`);
-                return;
-
-            case "var":
-                execCode.push(`${sp}${node.text}`);
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-
-            case "process":
-                execCode.push(`${sp}${node.text}`);
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-
-            case "output": {
-                let val = node.text.replace(/^Print\s*/i, "").trim();
-                execCode.push(`${sp}print(${val})`);
-                displayHtml.push(`<div class="code-line">${sp}print(${val})</div>`);
-                break;
+    
+    /*=============================================================================
+        13. DRAW CONNECTIONS (orthogonal, safe defs)
+    =============================================================================*/
+    function drawConnections() {
+        const defs = svgLayer.querySelector("defs").cloneNode(true);
+        svgLayer.innerHTML = "";
+        svgLayer.appendChild(defs);
+    
+        document.querySelectorAll(".conn-label").forEach(e => e.remove());
+    
+        connections.forEach(c => {
+            const p1 = getPortXY(c.from, c.port);
+            const p2 = getPortXY(c.to, "in");
+    
+            const color =
+                c.port === "yes" ? "#198754" :
+                c.port === "no"  ? "#dc3545" : "#555";
+    
+            const d = orthPath(p1, p2);
+    
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", d);
+            path.setAttribute("stroke", color);
+            path.setAttribute("stroke-width", "2");
+            path.setAttribute("marker-end", "url(#arrowhead)");
+            path.setAttribute("fill", "none");
+    
+            const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            hit.setAttribute("d", d);
+            hit.setAttribute("stroke", "transparent");
+            hit.setAttribute("stroke-width", "18");
+            hit.style.cursor = "pointer";
+            hit.onclick = () => {
+                if (confirm("Delete connection?")) {
+                    connections = connections.filter(x => x !== c);
+                    drawConnections();
+                    updateCode();
+                }
+            };
+    
+            svgLayer.appendChild(path);
+            svgLayer.appendChild(hit);
+    
+            if (c.port === "yes" || c.port === "no") {
+                const label = document.createElement("div");
+                label.className = "conn-label";
+                label.textContent = c.port === "yes" ? "Yes" : "No";
+                label.style.left = `${(p1.x + p2.x) / 2}px`;
+                label.style.top = `${(p1.y + p2.y) / 2}px`;
+                nodesLayer.appendChild(label);
             }
-
-            case "input": {
-                let raw = node.text.replace(/^Input\s+/i, "").trim();
-                let [v, p] = raw.split("=").map(x => x.trim());
-                if (!p) p = `"${v}"`;
-                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
-
-                if (node.dataType === "int") execCode.push(`${sp}${v} = int(input(${p}))`);
-                else if (node.dataType === "float") execCode.push(`${sp}${v} = float(input(${p}))`);
-                else execCode.push(`${sp}${v} = input(${p})`);
-
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-            }
-
-            case "decision":
-                generateIfElse(nodeId, indent, stopNode);
-                return;
-        }
-
-        const next = adj[nodeId][0];
-        if (next) generateBlock(next.to, indent, stopNode);
+        });
     }
-
-    /* ---------------------------------------------------
-       IF / ELSE
-    --------------------------------------------------- */
-    function generateIfElse(id, indent, stopNode) {
-        const node = nodes.find(n => n.id === id);
-        const sp = "    ".repeat(indent);
-        const condition = node.text.replace(/=/g, "==");
-
-        execCode.push(`${sp}if ${condition}:`);
-        displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
-
-        const yes = adj[id].find(e => e.port === "yes");
-        const no = adj[id].find(e => e.port === "no");
-
-        const merge = findMergeNode(yes?.to, no?.to);
-
-        generateBlock(yes?.to, indent + 1, merge);
-
-        execCode.push(`${sp}else:`);
-        displayHtml.push(`<div class="code-line">${sp}else:</div>`);
-        if (no) generateBlock(no.to, indent + 1, merge);
-
-        if (merge) generateBlock(merge, indent, stopNode);
+    
+    function orthPath(p1, p2) {
+        const mid = (p1.y + p2.y) / 2;
+        return `M ${p1.x} ${p1.y} L ${p1.x} ${mid} L ${p2.x} ${mid} L ${p2.x} ${p2.y}`;
     }
+    
+    /*=============================================================================
+        14. M1 MERGE DETECTION + MB1 AUTOPASS
+    =============================================================================*/
+    function autoPass(nodeId, port) {
+        const c = connections.find(x => x.from === nodeId && x.port === port);
+        return c ? c.to : null;
+    }
+    
+    function findMerge(a, b) {
+        if (!a && !b) return null;
+if (a === b) return a;
+if (!a || !b) return null;
 
-    /* ---------------------------------------------------
-       MERGE DETECTION — FIRST COMMON SUCCESSOR
-    --------------------------------------------------- */
-    function findMergeNode(a, b) {
-        if (!a) return b;
-        if (!b) return a;
-        if (a === b) return a;
-
-        const seenA = new Set();
-        const seenB = new Set();
-
-        let fa = [a], fb = [b];
-
-        while (fa.length || fb.length) {
-            const x = fa.shift();
-            if (x) {
-                if (seenB.has(x)) return x;
-                seenA.add(x);
-                adj[x].forEach(e => fa.push(e.to));
+    
+        const visitedA = new Set();
+        const visitedB = new Set();
+    
+        const walk = (start, set) => {
+            let q = [start];
+            while (q.length) {
+                const u = q.shift();
+                if (set.has(u)) continue;
+                set.add(u);
+                connections
+                    .filter(c => c.from === u)
+                    .forEach(c => q.push(c.to));
             }
-            const y = fb.shift();
-            if (y) {
-                if (seenA.has(y)) return y;
-                seenB.add(y);
-                adj[y].forEach(e => fb.push(e.to));
-            }
-        }
+        };
+    
+        walk(a, visitedA);
+        walk(b, visitedB);
+    
+        for (const id of visitedA)
+            if (visitedB.has(id)) return id;
+    
         return null;
     }
-
-    /* ---------------------------------------------------
-       LOOP GENERATION
-    --------------------------------------------------- */
-    function generateLoop(headerId, indent, stopNode) {
-        const info = loopInfo.get(headerId);
-        const sp = "    ".repeat(indent);
-
-        // ===========================
-        // 1. FOR-LOOP
-        // ===========================
-        if (info.type === "for") {
-            const d = info.details;
-
-            processed.add(d.initNode);
-            execCode.push(`${sp}highlight_node('${d.initNode}')`);
-
-            let limit = d.limit;
-            if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
-            else if (d.op === "<=") limit = `${d.limit} + 1`;
-
-            let rangeArgs = `${d.start}, ${limit}`;
-            if (d.step !== "1") rangeArgs += `, ${d.step}`;
-
-            execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
-            displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
-
-            execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-            const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-            if (bodyStart && bodyStart.to !== d.incrementNode)
-                generateBlock(bodyStart.to, indent + 1, d.incrementNode);
-            else {
-                execCode.push(`${sp}    pass`);
-                displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+    
+    /*=============================================================================
+        15. LOOP DETECTION (back edges)
+    =============================================================================*/
+    function detectBackEdges(startId) {
+        const visited = new Set();
+        const stack = new Set();
+        const back = [];
+    
+        function dfs(u) {
+            visited.add(u);
+            stack.add(u);
+    
+            connections
+                .filter(c => c.from === u)
+                .forEach(e => {
+                    if (!visited.has(e.to)) dfs(e.to);
+                    else if (stack.has(e.to)) back.push({ from: u, to: e.to });
+                });
+    
+            stack.delete(u);
+        }
+    
+        dfs(startId);
+        return back;
+    }
+    
+    /*=============================================================================
+        16. LOOP CLASSIFICATION (for / while / do-while)
+    =============================================================================*/
+    function classifyLoops(startId) {
+        const edges = detectBackEdges(startId);
+        const info = new Map();
+    
+        edges.forEach(be => {
+            const header = be.to;
+            if (info.has(header)) return;
+    
+            const set = new Set([header]);
+            const queue = [be.from];
+    
+            while (queue.length) {
+                const u = queue.shift();
+                set.add(u);
+                connections
+                    .filter(c => c.to === u)
+                    .map(c => c.from)
+                    .forEach(v => {
+                        if (!set.has(v)) queue.push(v);
+                    });
             }
+    
+            let controller = null;
+            const exits = [];
+    
+            set.forEach(id => {
+                const n = nodes.find(x => x.id === id);
+                connections
+                    .filter(c => c.from === id)
+                    .forEach(c => {
+                        if (!set.has(c.to)) exits.push(c);
+                        if (n.type === "decision") controller = id;
+                    });
+            });
+    
+            if (!controller) controller = be.from;
+    
+            info.set(header, {
+                type: "while-true",
+                header,
+                controller,
+                nodes: set,
+                exits
+            });
+        });
+    
+        return info;
+    }
+    /*=============================================================================
+    EDIT NODE MODAL (E1 — Full Editor)
+=============================================================================*/
+let currentEditId = null;
 
-            execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-            generateBlock(info.exits[0]?.to, indent, stopNode);
-            return;
-        }
+function editNode(id) {
+    currentEditId = id;
+    const node = nodes.find(n => n.id === id);
+    const body = document.getElementById("editNodeBody");
+    const title = document.getElementById("editNodeTitle");
 
-        // ===========================
-        // 2. WHILE (pre-tested)
-        // ===========================
-        if (info.type === "while") {
-            generateBlock(info.entry, indent, headerId);
+    if (!node) return;
 
-            const condNode = nodes.find(n => n.id === info.controller);
-            let cond = condNode.text.replace(/=/g, "==");
+    title.textContent = `Edit ${node.type.toUpperCase()} Node`;
 
-            const exitPort = info.exits[0].port;
-            const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
+    let html = "";
 
-            execCode.push(`${sp}while ${condExpr}:`);
-            displayHtml.push(`<div class="code-line">${sp}while ${condExpr}:</div>`);
+    html += `
+        <label class="fw-bold small">Text</label>
+        <input id="edit-node-text" class="form-control mb-2" value="${node.text}">
+    `;
 
-            execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-            const bodyStart = adj[headerId].find(e => e.port !== exitPort);
-            if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId);
-
-            generateBlock(info.exits[0]?.to, indent, stopNode);
-            return;
-        }
-
-        // ===========================
-        // 3. DO-WHILE (post-tested)
-        // ===========================
-        execCode.push(`${sp}while True:`);
-        displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
-
-        const sp2 = "    ".repeat(indent + 1);
-        const hNode = nodes.find(n => n.id === headerId);
-
-        execCode.push(`${sp2}highlight_node('${headerId}')`);
-        if (hNode.type === "process")
-            execCode.push(`${sp2}${hNode.text}`);
-
-        const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-        if (bodyStart && bodyStart.to !== info.controller)
-            generateBlock(bodyStart.to, indent + 1, info.controller);
-
-        const condNode = nodes.find(n => n.id === info.controller);
-        let cond = condNode.text.replace(/=/g, "==");
-        let exitPort = info.exits[0].port;
-        let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
-
-        execCode.push(`${sp2}highlight_node('${info.controller}')`);
-        execCode.push(`${sp2}if ${breakCond}: break`);
-
-        const loopBack = adj[info.controller].find(e => e.port !== exitPort);
-        if (loopBack) generateBlock(loopBack.to, indent + 1, headerId);
-
-        generateBlock(info.exits[0]?.to, indent, stopNode);
+    if (node.type === "input") {
+        html += `
+            <label class="fw-bold small mt-2">Input Data Type</label>
+            <select id="edit-node-type" class="form-select mb-2">
+                <option value="str" ${node.dataType === "str" ? "selected" : ""}>String</option>
+                <option value="int" ${node.dataType === "int" ? "selected" : ""}>Integer</option>
+                <option value="float" ${node.dataType === "float" ? "selected" : ""}>Float</option>
+            </select>
+        `;
     }
 
-    /* ---------------------------------------------------
-       FINAL OUTPUT
-    --------------------------------------------------- */
-    generateBlock(startNode.id, 0);
+    body.innerHTML = html;
 
-    pyBox.innerHTML = displayHtml.join("");
-    generatedCode = execCode.join("\n");
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("editNodeModal"));
+    modal.show();
 }
 
-    // --- 7. RUNTIME (UPDATED FOR DELAY) ---
-    function log(msg, type='info') {
-        const div = document.createElement('div');
-        div.style.marginBottom = '4px';
-        div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
-        div.textContent = msg; 
-        consoleDiv.appendChild(div); 
+function saveNodeEdit() {
+    const node = nodes.find(n => n.id === currentEditId);
+    if (!node) return;
+
+    const newText = document.getElementById("edit-node-text").value;
+
+    node.text = newText;
+
+    if (node.type === "input") {
+        node.dataType = document.getElementById("edit-node-type").value;
+    }
+
+    // re-render node text
+    const el = document.getElementById(node.id);
+    el.querySelector(".inner-text").textContent = node.text;
+
+    // update badge for input
+    const badge = el.querySelector(".node-badge");
+    if (badge && node.type === "input") badge.textContent = node.dataType.toUpperCase();
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById("editNodeModal"));
+    modal.hide();
+
+    updateCode();
+}
+
+    /*=============================================================================
+        17. S2 COMPILER (STRICT SINGLE GRAPH)
+    =============================================================================*/
+    let generatedCode = "";
+    /*=============================================================================
+    FOR LOOP INFERENCE (L1)
+=============================================================================*/
+function detectForLoop(candidateNodes) {
+    const body = Array.from(candidateNodes).map(id => nodes.find(n => n.id === id));
+    const assigns = body.filter(n => n.type === "var" || n.type === "process");
+
+    let init = null;
+    let inc = null;
+    let cond = null;
+
+    assigns.forEach(n => {
+        const t = n.text.replace(/\s+/g, "");
+
+        // init: i = 0
+        if (/^[a-zA-Z_]\w*=0$/.test(t)) init = n;
+
+        // condition: i < N
+        if (/^[a-zA-Z_]\w*<.+$/.test(t)) cond = n;
+
+        // increment: i = i + 1 OR i += 1
+ // increment: i = i + 1
+const incMatch = t.match(/^([a-zA-Z_]\w*)=([a-zA-Z_]\w*)\+1$/);
+if (incMatch && incMatch[1] === incMatch[2]) {
+    inc = n;
+}
+
+// increment: i += 1
+if (/^[a-zA-Z_]\w*\+=1$/.test(t)) {
+    inc = n;
+}
+
+    });
+
+    if (init && inc && cond) {
+        return {
+            variable: init.text.split("=")[0].trim(),
+            initNode: init.id,
+            incNode: inc.id,
+            condNode: cond.id
+        };
+    }
+    return null;
+}
+
+
+    function updateCode() {
+        const box = document.getElementById("code-python");
+        const start = nodes.find(n => n.type === "start");
+    
+        if (!start) {
+            box.innerHTML = `<span class="comment"># Add a Start node</span>`;
+            return;
+        }
+    
+        const code = [];
+        const html = [];
+    
+        code.push("import time");
+        code.push("");
+    
+        const loopInfo = classifyLoops(start.id);
+        const processed = new Set();
+    
+        const edges = connections.reduce((acc, c) => {
+            if (!acc[c.from]) acc[c.from] = [];
+            acc[c.from].push(c);
+            return acc;
+        }, {});
+    
+        function walk(u, indent, stop) {
+            if (!u || u === stop) return;
+            if (processed.has(u)) return;
+    
+            const node = nodes.find(n => n.id === u);
+            const sp = "    ".repeat(indent);
+    
+            if (loopInfo.has(u)) {
+                emitLoop(u, indent, stop);
+                return;
+            }
+    
+            processed.add(u);
+            code.push(`${sp}highlight_node("${u}")`);
+    
+            switch (node.type) {
+                case "start":
+                    break;
+    
+                case "end":
+                    code.push(`${sp}exit()`);
+                    html.push(`${sp}exit()`);
+                    return;
+    
+                case "var":
+                case "process":
+                    code.push(`${sp}${node.text}`);
+                    html.push(`${sp}${node.text}`);
+                    break;
+    
+                case "output":
+                    const val = node.text.replace(/^Print\s*/i, "").trim();
+                    code.push(`${sp}print(${val})`);
+                    html.push(`${sp}print(${val})`);
+                    break;
+    
+                    case "input": {
+    let raw = node.text.replace(/^Input\s+/i, "").trim();
+    let [v, msg] = raw.split("=").map(x => x.trim());
+
+    // message fallback
+    if (!msg) msg = `"Enter value for ${v}"`;
+
+    // auto-quote if missing
+    if (!/^["'].*["']$/.test(msg)) msg = `"${msg}"`;
+
+    if (node.dataType === "int") {
+        code.push(`${sp}${v} = int(input(${msg}))`);
+    } else if (node.dataType === "float") {
+        code.push(`${sp}${v} = float(input(${msg}))`);
+    } else {
+        code.push(`${sp}${v} = input(${msg})`);
+    }
+
+    if (node.dataType === "int")
+    html.push(`${sp}${v} = int(input(${msg}))`);
+else if (node.dataType === "float")
+    html.push(`${sp}${v} = float(input(${msg}))`);
+else
+    html.push(`${sp}${v} = input(${msg})`);
+
+    break;
+}
+
+    
+                case "decision":
+                    emitDecision(u, indent, stop);
+                    return;
+            }
+    
+            const outs = edges[u] || [];
+            if (outs.length) walk(outs[0].to, indent, stop);
+        }
+    
+        function emitDecision(u, indent, stop) {
+            const yes = autoPass(u, "yes");
+            const no = autoPass(u, "no");
+    
+            const merge = findMerge(yes, no);
+            const node = nodes.find(n => n.id === u);
+            const cond = node.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
+
+    
+            const sp = "    ".repeat(indent);
+            code.push(`${sp}if ${cond}:`);
+            walk(yes, indent + 1, merge);
+    
+            code.push(`${sp}else:`);
+            walk(no, indent + 1, merge);
+    
+            if (merge) walk(merge, indent, stop);
+        }
+    
+        function emitLoop(h, indent, stop) {
+            const info = loopInfo.get(h);
+            const sp = "    ".repeat(indent);
+    
+            const ctrl = nodes.find(n => n.id === info.controller);
+            let cond = ctrl.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
+    
+            const exitPort = info.exits[0].port;
+            const breakCond = exitPort === "yes" ? cond : `not (${cond})`;
+    
+            const forInfo = detectForLoop(info.nodes);
+
+if (forInfo) {
+    const v = forInfo.variable;
+    const initVal = nodes.find(n => n.id === forInfo.initNode).text.split("=")[1].trim();
+    const condText = nodes.find(n => n.id === forInfo.condNode).text;
+    const m = condText.match(/<\s*(.+)$/);
+const maxVal = m ? m[1].trim() : "0";
+
+
+    code.push(`${sp}for ${v} in range(${initVal}, ${maxVal}):`);
+    code.push(`${sp}    highlight_node("${h}")`);
+
+    connections
+        .filter(c => c.from === h && c.port !== "in")
+        .forEach(c => walk(c.to, indent + 1, h));
+
+    const next = info.exits[0];
+    walk(next.to, indent, stop);
+    return;
+}
+
+// fallback to while-true
+code.push(`${sp}while True:`);
+code.push(`${sp}    highlight_node("${h}")`);
+
+connections
+    .filter(c => c.from === h && c.port !== "in")
+    .forEach(c => walk(c.to, indent + 1, h));
+
+code.push(`${sp}    highlight_node("${info.controller}")`);
+code.push(`${sp}    if ${breakCond}: break`);
+
+const next = info.exits[0];
+walk(next.to, indent, stop);
+
+        }
+    
+        walk(start.id, 0, null);
+    
+        generatedCode = code.join("\n");
+        box.innerText = html.join("\n");
+    }
+    
+    /*=============================================================================
+        18. RUNTIME + HIGHLIGHT HOOK
+    =============================================================================*/
+    function log(msg, type = "info") {
+        const div = document.createElement("div");
+        div.style.color =
+            type === "error" ? "#ff6b6b" :
+            type === "input" ? "#74c0fc" :
+            "#b2f2bb";
+        div.textContent = msg;
+        consoleDiv.appendChild(div);
         consoleDiv.scrollTop = consoleDiv.scrollHeight;
     }
     
-    function highlightNode(nodeId) {
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const el = document.getElementById(nodeId);
-        if (el) {
-            el.classList.add('running');
-            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        }
+    function highlightNode(id) {
+        document.querySelectorAll(".node").forEach(n => n.classList.remove("running"));
+        const el = document.getElementById(id);
+        if (el) el.classList.add("running");
     }
     
+    Sk.builtins.highlight_node = function(id) {
+        if (!isRunning) throw "ExecutionStopped";
+    
+        const n = typeof id === "string" ? id : id.v;
+        highlightNode(n);
+    
+        const delay = parseInt(document.getElementById("speed-slider").value) || 800;
+    
+        return new Sk.misceval.promiseToSuspension(
+            new Promise(resolve => setTimeout(resolve, delay))
+        );
+    };
+    
     async function runSimulation() {
-        if(isRunning) return;
+        if (isRunning) return;
         isRunning = true;
-        document.getElementById('btn-run').style.display = 'none';
-        document.getElementById('btn-stop').style.display = 'inline-block';
-        consoleDiv.innerHTML = ''; 
-        
-        updateCode(); 
-        
-        // --- SKULPT SUSPENSION HOOK (THE FIX FOR SPEED) ---
-Sk.builtins.highlight_node = function(id) {
-    if (!isRunning) throw "ExecutionStopped";
-
-    const nodeId = (typeof id === "string") ? id : id.v;
-    highlightNode(nodeId);
-
-    const delay = parseInt(document.getElementById('speed-slider').value) || 800;
-    return new Sk.misceval.promiseToSuspension(
-        new Promise(resolve => setTimeout(resolve, delay))
-    );
-};
-
-
+    
+        document.getElementById("btn-run").style.display = "none";
+        document.getElementById("btn-stop").style.display = "inline-block";
+    
+        consoleDiv.innerHTML = "";
+        updateCode();
+    
         try {
-            await Sk.misceval.asyncToPromise(function() {
-                return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
-            });
+            await Sk.misceval.asyncToPromise(() =>
+                Sk.importMainWithBody("<stdin>", false, generatedCode, true)
+            );
             log("Program Finished.");
         } catch (e) {
-            if (e.toString() !== "ExecutionStopped") log(e.toString(), "error");
-            else log("Stopped by user.", "error");
+            if (e.toString() !== "ExecutionStopped")
+                log(e.toString(), "error");
         } finally {
             stopSimulation();
         }
     }
-
+    
     function stopSimulation() {
-        isRunning = false; 
-        document.getElementById('btn-run').style.display = 'inline-block';
-        document.getElementById('btn-stop').style.display = 'none';
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const modalEl = document.getElementById('inputModal');
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        if(bsModal) bsModal.hide();
+        isRunning = false;
+        document.getElementById("btn-run").style.display = "inline-block";
+        document.getElementById("btn-stop").style.display = "none";
+        document.querySelectorAll(".node").forEach(n => n.classList.remove("running"));
+    
+        const modalEl = document.getElementById("inputModal");
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
     }
+    function clearCanvas() {
+    if (!confirm("Clear all nodes?")) return;
 
-    // --- 8. INITIAL DEMO ---
+    nodes = [];
+    connections = [];
+    nodesLayer.innerHTML = "";
+    drawConnections();
+    updateCode();
+}
+    /*=============================================================================
+        19. INITIAL DEMO
+    =============================================================================*/
     setTimeout(() => {
-        nodes = []; connections = []; nodesLayer.innerHTML = ''; nextId = 1;
-        createNode('start', 50, 40);
-        createNode('end', 50, 530);
+        nodes = [];
+        connections = [];
+        nodesLayer.innerHTML = "";
+        nextId = 1;
+    
+        createNode("start", 80, 40);
+        createNode("end", 80, 300);
+    
         updateCode();
-    }, 100);
-</script>
+    }, 200);
+    
+    </script>
+    
 
 </body>
 </html>
