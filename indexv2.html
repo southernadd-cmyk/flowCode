@@ -848,27 +848,10 @@ svgLayer.appendChild(defs.cloneNode(true));
         }
     });
 
-    // --- 6. CODE GENERATOR (IMPROVED FOR ANIMATION & LOOPS) ---
-
-/**************************************************************************************************
- *  FLOWCODE COMPILER — STRUCTURED, STABLE, AND LOOP-CORRECT
- *  Generates:
- *      • for-loops  (counter pattern)
- *      • while-loops (pre-tested)
- *      • do-while loops (post-tested)
- *  PLUS:
- *      • correct merge detection
- *      • safe traversal (no infinite recursion)
- *      • stable indentation
- **************************************************************************************************/
 
 let generatedCode = "";
 
-/* ---------------------------------------------------------
-   MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
---------------------------------------------------------- */
-
-/* ---------------------------------------------------------
+    /* ---------------------------------------------------------
    MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
 --------------------------------------------------------- */
 function updateCode() {
@@ -1148,39 +1131,49 @@ function updateCode() {
     }
 
     /* ---------------------------------------------------
-       INFINITE LOOP DETECTION WARNING
+       GRAPH VALIDATION (IMPROVED - LESS STRICT)
     --------------------------------------------------- */
-    function checkForInfiniteLoops() {
-        const warnings = [];
+    function validateGraph() {
+        const warnings = []; // Changed from errors to warnings
         
-        loopInfo.forEach((info, headerId) => {
-            if (info.type === "while-true") {
-                // Check if there's any exit path
-                if (info.exits.length === 0) {
+        // Check for multiple start nodes (actual error)
+        const startNodes = nodes.filter(n => n.type === "start");
+        if (startNodes.length > 1) {
+            warnings.push({
+                type: "multiple-starts",
+                message: "Multiple start nodes found",
+                severity: "error"
+            });
+        }
+        
+        // Check for disconnected end nodes (only warn if unreachable)
+        const endNodes = nodes.filter(n => n.type === "end");
+        if (endNodes.length === 0) {
+            warnings.push({
+                type: "no-end",
+                message: "No end node found",
+                severity: "warning"
+            });
+        } else {
+            endNodes.forEach(end => {
+                if (!allReachable.has(end.id)) {
                     warnings.push({
-                        type: "infinite-loop",
-                        nodeId: headerId,
-                        message: "Potential infinite loop detected - no exit condition"
+                        type: "unreachable-end",
+                        message: `End node is unreachable from start`,
+                        severity: "warning"
                     });
                 }
-                
-                // Check if exit condition is reachable
-                const exitEdges = info.exits.filter(e => e.port === "yes" || e.port === "no");
-                if (exitEdges.length === 0) {
-                    warnings.push({
-                        type: "no-valid-exit",
-                        nodeId: headerId,
-                        message: "Loop has no conditional exit"
-                    });
-                }
-            }
-            
-            // Check for unreachable loop headers
-            if (!allReachable.has(headerId)) {
+            });
+        }
+        
+        // Check for nodes with no outgoing connections (except end)
+        // This is now just a warning, not an error
+        nodes.forEach(node => {
+            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
                 warnings.push({
-                    type: "unreachable-loop",
-                    nodeId: headerId,
-                    message: "Loop header is unreachable from start"
+                    type: "no-outgoing",
+                    message: `"${node.text}" has no outgoing connections`,
+                    severity: "info"
                 });
             }
         });
@@ -1188,44 +1181,17 @@ function updateCode() {
         return warnings;
     }
 
-    /* ---------------------------------------------------
-       GRAPH VALIDATION
-    --------------------------------------------------- */
-    function validateGraph() {
-        const errors = [];
-        
-        // Check for multiple start nodes
-        const startNodes = nodes.filter(n => n.type === "start");
-        if (startNodes.length > 1) {
-            errors.push("Multiple start nodes found");
-        }
-        
-        // Check for disconnected end nodes
-        const endNodes = nodes.filter(n => n.type === "end");
-        endNodes.forEach(end => {
-            if (!allReachable.has(end.id)) {
-                errors.push(`End node ${end.id} is unreachable`);
-            }
-        });
-        
-        // Check for nodes with no outgoing connections (except end)
-        nodes.forEach(node => {
-            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
-                errors.push(`Node ${node.id} has no outgoing connections`);
-            }
-        });
-        
-        return errors;
-    }
-
     // Run validation
+    // Run validation (only log severe errors, not warnings/info)
     const validationErrors = validateGraph();
     if (validationErrors.length > 0) {
         validationErrors.forEach(err => {
-            console.error("Graph validation:", err);
+            if (err.severity === "error") {
+                console.error("Graph error:", err.message);
+            }
+            // Don't log warnings/info to avoid console spam
         });
     }
-
     /* ---------------------------------------------------
        TRAVERSAL + CODE GENERATION
     --------------------------------------------------- */
@@ -1357,10 +1323,12 @@ function updateCode() {
     }
 
     /* ---------------------------------------------------
-       LOOP GENERATION
+       LOOP GENERATION (FIXED - SAFER ACCESS)
     --------------------------------------------------- */
     function generateLoop(headerId, indent, stopNode) {
         const info = loopInfo.get(headerId);
+        if (!info) return;
+        
         const sp = "    ".repeat(indent);
 
         // ===========================
@@ -1368,6 +1336,7 @@ function updateCode() {
         // ===========================
         if (info.type === "for") {
             const d = info.details;
+            if (!d) return;
 
             processed.add(d.initNode);
             execCode.push(`${sp}highlight_node('${d.initNode}')`);
@@ -1393,7 +1362,11 @@ function updateCode() {
             }
 
             execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-            generateBlock(info.exits[0]?.to, indent, stopNode);
+            
+            // SAFE access to exits
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+                generateBlock(info.exits[0].to, indent, stopNode);
+            }
             return;
         }
 
@@ -1404,9 +1377,10 @@ function updateCode() {
             generateBlock(info.entry, indent, headerId);
 
             const condNode = nodes.find(n => n.id === info.controller);
-            let cond = condNode.text.replace(/=/g, "==");
+            let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
 
-            const exitPort = info.exits[0].port;
+            // SAFE access to exits
+            const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
             const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
 
             execCode.push(`${sp}while ${condExpr}:`);
@@ -1417,12 +1391,14 @@ function updateCode() {
             const bodyStart = adj[headerId].find(e => e.port !== exitPort);
             if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId);
 
-            generateBlock(info.exits[0]?.to, indent, stopNode);
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+                generateBlock(info.exits[0].to, indent, stopNode);
+            }
             return;
         }
 
         // ===========================
-        // 3. DO-WHILE (post-tested)
+        // 3. DO-WHILE (post-tested) or WHILE-TRUE
         // ===========================
         execCode.push(`${sp}while True:`);
         displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
@@ -1431,7 +1407,7 @@ function updateCode() {
         const hNode = nodes.find(n => n.id === headerId);
 
         execCode.push(`${sp2}highlight_node('${headerId}')`);
-        if (hNode.type === "process")
+        if (hNode && hNode.type === "process")
             execCode.push(`${sp2}${hNode.text}`);
 
         const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
@@ -1439,8 +1415,10 @@ function updateCode() {
             generateBlock(bodyStart.to, indent + 1, info.controller);
 
         const condNode = nodes.find(n => n.id === info.controller);
-        let cond = condNode.text.replace(/=/g, "==");
-        let exitPort = info.exits[0].port;
+        let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
+        
+        // SAFE access to exits
+        const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
         let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
 
         execCode.push(`${sp2}highlight_node('${info.controller}')`);
@@ -1449,7 +1427,9 @@ function updateCode() {
         const loopBack = adj[info.controller].find(e => e.port !== exitPort);
         if (loopBack) generateBlock(loopBack.to, indent + 1, headerId);
 
-        generateBlock(info.exits[0]?.to, indent, stopNode);
+        if (info.exits && info.exits.length > 0 && info.exits[0]) {
+            generateBlock(info.exits[0].to, indent, stopNode);
+        }
     }
 
     /* ---------------------------------------------------
@@ -1462,14 +1442,27 @@ function updateCode() {
 }
 
     // --- 7. RUNTIME (UPDATED FOR DELAY) ---
-    function log(msg, type='info') {
-        const div = document.createElement('div');
-        div.style.marginBottom = '4px';
-        div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
-        div.textContent = msg; 
-        consoleDiv.appendChild(div); 
-        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+function log(msg, type='info') {
+    const div = document.createElement('div');
+    div.style.marginBottom = '4px';
+    
+    // Color coding based on severity
+    if (type === 'error') {
+        div.style.color = '#ff6b6b';
+        div.style.fontWeight = 'bold';
+    } else if (type === 'warning') {
+        div.style.color = '#ffc107';
+        div.style.fontWeight = 'bold';
+    } else if (type === 'input') {
+        div.style.color = '#74c0fc';
+    } else {
+        div.style.color = '#b2f2bb';
     }
+    
+    div.textContent = msg; 
+    consoleDiv.appendChild(div); 
+    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+}
     
     function highlightNode(nodeId) {
         document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
@@ -1486,7 +1479,7 @@ async function runSimulation() {
     // Run updateCode first to build the graph structure and generate code
     updateCode(); 
     
-    // Now build a simplified version of the graph to check for loops
+    // Now build a simplified version of the graph to check for TRULY INFINITE loops
     const adj = {}, revAdj = {};
     nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
     connections.forEach(c => {
@@ -1494,76 +1487,152 @@ async function runSimulation() {
         revAdj[c.to].push({ from: c.from, port: c.port });
     });
     
-    // Simple infinite loop detection
+    // Improved loop detection - only warn about TRULY infinite loops
+    const warnings = [];
     const startNode = nodes.find(n => n.type === "start");
+    
     if (startNode) {
-        const warnings = [];
+        // Check for cycles that have NO exit path (truly infinite)
         const visited = new Set();
         const stack = new Set();
         
-        function checkForCycles(nodeId) {
-            if (!nodeId || visited.has(nodeId)) return false;
+                function analyzeLoopSafety(nodeId, path = []) {
+            if (!nodeId || visited.has(nodeId)) return { hasExit: false, isInfinite: false };
             
             visited.add(nodeId);
             stack.add(nodeId);
+            path.push(nodeId);
             
-            for (const edge of (adj[nodeId] || [])) {
+            const edges = adj[nodeId] || [];
+            
+            // If no outgoing edges, it's not an infinite loop
+            if (edges.length === 0) {
+                stack.delete(nodeId);
+                path.pop();
+                return { hasExit: true, isInfinite: false };
+            }
+            
+            let hasExit = false;
+            let isPotentiallyInfinite = false;
+            
+            for (const edge of edges) {
                 if (!edge || !edge.to) continue;
                 
                 if (stack.has(edge.to)) {
                     // Found a cycle
-                    warnings.push({
-                        nodeId: edge.to,
-                        message: `Cycle detected involving node ${edge.to}`
-                    });
-                    return true;
-                }
-                
-                if (checkForCycles(edge.to)) {
-                    return true;
+                    const node = nodes.find(n => n.id === edge.to);
+                    
+                    if (node && node.type === "decision") {
+                        // Decision nodes have conditional exits - check if there's a non-loop exit
+                        const outgoingEdges = adj[edge.to] || [];
+                        const hasNonLoopExit = outgoingEdges.some(e => !stack.has(e.to));
+                        
+                        if (hasNonLoopExit) {
+                            hasExit = true;
+                        } else {
+                            // Decision loop with no exit
+                            isPotentiallyInfinite = true;
+                            warnings.push({
+                                nodeId: edge.to,
+                                message: `Loop at "${node.text}" has no exit condition`,
+                                severity: "warning"
+                            });
+                        }
+                    } else {
+                        // Non-decision node in cycle - might be infinite
+                        isPotentiallyInfinite = true;
+                        const cycleNode = nodes.find(n => n.id === edge.to);
+                        warnings.push({
+                            nodeId: edge.to,
+                            message: `Loop detected at "${cycleNode ? cycleNode.text : edge.to}"`,
+                            severity: "warning"
+                        });
+                    }
+                } else if (!visited.has(edge.to)) {
+                    const result = analyzeLoopSafety(edge.to, [...path]);
+                    if (result.hasExit) {
+                        hasExit = true;
+                    }
+                    if (result.isInfinite) {
+                        isPotentiallyInfinite = true;
+                    }
                 }
             }
             
             stack.delete(nodeId);
-            return false;
+            path.pop();
+            return { hasExit, isInfinite: isPotentiallyInfinite && !hasExit };
+        }
+
+        
+            stack.delete(nodeId);
+            path.pop();
+            return hasExit;
         }
         
-        checkForCycles(startNode.id);
+        analyzeLoopSafety(startNode.id);
         
-        // Check for nodes with no outgoing connections (except end nodes)
+        // Only check for disconnected nodes if they're not part of a valid flow
         nodes.forEach(node => {
-            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
+            // Skip checking start and end nodes for missing connections
+            // These are common in incomplete flows
+            if (node.type === "start" || node.type === "end") return;
+            
+            if (adj[node.id] && adj[node.id].length === 0) {
                 warnings.push({
                     nodeId: node.id,
-                    message: `Node "${node.text}" has no outgoing connections`
+                    message: `"${node.text}" has no outgoing connections`,
+                    severity: "info"
                 });
             }
         });
         
-        // Show warnings if any
-        if (warnings.length > 0) {
-            warnings.forEach(w => {
-                log(`Warning: ${w.message}`, 'error');
+               // Show warnings if any (but only ask for confirmation on severe warnings)
+        const severeWarnings = warnings.filter(w => w.severity === "error");
+        const regularWarnings = warnings.filter(w => w.severity === "warning");
+        
+        if (severeWarnings.length > 0) {
+            // Show severe warnings and ask for confirmation
+            severeWarnings.forEach(w => {
+                log(`ERROR: ${w.message}`, "error");
                 const el = document.getElementById(w.nodeId);
-                if (el) el.style.borderColor = '#ffc107';
+                if (el) el.style.borderColor = '#ff6b6b';
             });
             
-            if (!confirm(`${warnings.length} warning(s) detected. Run anyway?`)) {
+            if (!confirm(`${severeWarnings.length} error(s) detected. Run anyway?`)) {
                 // Reset border colors
-                warnings.forEach(w => {
+                severeWarnings.forEach(w => {
                     const el = document.getElementById(w.nodeId);
                     if (el) el.style.borderColor = '';
                 });
                 return;
             }
-            
-            // Reset border colors if user chooses to run
-            warnings.forEach(w => {
+        }
+        
+        if (regularWarnings.length > 0) {
+            // Just show regular warnings, don't block or show confirmation
+            regularWarnings.forEach(w => {
+                log(`Warning: ${w.message}`, "warning");
                 const el = document.getElementById(w.nodeId);
-                if (el) el.style.borderColor = '';
+                if (el) el.style.borderColor = '#ffc107';
+            });
+            
+            // Auto-reset border colors after 3 seconds
+            setTimeout(() => {
+                regularWarnings.forEach(w => {
+                    const el = document.getElementById(w.nodeId);
+                    if (el) el.style.borderColor = '';
+                });
+            }, 3000);
+        }
+        
+        // Info messages - just log them quietly
+        const infoMessages = warnings.filter(w => w.severity === "info");
+        if (infoMessages.length > 0) {
+            infoMessages.forEach(w => {
+                console.info(`Info: ${w.message}`);
             });
         }
-    }
     
     consoleDiv.innerHTML = ''; 
     isRunning = true;
@@ -1625,15 +1694,7 @@ function stopSimulation() {
     if(bsModal) bsModal.hide();
 }
 
-// Remove the duplicate validateGraph() function from here - it's already inside updateCode()
 
-    // --- 8. INITIAL DEMO ---
-    setTimeout(() => {
-        nodes = []; connections = []; nodesLayer.innerHTML = ''; nextId = 1;
-        createNode('start', 50, 40);
-        createNode('end', 50, 530);
-        updateCode();
-    }, 100);
 </script>
 
 </body>
