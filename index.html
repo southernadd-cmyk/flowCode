@@ -807,26 +807,53 @@
         }
 
         function analyzeForLoop(headerId, loopNodesSet) {
-            const headerNode = nodes.find(n => n.id === headerId);
-            if (headerNode.type !== 'decision') return null;
-            const condMatch = headerNode.text.match(/([a-z_]\w*)\s*(<|<=|!=)\s*(\w+)/);
-            if (!condMatch) return null;
+    const headerNode = nodes.find(n => n.id === headerId);
+    if (!headerNode || headerNode.type !== 'decision') return null;
 
-            const [_, varName, op, limit] = condMatch;
-            const parents = (revAdj[headerId] || []).filter(e => !loopNodesSet.has(e.from));
-            if (parents.length !== 1) return null;
-            
-            const initNode = nodes.find(n => n.id === parents[0].from);
-            const initMatch = initNode?.text.match(new RegExp(`^${varName}\\s*=\\s*(\\d+)`));
-            if (!initMatch) return null;
+    // Match things like:  x < 5   or   i <= 10
+    const condMatch = headerNode.text.match(/^\s*([a-z_]\w*)\s*(<|<=|>|>=|!=)\s*(\w+)\s*$/i);
+    if (!condMatch) return null;
 
-            const backEdge = backEdges.find(be => be.to === headerId);
-            const incNode = nodes.find(n => n.id === backEdge.from);
-            const incMatch = incNode?.text.match(new RegExp(`^${varName}\\s*=\\s*${varName}\\s*\\+\\s*(\\d+)`));
-            if (!incMatch) return null;
+    const [, varName, op, limit] = condMatch;
 
-            return { varName, startValue: initMatch[1], limit, op, stepValue: incMatch[1], initNodeId: initNode.id, incrementNodeId: incNode.id };
-        }
+    // Find an init node outside the loop that assigns the counter: x = 0
+    const parentsAll = revAdj[headerId] || [];
+    const initParent = parentsAll.find(e => !loopNodesSet.has(e.from));
+    if (!initParent) return null;
+
+    const initNode = nodes.find(n => n.id === initParent.from);
+    if (!initNode) return null;
+
+    const initMatch = initNode.text.match(new RegExp(
+        "^\\s*" + varName + "\\s*=\\s*(\\d+)\\s*$"
+    ));
+    if (!initMatch) return null;
+
+    // Find increment node on the back edge, e.g. x = x + 1
+    const backEdge = backEdges.find(be => be.to === headerId);
+    if (!backEdge) return null;
+
+    const incNode = nodes.find(n => n.id === backEdge.from);
+    if (!incNode) return null;
+
+    const incMatch = incNode.text.match(new RegExp(
+        "^\\s*" + varName + "\\s*=\\s*" + varName + "\\s*\\+\\s*(\\d+)\\s*$"
+    ));
+    if (!incMatch) return null;
+
+    const stepValue = incMatch[1];
+
+    return {
+        varName,
+        startValue: initMatch[1],
+        limit,
+        op,
+        stepValue,
+        initNodeId: initNode.id,
+        incrementNodeId: incNode.id
+    };
+}
+
 
         // --- PASS 2: CODE GENERATION ---
         const processed = new Set();
