@@ -707,20 +707,7 @@
         }
     });
 
-
-
-
-
-
-
-
-   
-
-
-
-
-
-// --- 6. COMPILER-STYLE GRAPH-TO-CODE GENERATION (FINAL & ROBUST) ---
+    // --- 6. COMPILER-STYLE GRAPH-TO-CODE GENERATION (FINAL & ROBUST) ---
     let generatedCode = "";
 
     function updateCode() {
@@ -903,7 +890,14 @@
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
                 
                 const bodyStartEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
-                generateBlock(bodyStartEdge.to, indentLvl + 1, info.forDetails.incrementNodeId);
+                if (bodyStartEdge) {
+                    generateBlock(bodyStartEdge.to, indentLvl + 1, info.forDetails.incrementNodeId);
+                } else {
+                    // Empty for-loop body – insert pass to keep Python valid
+                    const bodySpaces = "    ".repeat(indentLvl + 1);
+                    execCode.push(`${bodySpaces}pass`);
+                    displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">pass</span></div>`);
+                }
             }
             else if (info.type === 'while') { // Clean 'while' loop requires unrolling
                 generateBlock(info.predecessor, indentLvl, headerId); // Generate the part before the loop
@@ -914,7 +908,14 @@
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
 
                 const bodyStartEdge = adj[headerId].find(e => e.port !== exitPort);
-                generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
+                if (bodyStartEdge) {
+                    generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
+                } else {
+                    // Empty while body – insert pass
+                    const bodySpaces = "    ".repeat(indentLvl + 1);
+                    execCode.push(`${bodySpaces}pass`);
+                    displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">pass</span></div>`);
+                }
             }
             else { // Fallback to robust 'while True'
                 execCode.push(`${spaces}while True:`);
@@ -939,7 +940,6 @@
         }
         
         function generateIfElse(nodeId, indentLvl, stopNode) {
-            // ... (This function remains largely the same, but benefits from better context)
             const node = nodes.find(n => n.id === nodeId);
             const spaces = "    ".repeat(indentLvl);
             let condition = node.text.replace(/=/g, '==');
@@ -963,7 +963,6 @@
         }
 
         function findMergeNode(branchA, branchB, decisionId) {
-            // A safer merge node finder
             if (!branchA) return branchB;
             if (!branchB) return branchA;
             if (branchA === branchB) return branchA;
@@ -992,18 +991,6 @@
         generatedCode = execCode.join("\n");
     }
 
-
-
-
-
-
-    
-
-    
-
-
-
-    
     // --- 7. RUNTIME ---
     function log(msg, type='info') {
         const div = document.createElement('div');
@@ -1056,7 +1043,6 @@
     }
 
     // --- 8. INITIAL DEMO SETUP ---
-    // Create example nodes
     setTimeout(() => {
         // Clear any existing nodes from earlier
         nodes = [];
@@ -1064,14 +1050,9 @@
         nodesLayer.innerHTML = '';
         nextId = 1;
         
-        // Create demo flowchart: Simple counting loop
+        // Minimal demo: just Start + End
         createNode('start', 50, 40);
-
-        
         createNode('end', 50, 530);
-        
-
-
         updateCode();
     }, 100);
 </script>
