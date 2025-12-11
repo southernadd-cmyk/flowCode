@@ -874,7 +874,7 @@
 
         function generateLoop(headerId, indentLvl, stopNode) {
             const info = loopInfo.get(headerId);
-            info.nodes.forEach(id => processed.add(id));
+            processed.add(headerId);
             const spaces = "    ".repeat(indentLvl);
             const controllerNode = nodes.find(n => n.id === info.controller);
             let condition = controllerNode.text.replace(/=/g, '==');
