@@ -1224,18 +1224,26 @@ function updateCode() {
             }
                 
             case "input": {
-                let raw = node.text.replace(/^Input\s+/i, "").trim();
-                let [v, p] = raw.split("=").map(x => x.trim());
-                if (!p) p = `"${v}"`;
-                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
-                
-                if (node.dataType === "int") execCode.push(`${sp}${v} = int(input(${p}))`);
-                else if (node.dataType === "float") execCode.push(`${sp}${v} = float(input(${p}))`);
-                else execCode.push(`${sp}${v} = input(${p})`);
-                
-                displayHtml.push(`<div class="code-line">${sp}${pyCode}</div>`);
-                break;
-            }
+    let raw = node.text.replace(/^Input\s+/i, "").trim();
+    let [v, p] = raw.split("=").map(x => x.trim());
+    if (!p) p = `"${v}"`;
+    if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+    
+    let pythonCode;
+    if (node.dataType === "int") {
+        pythonCode = `${v} = int(input(${p}))`;
+        execCode.push(`${sp}${pythonCode}`);
+    } else if (node.dataType === "float") {
+        pythonCode = `${v} = float(input(${p}))`;
+        execCode.push(`${sp}${pythonCode}`);
+    } else {
+        pythonCode = `${v} = input(${p})`;
+        execCode.push(`${sp}${pythonCode}`);
+    }
+    
+    displayHtml.push(`<div class="code-line">${sp}${pythonCode}</div>`);
+    break;
+}
                 
             case "decision":
                 generateIfElse(nodeId, indent, stopNode, inLoop);
