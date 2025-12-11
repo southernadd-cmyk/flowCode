@@ -917,10 +917,12 @@
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
                 
                 const bodyStartEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
-                if (bodyStartEdge) {
+                
+                // Check if a body exists AND if the first node isn't just the incrementor (which gets skipped)
+                if (bodyStartEdge && bodyStartEdge.to !== info.forDetails.incrementNodeId) {
                     generateBlock(bodyStartEdge.to, indentLvl + 1, info.forDetails.incrementNodeId);
                 } else {
-                    // Empty for-loop body – insert pass to keep Python valid
+                    // Empty for-loop body (or body is just the increment node) – insert pass
                     const bodySpaces = "    ".repeat(indentLvl + 1);
                     execCode.push(`${bodySpaces}pass`);
                     displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">pass</span></div>`);
