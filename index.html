@@ -1483,6 +1483,15 @@ function updateCode() {
         generateBlock(info.exits[0].to, indent, stopNode);
     }
 }
+        /* ---------------------------------------------------
+       FINAL OUTPUT
+    --------------------------------------------------- */
+    generateBlock(startNode.id, 0);
+
+    pyBox.innerHTML = displayHtml.join("");
+    generatedCode = execCode.join("\n");
+}
+    
     // --- 7. RUNTIME (UPDATED FOR DELAY) ---
 function log(msg, type='info') {
     const div = document.createElement('div');
