@@ -238,6 +238,12 @@
             <div class="palette-header">Start / End</div>
             <div class="palette-item" draggable="true" data-type="start"><i class="fa-regular fa-circle-play"></i> Start</div>
             <div class="palette-item" draggable="true" data-type="end"><i class="fa-regular fa-circle-stop"></i> End</div>
+
+            <div class="palette-header">Variables</div>
+<div class="palette-item" draggable="true" data-type="var">
+    <i class="fa-solid fa-pen"></i> Variable
+</div>
+            
             <div class="palette-header">I/O</div>
             <div class="palette-item" draggable="true" data-type="input"><i class="fa-solid fa-keyboard"></i> Input</div>
             <div class="palette-item" draggable="true" data-type="output"><i class="fa-solid fa-terminal"></i> Print</div>
@@ -423,6 +429,10 @@
         
         if(type==='start') text="Start";
         else if(type==='end') text="End";
+            else if (type === 'var') {
+    text = "x = 0";
+    dataType = "int"; // default
+}
         else if(type==='process') text="x = x + 1"; 
         else if(type==='decision') text="x < 5";
         else if(type==='input') { text="Input x = \"Enter Value\""; dataType = "str"; }
@@ -520,10 +530,38 @@
                         <select id="edit-input-type" class="form-select">
                             <option value="str" ${node.dataType === 'str' ? 'selected' : ''}>String (Text)</option>
                             <option value="int" ${node.dataType === 'int' ? 'selected' : ''}>Integer (Number)</option>
+                            <option value="float" ${node.dataType === 'float' ? 'selected' : ''}>Float (Decimal)</option>
+
                         </select>
                         <small class="text-muted">Select "Integer" to convert input to number</small>
                     </div>`;
-        } else if(node.type === 'output') {
+        } 
+        
+        else if (node.type === 'var') {
+    modalTitle.innerText = "Edit Variable";
+
+    let parts = node.text.split('=');
+    let varName = parts[0].trim();
+    let value = parts[1].trim();
+
+    html = `
+        <label class="form-label fw-bold small">Variable Name</label>
+        <input id="edit-var-name" class="form-control" value="${varName}">
+
+        <label class="form-label fw-bold small mt-2">Initial Value</label>
+        <input id="edit-var-value" class="form-control" value="${value}">
+
+        <label class="form-label fw-bold small mt-2">Type</label>
+        <select id="edit-var-type" class="form-select">
+            <option value="str" ${node.dataType==="str" ? "selected":""}>String</option>
+            <option value="int" ${node.dataType==="int" ? "selected":""}>Integer</option>
+            <option value="float" ${node.dataType==="float" ? "selected":""}>Float</option>
+        </select>
+    `;
+}
+
+        
+        else if(node.type === 'output') {
             modalTitle.innerText = "Edit Output Node";
             let val = node.text.replace(/^Print\s*/i, '').trim();
             html = `<label class="form-label fw-bold small">Value to Print</label>
@@ -571,6 +609,20 @@ function saveNodeEdit() {
         if (!v) return alert("Value required");
         newText = `Print ${v}`;
     }
+else if (node.type === 'var') {
+    const name = document.getElementById('edit-var-name').value.trim();
+    let value = document.getElementById('edit-var-value').value.trim();
+    const dtype = document.getElementById('edit-var-type').value;
+
+    node.dataType = dtype;
+    if (dtype === "str" && !(value.startsWith('"') || value.startsWith("'"))) {
+        value = `"${value}"`;
+    }
+
+    node.text = `${name} = ${value}`;
+}
+
+        
     else {
         newText = document.getElementById('edit-generic-text').value;
     }
@@ -860,6 +912,19 @@ svgLayer.appendChild(defs.cloneNode(true));
 
             switch (node.type) {
                 case 'decision': generateIfElse(nodeId, indentLvl, stopNode); return;
+                    case 'var':
+    if (node.dataType === "int") {
+        execCode.push(`${spaces}${node.text}`);
+    } 
+    else if (node.dataType === "float") {
+        execCode.push(`${spaces}${node.text}`);
+    }
+    else { // string
+        execCode.push(`${spaces}${node.text}`);
+    }
+    displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
+    break;
+
                 case 'start': displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`); break;
                 case 'end': execCode.push(`${spaces}exit()`); displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`); return;
                 case 'process': execCode.push(`${spaces}${node.text}`); displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`); break;
@@ -872,19 +937,16 @@ case 'input':
     if (!(prompt.startsWith('"') || prompt.startsWith("'")))
         prompt = `"${prompt}"`;
 
-    if (node.dataType === 'int') {
-        execCode.push(`${spaces}${varName} = int(input(${prompt}))`);
-        displayHtml.push(
-            `<div class="code-line">${spaces}${varName} = `
-            + `<span class="func">int</span>(<span class="func">input</span>(<span class="string">${prompt}</span>))</div>`
-        );
-    } else {
-        execCode.push(`${spaces}${varName} = input(${prompt})`);
-        displayHtml.push(
-            `<div class="code-line">${spaces}${varName} = `
-            + `<span class="func">input</span>(<span class="string">${prompt}</span>)</div>`
-        );
-    }
+if (node.dataType === 'int') {
+    execCode.push(`${spaces}${varName} = int(input(${prompt}))`);
+}
+else if (node.dataType === 'float') {
+    execCode.push(`${spaces}${varName} = float(input(${prompt}))`);
+}
+else { // string
+    execCode.push(`${spaces}${varName} = input(${prompt})`);
+}
+
     break;
 
                 case 'output':
