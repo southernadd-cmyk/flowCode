@@ -503,24 +503,33 @@
         nodesLayer.appendChild(el);
     }
 
-    function addPorts(el, node) {
-        if(node.type === 'start') { addDot(el, 'out', node.id, 'next'); } 
-        else if(node.type === 'end') { addDot(el, 'in', node.id, 'in'); } 
-        else if(node.type === 'decision') {
-            addDot(el, 'in', node.id, 'in');
-            addDot(el, 'out-yes', node.id, 'yes'); 
-            addDot(el, 'out-no', node.id, 'no');   
-        } 
-        else if (node.type === 'var' || node.type === 'process') {
-    addDot(el, 'in', node.id, 'in');
-    addDot(el, 'out', node.id, 'next');
+function addPorts(el, node) {
+    if (node.type === 'start') {
+        // Start has only OUT
+        addDot(el, 'out', node.id, 'next');
+    } 
+    else if (node.type === 'end') {
+        // End has only IN
+        addDot(el, 'in', node.id, 'in');
     }
-        else {
-    addDot(el, 'in', node.id, 'in');
-    addDot(el, 'out', node.id, 'next');
+    else if (node.type === 'decision') {
+        // Decision has 1 IN and 2 OUTs (yes/no)
+        addDot(el, 'in', node.id, 'in');
+        addDot(el, 'out-yes', node.id, 'yes');
+        addDot(el, 'out-no', node.id, 'no');
+    } 
+    else if (
+        node.type === 'process' ||
+        node.type === 'var' ||
+        node.type === 'input' ||
+        node.type === 'output'
+    ) {
+        // Standard blocks: IN + OUT
+        addDot(el, 'in', node.id, 'in');
+        addDot(el, 'out', node.id, 'next');
+    }
 }
 
-    }
 
     function addDot(parent, className, nodeId, portType) {
         const dot = document.createElement('div');
