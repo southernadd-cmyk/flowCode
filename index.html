@@ -29,12 +29,14 @@
             --console-bg: #1e1e1e;
         }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            height: 100vh; 
-            overflow: hidden; 
-            background-color: #fff;
-        }
+body { 
+    font-family: 'Inter', sans-serif; 
+    height: 100vh; 
+    overflow-y: auto; /* Change from hidden to auto */
+    overflow-x: hidden; /* Keep horizontal hidden if needed */
+    background-color: #fff;
+    margin: 0;
+}
 
         .wrapper { height: 100vh; display: flex; flex-direction: column; }
         .main-area { flex: 1; display: flex; overflow: hidden; }
