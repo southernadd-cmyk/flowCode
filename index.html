@@ -985,8 +985,86 @@ function updateCode() {
         }
     });
 
-    const loopInfo = new Map();
-            // Find the actual cycle path (not including predecessors)
+        const loopInfo = new Map();
+
+    // Enhanced loop set detection
+    for (const be of backEdges) {
+        const header = be.to;
+        if (loopInfo.has(header)) continue;
+
+        // Use BFS to find all nodes in the loop
+        const loopNodes = new Set([header]);
+        const queue = [be.from];
+        const seen = new Set([be.from, header]);
+        const entryPoints = new Set();
+
+        while (queue.length) {
+            const u = queue.shift();
+            loopNodes.add(u);
+            
+            // Check predecessors
+            (revAdj[u] || []).forEach(e => {
+                if (e && e.from) {
+                    if (!loopNodes.has(e.from)) {
+                        entryPoints.add(e.from);
+                    }
+                    if (!seen.has(e.from)) {
+                        seen.add(e.from);
+                        queue.push(e.from);
+                    }
+                }
+            });
+        }
+
+        // Find exits and categorize loop type
+        let controller = null;
+        const exits = [];
+        const loopEntries = Array.from(entryPoints);
+
+        loopNodes.forEach(id => {
+            (adj[id] || []).forEach(edge => {
+                if (edge && edge.to && !loopNodes.has(edge.to)) {
+                    exits.push(edge);
+                    const node = nodes.find(x => x.id === id);
+                    if (node && node.type === "decision") {
+                        controller = id;
+                    }
+                }
+            });
+        });
+
+        if (!controller) {
+            // If no decision node controls the exit, use the last node before exit
+            controller = exits.length > 0 ? exits[0].from : be.from;
+        }
+
+        // Determine loop type
+        let loopType = "while-true";
+        let entryNode = null;
+
+        // Check for pre-test (while) loop
+        if (header === controller && loopEntries.length === 1) {
+            loopType = "while";
+            entryNode = loopEntries[0];
+        }
+
+        // Check for do-while pattern
+        if (header !== controller && loopEntries.length > 0) {
+            // If the controller is inside the loop body, it's likely do-while
+            const controllerIndex = Array.from(loopNodes).indexOf(controller);
+            const headerIndex = Array.from(loopNodes).indexOf(header);
+            if (controllerIndex > headerIndex) {
+                loopType = "do-while";
+            }
+        }
+
+        // Check for for-loop pattern (more robust)
+        const forLoopDetails = detectForLoop(header, loopNodes);
+        if (forLoopDetails) {
+            loopType = "for";
+        }
+
+        // Find the actual cycle path (not including predecessors)
         const cyclePath = findCyclePath(header);
         
         const info = {
@@ -1002,6 +1080,7 @@ function updateCode() {
         };
 
         loopInfo.set(header, info);
+    }
 
     // Enhanced loop set detection
     for (const be of backEdges) {
