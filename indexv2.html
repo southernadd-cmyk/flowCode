@@ -919,165 +919,226 @@ function updateCode() {
     // IMPROVED LOOP DETECTION
     // -----------------------------------------------------------
     function detectLoops() {
-        const backEdges = [];
-        const visited = new Set();
-        const recursionStack = new Set();
-        const nodeOrder = new Map(); // For topological ordering
-        let order = 0;
+    const backEdges = [];
+    const visited = new Set();
+    const recursionStack = new Set();
+    const nodeOrder = new Map();
+    let order = 0;
 
-        function dfs(u, parent) {
-            if (!u) return;
+    function dfs(u, parent) {
+        if (!u) return;
+        
+        visited.add(u);
+        recursionStack.add(u);
+        nodeOrder.set(u, order++);
+
+        for (let edge of (adj[u] || [])) {
+            if (!edge || !edge.to) continue;
             
-            visited.add(u);
-            recursionStack.add(u);
-            nodeOrder.set(u, order++);
-
-            for (let edge of (adj[u] || [])) {
-                if (!edge || !edge.to) continue;
-                
-                const v = edge.to;
-                
-                if (!visited.has(v)) {
-                    dfs(v, u);
-                } else if (recursionStack.has(v)) {
-                    // Back edge detected
-                    backEdges.push({
-                        from: u,
-                        to: v,
-                        port: edge.port,
-                        type: 'back-edge'
-                    });
-                }
-            }
+            const v = edge.to;
             
-            recursionStack.delete(u);
-        }
-
-        dfs(startNode.id, null);
-
-        // Mark all reachable nodes from start
-        const reachable = new Set();
-        function markReachable(u) {
-            if (!u || reachable.has(u)) return;
-            reachable.add(u);
-            (adj[u] || []).forEach(e => markReachable(e.to));
-        }
-        markReachable(startNode.id);
-
-        // -----------------------------------------------------------
-        // CLASSIFY LOOPS
-        // -----------------------------------------------------------
-        const loopInfo = new Map();
-
-        backEdges.forEach(be => {
-            const header = be.to;
-            if (loopInfo.has(header)) return;
-
-            // Find all nodes in the loop using BFS from header
-            const loopNodes = new Set([header]);
-            const queue = [be.from];
-            const visitedLoop = new Set([be.from, header]);
-
-            while (queue.length) {
-                const u = queue.shift();
-                loopNodes.add(u);
-                
-                // Add predecessors that are also in the loop
-                (revAdj[u] || []).forEach(e => {
-                    if (e && e.from && !visitedLoop.has(e.from)) {
-                        visitedLoop.add(e.from);
-                        queue.push(e.from);
-                    }
-                });
-                
-                // Add successors that are also in the loop
-                (adj[u] || []).forEach(e => {
-                    if (e && e.to && !visitedLoop.has(e.to) && reachable.has(e.to)) {
-                        visitedLoop.add(e.to);
-                        queue.push(e.to);
-                    }
+            if (!visited.has(v)) {
+                dfs(v, u);
+            } else if (recursionStack.has(v)) {
+                // Back edge detected
+                backEdges.push({
+                    from: u,
+                    to: v,
+                    port: edge.port,
+                    type: 'back-edge'
                 });
             }
+        }
+        
+        recursionStack.delete(u);
+    }
 
-            // Find loop controller (decision node that controls exit)
-            let controller = null;
-            const exits = [];
+    dfs(startNode.id, null);
+
+    // Mark all reachable nodes from start
+    const reachable = new Set();
+    function markReachable(u) {
+        if (!u || reachable.has(u)) return;
+        reachable.add(u);
+        (adj[u] || []).forEach(e => markReachable(e.to));
+    }
+    markReachable(startNode.id);
+
+    // -----------------------------------------------------------
+    // CLASSIFY LOOPS - IMPROVED VERSION
+    // -----------------------------------------------------------
+    const loopInfo = new Map();
+
+    backEdges.forEach(be => {
+        const header = be.to;
+        if (loopInfo.has(header)) return;
+
+        // Find all nodes in the loop using BFS from header
+        const loopNodes = new Set([header]);
+        const queue = [be.from];
+        const visitedLoop = new Set([be.from, header]);
+
+        while (queue.length) {
+            const u = queue.shift();
+            loopNodes.add(u);
             
-            // Find all exits from the loop
-            loopNodes.forEach(id => {
-                (adj[id] || []).forEach(edge => {
-                    if (edge && edge.to && !loopNodes.has(edge.to)) {
-                        exits.push({ from: id, to: edge.to, port: edge.port });
-                    }
-                });
-            });
-
-            // Find controller (decision node with an exit)
-            loopNodes.forEach(id => {
-                const node = nodes.find(n => n.id === id);
-                if (node && node.type === "decision") {
-                    // Check if this decision has an exit
-                    const hasExit = exits.some(e => e.from === id);
-                    if (hasExit) {
-                        controller = id;
-                    }
+            // Add predecessors that are also in the loop
+            (revAdj[u] || []).forEach(e => {
+                if (e && e.from && !visitedLoop.has(e.from)) {
+                    visitedLoop.add(e.from);
+                    queue.push(e.from);
                 }
             });
-
-            // If no decision node found, check for other potential controllers
-            if (!controller && exits.length > 0) {
-                // Use the node with an exit as controller
-                controller = exits[0].from;
-            }
-
-            // Determine loop type
-            let loopType = "while-true";
             
-            // Check for while loop (pre-test)
-            if (controller && controller === header) {
-                loopType = "while";
+            // Add successors that are also in the loop
+            (adj[u] || []).forEach(e => {
+                if (e && e.to && !visitedLoop.has(e.to) && reachable.has(e.to)) {
+                    visitedLoop.add(e.to);
+                    queue.push(e.to);
+                }
+            });
+        }
+
+        // Find ALL exits from the loop
+        const exits = [];
+        loopNodes.forEach(id => {
+            (adj[id] || []).forEach(edge => {
+                if (edge && edge.to && !loopNodes.has(edge.to)) {
+                    exits.push({ from: id, to: edge.to, port: edge.port });
+                }
+            });
+        });
+
+        // Find decision nodes in the loop
+        const decisionNodes = [];
+        loopNodes.forEach(id => {
+            const node = nodes.find(n => n.id === id);
+            if (node && node.type === "decision") {
+                decisionNodes.push(id);
             }
-            
-            // Check for do-while (post-test)
-            else if (controller && controller !== header) {
-                // Check if controller comes after header in execution
+        });
+
+        // Find loop controller (decision node that controls exit)
+        let controller = null;
+        let controllerExits = [];
+        
+        // Look for decision nodes that have exits
+        for (const decisionId of decisionNodes) {
+            const decisionExits = exits.filter(e => e.from === decisionId);
+            if (decisionExits.length > 0) {
+                controller = decisionId;
+                controllerExits = decisionExits;
+                break;
+            }
+        }
+
+        // If no decision with exit found, check other nodes with exits
+        if (!controller && exits.length > 0) {
+            controller = exits[0].from;
+        }
+
+        // Find loop entry points
+        const entryPoints = new Set();
+        loopNodes.forEach(id => {
+            (revAdj[id] || []).forEach(e => {
+                if (e && e.from && !loopNodes.has(e.from)) {
+                    entryPoints.add(e.from);
+                }
+            });
+        });
+
+        // ---------------------------------------------------
+        // IMPROVED LOOP TYPE DETECTION
+        // ---------------------------------------------------
+        let loopType = "while-true";
+        
+        // Check 1: For-loop pattern (most specific)
+        const forLoopDetails = detectForLoopPattern(header, loopNodes);
+        if (forLoopDetails) {
+            loopType = "for";
+        }
+        // Check 2: While loop (decision at start controls loop)
+        else if (controller && controller === header) {
+            loopType = "while";
+        }
+        // Check 3: Do-while pattern (decision at end of loop body)
+        else if (controller && controller !== header) {
+            // Check if controller is reachable from header (executes after header)
+            const controllerReachable = isReachable(header, controller, adj);
+            if (controllerReachable) {
+                // Check if this looks like do-while (body then condition)
                 const headerOrder = nodeOrder.get(header) || 0;
                 const controllerOrder = nodeOrder.get(controller) || 0;
                 if (controllerOrder > headerOrder) {
                     loopType = "do-while";
                 }
             }
+        }
+        // Check 4: Special case - decision controls exit but isn't header
+        // This handles your test case: Input x → Decision → (loop back) → Input x
+        else if (controller && decisionNodes.includes(controller)) {
+            // Check if the decision has one branch that loops back
+            const decisionEdges = adj[controller] || [];
+            const hasLoopBack = decisionEdges.some(e => 
+                e && e.to && (e.to === header || loopNodes.has(e.to))
+            );
+            const hasExit = decisionEdges.some(e => 
+                e && e.to && !loopNodes.has(e.to)
+            );
             
-            // Check for for-loop pattern
-            const forLoopDetails = detectForLoopPattern(header, loopNodes);
-            if (forLoopDetails) {
-                loopType = "for";
+            if (hasLoopBack && hasExit) {
+                // This is actually a while loop where the decision is the real header
+                // Reassign header to be the decision
+                const realHeader = controller;
+                if (!loopInfo.has(realHeader)) {
+                    // Update loop info with decision as header
+                    loopInfo.set(realHeader, {
+                        type: "while",
+                        header: realHeader,
+                        controller: realHeader,
+                        loopNodes,
+                        exits: controllerExits,
+                        entryPoints: Array.from(entryPoints),
+                        details: null
+                    });
+                    return; // Skip setting for the original header
+                }
             }
+        }
 
-            // Find loop entry points (nodes outside loop that enter it)
-            const entryPoints = new Set();
-            loopNodes.forEach(id => {
-                (revAdj[id] || []).forEach(e => {
-                    if (e && e.from && !loopNodes.has(e.from)) {
-                        entryPoints.add(e.from);
-                    }
-                });
-            });
-
-            loopInfo.set(header, {
-                type: loopType,
-                header,
-                controller,
-                loopNodes,
-                exits,
-                entryPoints: Array.from(entryPoints),
-                details: forLoopDetails
-            });
+        loopInfo.set(header, {
+            type: loopType,
+            header,
+            controller,
+            loopNodes,
+            exits,
+            entryPoints: Array.from(entryPoints),
+            details: forLoopDetails
         });
+    });
 
-        return loopInfo;
+    return loopInfo;
+}
+
+// Helper function to check reachability
+function isReachable(start, target, adj) {
+    if (start === target) return true;
+    
+    const visited = new Set();
+    const queue = [start];
+    
+    while (queue.length) {
+        const current = queue.shift();
+        if (current === target) return true;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        
+        (adj[current] || []).forEach(e => {
+            if (e && e.to) queue.push(e.to);
+        });
     }
-
+    return false;
+}
     // -----------------------------------------------------------
     // IMPROVED FOR-LOOP DETECTION
     // -----------------------------------------------------------
