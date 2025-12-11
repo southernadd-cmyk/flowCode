@@ -265,19 +265,25 @@
         <div id="output-panel">
             <div class="panel-toolbar">
                 <span class="panel-title"><i class="fa-brands fa-python"></i> Python 3</span>
+                
+                <!-- CONTROLS GROUP -->
                 <div class="d-flex align-items-center gap-2">
-        <label class="small text-muted fw-bold" style="font-size: 10px;">SPEED</label>
-        <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="800" style="width: 80px;">
-        
-        <div class="vr mx-2"></div> <!-- Vertical Divider -->
+                    <!-- Speed Slider -->
+                    <label class="small text-muted fw-bold" style="font-size: 10px;">SPEED</label>
+                    <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="800" style="width: 80px;">
+                    
+                    <div class="vr mx-2"></div> <!-- Vertical Divider -->
+            
+                    <!-- Run/Stop Buttons -->
+                    <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
+                        <i class="fa-solid fa-play me-1"></i> RUN
+                    </button>
+                    <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
+                        <i class="fa-solid fa-stop me-1"></i> STOP
+                    </button>
+                </div>
+            </div>
 
-        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
-            <i class="fa-solid fa-play me-1"></i> RUN
-        </button>
-        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
-            <i class="fa-solid fa-stop me-1"></i> STOP
-        </button>
-    </div>
                 <div>
                     <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()"><i class="fa-solid fa-play me-1"></i> RUN</button>
                     <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop me-1"></i> STOP</button>
@@ -928,8 +934,12 @@
             let condition = controllerNode.text.replace(/=/g, '==');
 
             if (info.type === 'for') {
-                const { varName, startValue, limit, op, stepValue, initNodeId } = info.forDetails;
-                processed.add(initNodeId); // Consume the init node
+                const { varName, startValue, limit, op, stepValue, initNodeId, incrementNodeId } = info.forDetails;
+                processed.add(initNodeId); 
+                
+                // 1. Highlight the Initialization Node (e.g., x=1) once before loop starts
+                execCode.push(`${spaces}highlight_node('${initNodeId}')`);
+                
                 let rangeLimit = op === '<=' ? (isNaN(parseInt(limit)) ? `${limit} + 1` : parseInt(limit) + 1) : limit;
                 let rangeArgs = `${startValue}, ${rangeLimit}`;
                 if (stepValue !== '1') rangeArgs += `, ${stepValue}`;
@@ -937,37 +947,45 @@
                 execCode.push(`${spaces}for ${varName} in range(${rangeArgs}):`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
                 
+                // 2. MAGIC FIX: Highlight the Diamond (Decision) at start of every iteration
+                execCode.push(`${spaces}    highlight_node('${headerId}')`);
+
                 const bodyStartEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
                 
-                // Check if a body exists AND if the first node isn't just the incrementor (which gets skipped)
-                if (bodyStartEdge && bodyStartEdge.to !== info.forDetails.incrementNodeId) {
-                    generateBlock(bodyStartEdge.to, indentLvl + 1, info.forDetails.incrementNodeId);
+                if (bodyStartEdge && bodyStartEdge.to !== incrementNodeId) {
+                    generateBlock(bodyStartEdge.to, indentLvl + 1, incrementNodeId);
                 } else {
-                    // Empty for-loop body (or body is just the increment node) – insert pass
                     const bodySpaces = "    ".repeat(indentLvl + 1);
                     execCode.push(`${bodySpaces}pass`);
                     displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">pass</span></div>`);
                 }
+
+                // 3. MAGIC FIX: Highlight the Increment Node (x=x+1) at end of every iteration
+                if (incrementNodeId) {
+                    execCode.push(`${spaces}    highlight_node('${incrementNodeId}')`);
+                }
             }
-            else if (info.type === 'while') { // Clean 'while' loop requires unrolling
-                generateBlock(info.predecessor, indentLvl, headerId); // Generate the part before the loop
+            else if (info.type === 'while') { 
+                generateBlock(info.predecessor, indentLvl, headerId); 
                 
                 const exitPort = info.exits[0].port;
                 const loopCondition = exitPort === 'no' ? condition : `not (${condition})`;
                 execCode.push(`${spaces}while ${loopCondition}:`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
 
+                // Highlight the diamond every time the while loop checks
+                execCode.push(`${spaces}    highlight_node('${headerId}')`);
+
                 const bodyStartEdge = adj[headerId].find(e => e.port !== exitPort);
                 if (bodyStartEdge) {
                     generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
                 } else {
-                    // Empty while body – insert pass
                     const bodySpaces = "    ".repeat(indentLvl + 1);
                     execCode.push(`${bodySpaces}pass`);
                     displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">pass</span></div>`);
                 }
             }
-            else { // Fallback to robust 'while True'
+            else { // While True
                 execCode.push(`${spaces}while True:`);
                 displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> True:</div>`);
                 
@@ -984,7 +1002,6 @@
                 displayHtml.push(`<div class="code-line">${bodySpaces}    <span class="keyword">break</span></div>`);
             }
 
-            // After the loop is fully generated, continue from the exit.
             const exitNode = info.exits[0]?.to;
             if (exitNode) generateBlock(exitNode, indentLvl, stopNode);
         }
