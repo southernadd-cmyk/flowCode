@@ -1154,68 +1154,7 @@ function updateCode() {
     // -----------------------------------------------------------
     const loops = detectLoops();
 
-    function generateCode(nodeId, indent, stopAt = null) {
-        if (!nodeId || nodeId === stopAt) return;
-        if (processed.has(nodeId)) return;
-        
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) return;
-
-        // Check if this node starts a loop
-        if (loops.has(nodeId)) {
-            generateLoop(nodeId, indent);
-            return;
-        }
-
-        processed.add(nodeId);
-        const sp = "    ".repeat(indent);
-
-        // Generate node code
-        generateNodeCode(node, sp);
-
-        // Get next node
-        const nextEdges = adj[nodeId] || [];
-        if (nextEdges.length > 0) {
-            const nextEdge = nextEdges[0];
-            if (nextEdge && nextEdge.to) {
-                generateCode(nextEdge.to, indent, stopAt);
-            }
-        }
-    }
-
-    function generateLoop(headerId, indent) {
-        const loop = loops.get(headerId);
-        if (!loop) return;
-
-        const sp = "    ".repeat(indent);
-
-        // Generate any nodes before loop that connect to header
-        const externalPreds = (revAdj[headerId] || []).filter(e => 
-            e && e.from && !loop.loopNodes.has(e.from)
-        );
-        
-        for (const pred of externalPreds) {
-            if (!processed.has(pred.from)) {
-                generateCode(pred.from, indent, headerId);
-            }
-        }
-
-        // Generate loop based on type
-        switch (loop.type) {
-            case "for":
-                generateForLoopCode(loop, indent);
-                break;
-            case "while":
-                generateWhileLoopCode(loop, indent);
-                break;
-            case "do-while":
-                generateDoWhileLoopCode(loop, indent);
-                break;
-            default:
-                generateWhileTrueLoopCode(loop, indent);
-                break;
-        }
-    }
+    
 
     function generateNodeCode(node, sp) {
         // Highlight
@@ -1268,32 +1207,268 @@ function updateCode() {
         }
     }
 
-    function generateDecisionCode(node, sp) {
-        const condition = node.text.replace(/=/g, "==");
-        
-        execCode.push(`${sp}if ${condition}:`);
-        displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
+       // -----------------------------------------------------------
+    // SIMPLIFIED CODE GENERATION
+    // -----------------------------------------------------------
+    const loops = detectLoops();
+    const processed = new Set();
 
-        const edges = adj[node.id] || [];
+    function generateBlock(startId, indent, stopAt = null, inLoop = false) {
+        let current = startId;
+        
+        while (current && current !== stopAt && !processed.has(current)) {
+            const node = nodes.find(n => n.id === current);
+            if (!node) break;
+            
+            // Check if this starts a loop
+            if (loops.has(current) && !inLoop) {
+                generateLoopBlock(current, indent);
+                return; // Loop generation handles what comes after
+            }
+            
+            processed.add(current);
+            const sp = "    ".repeat(indent);
+            
+            // Generate node code
+            generateNodeCode(node, sp);
+            
+            // Handle decision nodes specially
+            if (node.type === "decision") {
+                generateDecisionBlock(node, indent, stopAt, inLoop);
+                return;
+            }
+            
+            // Get next node
+            const edges = adj[current] || [];
+            if (edges.length === 0) break;
+            
+            // For non-decision nodes, take first edge
+            current = edges[0].to;
+        }
+    }
+
+    function generateNodeCode(node, sp) {
+        // Highlight
+        if (node.type !== 'start' && node.type !== 'end') {
+            execCode.push(`${sp}highlight_node('${node.id}')`);
+        }
+
+        switch (node.type) {
+            case "start":
+                displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
+                break;
+            case "end":
+                execCode.push(`${sp}exit()`);
+                displayHtml.push(`<div class="code-line">${sp}exit()</div>`);
+                break;
+            case "var":
+            case "process":
+                execCode.push(`${sp}${node.text}`);
+                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
+                break;
+            case "output": {
+                let val = node.text.replace(/^Print\s*/i, "").trim();
+                execCode.push(`${sp}print(${val})`);
+                displayHtml.push(`<div class="code-line">${sp}print(${val})</div>`);
+                break;
+            }
+            case "input": {
+                let raw = node.text.replace(/^Input\s+/i, "").trim();
+                let [v, p] = raw.split("=").map(x => x.trim());
+                if (!p) p = `"${v}"`;
+                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+                
+                let pythonCode;
+                if (node.dataType === "int") {
+                    pythonCode = `${v} = int(input(${p}))`;
+                } else if (node.dataType === "float") {
+                    pythonCode = `${v} = float(input(${p}))`;
+                } else {
+                    pythonCode = `${v} = input(${p})`;
+                }
+                
+                execCode.push(`${sp}${pythonCode}`);
+                displayHtml.push(`<div class="code-line">${sp}${pythonCode}</div>`);
+                break;
+            }
+            case "decision":
+                // Decision nodes are handled in generateDecisionBlock
+                break;
+        }
+    }
+
+    function generateDecisionBlock(decisionNode, indent, stopAt, inLoop) {
+        const sp = "    ".repeat(indent);
+        const condition = decisionNode.text.replace(/=/g, "==");
+        const edges = adj[decisionNode.id] || [];
         const yesEdge = edges.find(e => e.port === "yes");
         const noEdge = edges.find(e => e.port === "no");
-
-        // Generate yes branch
+        
+        // Check if this decision is part of a loop
+        const loopForDecision = Array.from(loops.entries()).find(([header, loop]) => 
+            loop.loopNodes.has(decisionNode.id)
+        );
+        
+        if (loopForDecision && loopForDecision[1].controller === decisionNode.id) {
+            // This decision controls a loop - handle it in loop generation
+            generateLoopBlock(loopForDecision[0], indent);
+            return;
+        }
+        
+        // Regular if/else
+        execCode.push(`${sp}if ${condition}:`);
+        displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
+        
         if (yesEdge && yesEdge.to) {
-            generateCode(yesEdge.to, sp.length / 4 + 1); // indent + 1
+            generateBlock(yesEdge.to, indent + 1, stopAt, inLoop);
+        } else {
+            execCode.push(`${sp}    pass`);
+            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+        }
+        
+        if (noEdge && noEdge.to) {
+            execCode.push(`${sp}else:`);
+            displayHtml.push(`<div class="code-line">${sp}else:</div>`);
+            generateBlock(noEdge.to, indent + 1, stopAt, inLoop);
+        }
+    }
+
+    function generateLoopBlock(headerId, indent) {
+        const loop = loops.get(headerId);
+        if (!loop) return;
+        
+        processed.add(headerId);
+        const sp = "    ".repeat(indent);
+        const headerNode = nodes.find(n => n.id === headerId);
+        
+        // Generate any code before the loop that connects to header
+        const externalPreds = (revAdj[headerId] || []).filter(e => 
+            e && e.from && !loop.loopNodes.has(e.from) && !processed.has(e.from)
+        );
+        
+        for (const pred of externalPreds) {
+            generateBlock(pred.from, indent, headerId, false);
+        }
+        
+        // Generate the loop based on type
+        switch (loop.type) {
+            case "for":
+                generateForLoopCode(loop, indent);
+                break;
+            case "while":
+                generateWhileLoopCode(loop, indent);
+                break;
+            case "do-while":
+                generateDoWhileLoopCode(loop, indent);
+                break;
+            default:
+                generateWhileTrueLoopCode(loop, indent);
+                break;
+        }
+    }
+
+    // Keep your existing generateForLoopCode, generateWhileLoopCode, etc. functions
+    // but make sure generateWhileLoopCode looks like this:
+
+    function generateWhileLoopCode(loop, indent) {
+        const sp = "    ".repeat(indent);
+        const controllerNode = nodes.find(n => n.id === loop.controller);
+        
+        if (!controllerNode) {
+            generateWhileTrueLoopCode(loop, indent);
+            return;
+        }
+
+        const condition = controllerNode.text.replace(/=/g, "==");
+        
+        // Find exit port
+        const exitEdge = loop.exits.find(e => e.from === loop.controller);
+        const exitPort = exitEdge ? exitEdge.port : "yes";
+        
+        // Determine loop condition
+        let loopCondition;
+        if (exitPort === "yes") {
+            // Exit when condition is true, so loop while condition is false
+            loopCondition = `not (${condition})`;
+        } else {
+            // Exit when condition is false, so loop while condition is true
+            loopCondition = condition;
+        }
+
+        execCode.push(`${sp}while ${loopCondition}:`);
+        displayHtml.push(`<div class="code-line">${sp}while ${loopCondition}:</div>`);
+
+        // Highlight controller
+        execCode.push(`${sp}    highlight_node('${loop.controller}')`);
+
+        // Generate loop body (non-exit branch)
+        const bodyEdge = (adj[loop.controller] || []).find(e => e.port !== exitPort);
+        if (bodyEdge && bodyEdge.to) {
+            generateLoopBody(bodyEdge.to, loop, indent + 1);
         } else {
             execCode.push(`${sp}    pass`);
             displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
         }
 
-        // Generate no branch if exists
-        if (noEdge && noEdge.to) {
-            execCode.push(`${sp}else:`);
-            displayHtml.push(`<div class="code-line">${sp}else:</div>`);
-            generateCode(noEdge.to, sp.length / 4 + 1);
+        // Continue after loop (exit branch)
+        if (exitEdge && exitEdge.to) {
+            generateBlock(exitEdge.to, indent, null, false);
         }
     }
 
+    function generateLoopBody(startId, loop, indent) {
+        let current = startId;
+        const visitedInLoop = new Set();
+        
+        while (current && loop.loopNodes.has(current) && !visitedInLoop.has(current)) {
+            if (processed.has(current)) break;
+            
+            visitedInLoop.add(current);
+            const node = nodes.find(n => n.id === current);
+            if (!node) break;
+            
+            // Don't process the loop header again
+            if (current === loop.header) {
+                // Find next node in loop
+                const edges = adj[current] || [];
+                const loopEdge = edges.find(e => 
+                    e && e.to && loop.loopNodes.has(e.to) && !visitedInLoop.has(e.to)
+                );
+                current = loopEdge ? loopEdge.to : null;
+                continue;
+            }
+            
+            processed.add(current);
+            const sp = "    ".repeat(indent);
+            
+            // Handle decision nodes in loop body
+            if (node.type === "decision") {
+                // Check if this is the loop controller
+                if (current === loop.controller) {
+                    // Already handled in while loop condition
+                    break;
+                }
+                // Regular decision in loop body
+                generateDecisionBlock(node, indent, null, true);
+                return;
+            }
+            
+            // Regular node in loop
+            generateNodeCode(node, sp);
+            
+            // Get next node in loop
+            const edges = adj[current] || [];
+            const loopEdge = edges.find(e => 
+                e && e.to && loop.loopNodes.has(e.to) && !visitedInLoop.has(e.to)
+            );
+            current = loopEdge ? loopEdge.to : null;
+        }
+    }
+
+    // -----------------------------------------------------------
+    // START GENERATION
+    // -----------------------------------------------------------
+    generateBlock(startNode.id, 0);
     // -----------------------------------------------------------
     // LOOP CODE GENERATORS
     // -----------------------------------------------------------
