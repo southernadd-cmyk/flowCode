@@ -54,19 +54,50 @@
             font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
             color: #adb5bd; font-weight: 700; margin-top: 20px; margin-bottom: 10px;
         }
-        .palette-item {
-            cursor: move; user-select: none; margin-bottom: 10px; padding: 10px;
-            border: 1px solid #dee2e6; border-radius: 6px; background: white;
-            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
-            font-size: 0.9rem; color: #495057; font-weight: 600;
-        }
-        .palette-item:hover {
-            border-color: var(--accent); transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: var(--accent);
-        }
-        .palette-item i { width: 20px; text-align: center; color: #6c757d; }
-        .palette-item:hover i { color: var(--accent); }
+       .palette-item {
+    cursor: move; /* Better browser support than grab */
+    user-select: none;
+    margin-bottom: 10px;
+    padding: 12px; /* Slightly more padding */
+    border: 2px solid #dee2e6; /* Thicker border */
+    border-radius: 8px; /* Slightly more rounded */
+    background: white;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: #495057;
+    font-weight: 600;
+    box-sizing: border-box;
+    position: relative;
+}
 
+.palette-item:hover {
+    border-color: var(--accent);
+    box-shadow: 0 6px 12px rgba(13, 110, 253, 0.15); /* Blue-tinted shadow */
+    color: var(--accent);
+    cursor: move;
+    top: -1px; /* Subtle lift instead of transform */
+}
+
+.palette-item:active {
+    cursor: move;
+    border-color: #0a58ca; /* Darker blue for active state */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    top: 0; /* Reset position when clicking */
+}
+
+.palette-item i { 
+    width: 20px; 
+    text-align: center; 
+    color: #6c757d;
+    transition: color 0.2s ease; /* Smooth icon color transition */
+}
+
+.palette-item:hover i { 
+    color: var(--accent); 
+}
         /* --- CANVAS --- */
         #canvas {
             flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
