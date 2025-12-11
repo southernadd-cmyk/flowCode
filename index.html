@@ -886,7 +886,7 @@ let generatedCode = "";
    MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
 --------------------------------------------------------- */
 function updateCode() {
-    processed.clear();
+    const processed = new Set();
     const pyBox = document.getElementById("code-python");
     let execCode = ["import time", "import sys", ""];
     let displayHtml = [];
@@ -1227,7 +1227,7 @@ function updateCode() {
     /* ---------------------------------------------------
        TRAVERSAL + CODE GENERATION
     --------------------------------------------------- */
-    const processed = new Set();
+    
 
     function generateBlock(nodeId, indent, stopNode = null, inLoop = false) {
     if (!nodeId) return;
