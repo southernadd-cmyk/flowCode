@@ -760,9 +760,10 @@
         13. DRAW CONNECTIONS (orthogonal, safe defs)
     =============================================================================*/
     function drawConnections() {
-        const defs = svgLayer.querySelector("defs").cloneNode(true);
-        svgLayer.innerHTML = "";
-        svgLayer.appendChild(defs);
+        while (svgLayer.children.length > 1) {
+    svgLayer.removeChild(svgLayer.lastChild);
+}
+
     
         document.querySelectorAll(".conn-label").forEach(e => e.remove());
     
