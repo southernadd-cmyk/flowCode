@@ -868,6 +868,9 @@ let generatedCode = "";
    MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
 --------------------------------------------------------- */
 
+/* ---------------------------------------------------------
+   MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
+--------------------------------------------------------- */
 function updateCode() {
     const pyBox = document.getElementById("code-python");
     let execCode = ["import time", "import sys", ""];
@@ -1480,7 +1483,7 @@ function updateCode() {
 async function runSimulation() {
     if(isRunning) return;
     
-    // Run updateCode first to build the graph structure
+    // Run updateCode first to build the graph structure and generate code
     updateCode(); 
     
     // Now build a simplified version of the graph to check for loops
@@ -1598,6 +1601,8 @@ async function runSimulation() {
                 log("Hint: Check data types (int vs str)", "error");
             } else if (e.toString().includes("ValueError")) {
                 log("Hint: Invalid value provided", "error");
+            } else if (e.toString().includes("IndentationError")) {
+                log("Hint: Check indentation in generated code", "error");
             }
         } else {
             log("Stopped by user.", "error");
@@ -1619,6 +1624,8 @@ function stopSimulation() {
     const bsModal = bootstrap.Modal.getInstance(modalEl);
     if(bsModal) bsModal.hide();
 }
+
+// Remove the duplicate validateGraph() function from here - it's already inside updateCode()
 
     // --- 8. INITIAL DEMO ---
     setTimeout(() => {
