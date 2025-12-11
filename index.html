@@ -141,7 +141,15 @@
         
         .node:hover { border-color: var(--accent); }
         .node.selected { border-color: #dc3545; box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2); }
-        .node.running { background-color: #fff3cd; border-color: #ffc107; box-shadow: 0 0 10px #ffc107; z-index: 100; transition: all 0.2s; }
+.node.running { 
+    background-color: #d1e7dd;      /* Light Green Background */
+    border-color: #198754;          /* Dark Green Border */
+    color: #0f5132;                 /* Dark Green Text */
+    box-shadow: 0 0 15px rgba(25, 135, 84, 0.6); /* Green Glow */
+    transform: scale(1.05);         /* Slight Zoom effect */
+    z-index: 100; 
+    transition: all 0.2s ease-in-out;
+}
 
         /* --- SHAPES --- */
         .shape-start, .shape-end { width: 120px; height: 50px; border-radius: 25px; }
@@ -257,6 +265,19 @@
         <div id="output-panel">
             <div class="panel-toolbar">
                 <span class="panel-title"><i class="fa-brands fa-python"></i> Python 3</span>
+                <div class="d-flex align-items-center gap-2">
+        <label class="small text-muted fw-bold" style="font-size: 10px;">SPEED</label>
+        <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="800" style="width: 80px;">
+        
+        <div class="vr mx-2"></div> <!-- Vertical Divider -->
+
+        <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
+            <i class="fa-solid fa-play me-1"></i> RUN
+        </button>
+        <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
+            <i class="fa-solid fa-stop me-1"></i> STOP
+        </button>
+    </div>
                 <div>
                     <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()"><i class="fa-solid fa-play me-1"></i> RUN</button>
                     <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;"><i class="fa-solid fa-stop me-1"></i> STOP</button>
@@ -1030,46 +1051,80 @@
         consoleDiv.scrollTop = consoleDiv.scrollHeight;
     }
     
-    function stopSimulation() {
-        isRunning = false; 
-        document.getElementById('btn-run').style.display = 'inline-block';
-        document.getElementById('btn-stop').style.display = 'none';
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const modalEl = document.getElementById('inputModal');
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        if(bsModal) bsModal.hide();
-    }
+   // --- HIGHLIGHTING LOGIC ---
+
+// 1. Visual Function
+function highlightNode(nodeId) {
+    // Remove 'running' class from ALL nodes
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
     
-    function highlightNode(nodeId) {
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const el = document.getElementById(nodeId);
-        if(el) el.classList.add('running');
+    // Add 'running' class to the current node
+    const el = document.getElementById(nodeId);
+    if (el) {
+        el.classList.add('running');
+        // Auto-scroll logic (optional): keeps the active node in view
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
     }
+}
+
+// 2. Main Run Function
+async function runSimulation() {
+    if (isRunning) return;
+    isRunning = true;
     
-    async function runSimulation() {
-        if(isRunning) return;
-        isRunning = true;
-        document.getElementById('btn-run').style.display = 'none';
-        document.getElementById('btn-stop').style.display = 'inline-block';
-        consoleDiv.innerHTML = ''; 
-        updateCode(); 
-        Sk.builtins.highlight_node = function(id) {
-            if (!isRunning) throw "ExecutionStopped"; 
-            highlightNode(id.v); 
-            return new Promise(resolve => setTimeout(resolve, 300));
-        };
-        try {
-            await Sk.misceval.asyncToPromise(function() {
-                return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
-            });
-            log("Program Finished.");
-        } catch (e) {
-            if (e.toString() !== "ExecutionStopped") log(e.toString(), "error");
-            else log("Stopped by user.", "error");
-        } finally {
-            stopSimulation();
+    // UI Updates
+    document.getElementById('btn-run').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'inline-block';
+    consoleDiv.innerHTML = ''; 
+    
+    // Generate the Python code based on the flowchart
+    updateCode(); 
+    
+    // --- SKULPT HOOK FOR ANIMATION ---
+    // This function is called by Python every time highlight_node('id') executes
+    Sk.builtins.highlight_node = function(id) {
+        if (!isRunning) throw "ExecutionStopped"; 
+        
+        // 1. Highlight the node visually
+        highlightNode(id.v); 
+        
+        // 2. Get delay from slider (default 800ms)
+        const delay = parseInt(document.getElementById('speed-slider').value) || 800;
+        
+        // 3. Pause execution for that amount of time
+        return new Promise(resolve => setTimeout(resolve, delay));
+    };
+
+    // --- EXECUTE PYTHON ---
+    try {
+        await Sk.misceval.asyncToPromise(function() {
+            return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
+        });
+        log("Program Finished.", "success");
+    } catch (e) {
+        if (e.toString() !== "ExecutionStopped") {
+            log(e.toString(), "error");
+        } else {
+            log("Stopped by user.", "error");
         }
+    } finally {
+        stopSimulation();
     }
+}
+
+function stopSimulation() {
+    isRunning = false; 
+    document.getElementById('btn-run').style.display = 'inline-block';
+    document.getElementById('btn-stop').style.display = 'none';
+    
+    // Clear highlights
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    
+    // Close modal if open
+    const modalEl = document.getElementById('inputModal');
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    if(bsModal) bsModal.hide();
+}
 
     // --- 8. INITIAL DEMO SETUP ---
     setTimeout(() => {
