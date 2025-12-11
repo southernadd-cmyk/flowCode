@@ -1302,16 +1302,9 @@ function updateCode() {
         }
             
         case "decision":
-            // If we're already in a loop, don't generate if/else but continue
-            if (inLoop) {
-                // Just continue with the next node
-                const next = adj[nodeId][0];
-                if (next) generateBlock(next.to, indent, stopNode, inLoop);
-                return;
-            } else {
-                generateIfElse(nodeId, indent, stopNode);
-                return;
-            }
+    // Always generate if/else, but pass inLoop parameter
+    generateIfElse(nodeId, indent, stopNode, inLoop);
+    return;
     }
     
     // Continue to next node
@@ -1323,28 +1316,27 @@ function updateCode() {
     /* ---------------------------------------------------
        IF / ELSE
     --------------------------------------------------- */
-    function generateIfElse(id, indent, stopNode) {
-        const node = nodes.find(n => n.id === id);
-        const sp = "    ".repeat(indent);
-        const condition = node.text.replace(/=/g, "==");
+    function generateIfElse(id, indent, stopNode, inLoop = false) {
+    const node = nodes.find(n => n.id === id);
+    const sp = "    ".repeat(indent);
+    const condition = node.text.replace(/=/g, "==");
 
-        execCode.push(`${sp}if ${condition}:`);
-        displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
+    execCode.push(`${sp}if ${condition}:`);
+    displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
 
-        const yes = adj[id].find(e => e.port === "yes");
-        const no = adj[id].find(e => e.port === "no");
+    const yes = adj[id].find(e => e.port === "yes");
+    const no = adj[id].find(e => e.port === "no");
 
-        const merge = findMergeNode(yes?.to, no?.to);
+    const merge = findMergeNode(yes?.to, no?.to);
 
-        generateBlock(yes?.to, indent + 1, merge);
+    generateBlock(yes?.to, indent + 1, merge, inLoop);
 
-        execCode.push(`${sp}else:`);
-        displayHtml.push(`<div class="code-line">${sp}else:</div>`);
-        if (no) generateBlock(no.to, indent + 1, merge);
+    execCode.push(`${sp}else:`);
+    displayHtml.push(`<div class="code-line">${sp}else:</div>`);
+    if (no) generateBlock(no.to, indent + 1, merge, inLoop);
 
-        if (merge) generateBlock(merge, indent, stopNode);
-    }
-
+    if (merge) generateBlock(merge, indent, stopNode, inLoop);
+}
     /* ---------------------------------------------------
        MERGE DETECTION — FIRST COMMON SUCCESSOR
     --------------------------------------------------- */
@@ -1384,119 +1376,113 @@ function updateCode() {
     
     const sp = "    ".repeat(indent);
     
-    // Mark ALL loop nodes as processed so they don't get generated outside the loop
-    info.loopNodes.forEach(id => processed.add(id));
+    // Mark ALL loop nodes as processed FIRST (before generating loop body)
+    if (info.loopNodes && info.loopNodes.forEach) {
+        info.loopNodes.forEach(id => processed.add(id));
+    }
 
-        // ===========================
-        // 1. FOR-LOOP
-        // ===========================
-        if (info.type === "for") {
-            const d = info.details;
-            if (!d) return;
+    // ===========================
+    // 1. FOR-LOOP
+    // ===========================
+    if (info.type === "for") {
+        const d = info.details;
+        if (!d) return;
 
-            processed.add(d.initNode);
-            execCode.push(`${sp}highlight_node('${d.initNode}')`);
+        // The init node should already be processed from the generateBlock call
+        // but add highlight for it
+        execCode.push(`${sp}highlight_node('${d.initNode}')`);
 
-            let limit = d.limit;
-            if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
-            else if (d.op === "<=") limit = `${d.limit} + 1`;
+        let limit = d.limit;
+        if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
+        else if (d.op === "<=") limit = `${d.limit} + 1`;
 
-            let rangeArgs = `${d.start}, ${limit}`;
-            if (d.step !== "1") rangeArgs += `, ${d.step}`;
+        let rangeArgs = `${d.start}, ${limit}`;
+        if (d.step !== "1") rangeArgs += `, ${d.step}`;
 
-            execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
-            displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
+        execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
+        displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
 
-            execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-            const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-            if (bodyStart && bodyStart.to !== d.incrementNode)
-                generateBlock(bodyStart.to, indent + 1, d.incrementNode);
-            else {
-                execCode.push(`${sp}    pass`);
-                displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
-            }
-
-            execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-            
-            // SAFE access to exits
-            if (info.exits && info.exits.length > 0 && info.exits[0]) {
-                generateBlock(info.exits[0].to, indent, stopNode);
-            }
-            return;
-        }
-
-        // ===========================
-        // 2. WHILE (pre-tested)
-        // ===========================
-        if (info.type === "while") {
-            generateBlock(info.entry, indent, headerId);
-
-            const condNode = nodes.find(n => n.id === info.controller);
-            let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
-
-            // SAFE access to exits
-            const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
-            const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
-
-            execCode.push(`${sp}while ${condExpr}:`);
-            displayHtml.push(`<div class="code-line">${sp}while ${condExpr}:</div>`);
-
-            execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-            const bodyStart = adj[headerId].find(e => e.port !== exitPort);
-            if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId);
-
-            if (info.exits && info.exits.length > 0 && info.exits[0]) {
-                generateBlock(info.exits[0].to, indent, stopNode);
-            }
-            return;
-        }
-
-        // ===========================
-        // 3. DO-WHILE (post-tested) or WHILE-TRUE
-        // ===========================
-        execCode.push(`${sp}while True:`);
-        displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
-
-        const sp2 = "    ".repeat(indent + 1);
-        const hNode = nodes.find(n => n.id === headerId);
-
-        execCode.push(`${sp2}highlight_node('${headerId}')`);
-        if (hNode && hNode.type === "process")
-            execCode.push(`${sp2}${hNode.text}`);
+        execCode.push(`${sp}    highlight_node('${headerId}')`);
 
         const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-        if (bodyStart && bodyStart.to !== info.controller)
-            generateBlock(bodyStart.to, indent + 1, info.controller);
+        if (bodyStart && bodyStart.to !== d.incrementNode)
+            generateBlock(bodyStart.to, indent + 1, d.incrementNode, true); // Pass inLoop = true
+        else {
+            execCode.push(`${sp}    pass`);
+            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+        }
+
+        execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
+        
+        // SAFE access to exits
+        if (info.exits && info.exits.length > 0 && info.exits[0]) {
+            generateBlock(info.exits[0].to, indent, stopNode);
+        }
+        return;
+    }
+
+    // ===========================
+    // 2. WHILE (pre-tested)
+    // ===========================
+    if (info.type === "while") {
+        // Generate code before the loop (entry point)
+        generateBlock(info.entry, indent, headerId);
 
         const condNode = nodes.find(n => n.id === info.controller);
         let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
-        
+
         // SAFE access to exits
         const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
-        let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
+        const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
 
-        execCode.push(`${sp2}highlight_node('${info.controller}')`);
-        execCode.push(`${sp2}if ${breakCond}: break`);
+        execCode.push(`${sp}while ${condExpr}:`);
+        displayHtml.push(`<div class="code-line">${sp}while ${condExpr}:</div>`);
 
-        const loopBack = adj[info.controller].find(e => e.port !== exitPort);
-        if (loopBack) generateBlock(loopBack.to, indent + 1, headerId);
+        execCode.push(`${sp}    highlight_node('${headerId}')`);
 
-            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+        const bodyStart = adj[headerId].find(e => e.port !== exitPort);
+        if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId, true); // Pass inLoop = true
+
+        if (info.exits && info.exits.length > 0 && info.exits[0]) {
+            generateBlock(info.exits[0].to, indent, stopNode);
+        }
+        return;
+    }
+
+    // ===========================
+    // 3. DO-WHILE (post-tested) or WHILE-TRUE
+    // ===========================
+    execCode.push(`${sp}while True:`);
+    displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
+
+    const sp2 = "    ".repeat(indent + 1);
+    const hNode = nodes.find(n => n.id === headerId);
+
+    execCode.push(`${sp2}highlight_node('${headerId}')`);
+    if (hNode && hNode.type === "process")
+        execCode.push(`${sp2}${hNode.text}`);
+
+    const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
+    if (bodyStart && bodyStart.to !== info.controller)
+        generateBlock(bodyStart.to, indent + 1, info.controller, true); // Pass inLoop = true
+
+    const condNode = nodes.find(n => n.id === info.controller);
+    let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
+    
+    // SAFE access to exits
+    const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
+    let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
+
+    execCode.push(`${sp2}highlight_node('${info.controller}')`);
+    execCode.push(`${sp2}if ${breakCond}: break`);
+
+    const loopBack = adj[info.controller].find(e => e.port !== exitPort);
+    if (loopBack) generateBlock(loopBack.to, indent + 1, headerId, true); // Pass inLoop = true
+
+    if (info.exits && info.exits.length > 0 && info.exits[0]) {
         generateBlock(info.exits[0].to, indent, stopNode);
     }
-    }
-
-    /* ---------------------------------------------------
-       FINAL OUTPUT
-    --------------------------------------------------- */
-    generateBlock(startNode.id, 0);
-
-    pyBox.innerHTML = displayHtml.join("");
-    generatedCode = execCode.join("\n");
 }
-
     // --- 7. RUNTIME (UPDATED FOR DELAY) ---
 function log(msg, type='info') {
     const div = document.createElement('div');
