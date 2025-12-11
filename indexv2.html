@@ -1496,19 +1496,19 @@ async function runSimulation() {
         const visited = new Set();
         const stack = new Set();
         
-                function analyzeLoopSafety(nodeId, path = []) {
-            if (!nodeId || visited.has(nodeId)) return { hasExit: false, isInfinite: false };
+        // FIXED: Complete function with proper parameters
+        function analyzeLoopSafety(nodeId) {
+            if (!nodeId) return { hasExit: false, isInfinite: false };
+            if (visited.has(nodeId)) return { hasExit: false, isInfinite: false };
             
             visited.add(nodeId);
             stack.add(nodeId);
-            path.push(nodeId);
             
             const edges = adj[nodeId] || [];
             
             // If no outgoing edges, it's not an infinite loop
             if (edges.length === 0) {
                 stack.delete(nodeId);
-                path.pop();
                 return { hasExit: true, isInfinite: false };
             }
             
@@ -1549,7 +1549,7 @@ async function runSimulation() {
                         });
                     }
                 } else if (!visited.has(edge.to)) {
-                    const result = analyzeLoopSafety(edge.to, [...path]);
+                    const result = analyzeLoopSafety(edge.to);
                     if (result.hasExit) {
                         hasExit = true;
                     }
@@ -1560,25 +1560,15 @@ async function runSimulation() {
             }
             
             stack.delete(nodeId);
-            path.pop();
             return { hasExit, isInfinite: isPotentiallyInfinite && !hasExit };
         }
-
         
-            stack.delete(nodeId);
-            path.pop();
-            return hasExit;
-        }
-        
+        // Run the analysis from start
         analyzeLoopSafety(startNode.id);
         
-        // Only check for disconnected nodes if they're not part of a valid flow
+        // Check for nodes with no outgoing connections (except end)
         nodes.forEach(node => {
-            // Skip checking start and end nodes for missing connections
-            // These are common in incomplete flows
-            if (node.type === "start" || node.type === "end") return;
-            
-            if (adj[node.id] && adj[node.id].length === 0) {
+            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
                 warnings.push({
                     nodeId: node.id,
                     message: `"${node.text}" has no outgoing connections`,
@@ -1587,7 +1577,7 @@ async function runSimulation() {
             }
         });
         
-               // Show warnings if any (but only ask for confirmation on severe warnings)
+        // Show warnings if any (but only ask for confirmation on severe warnings)
         const severeWarnings = warnings.filter(w => w.severity === "error");
         const regularWarnings = warnings.filter(w => w.severity === "warning");
         
@@ -1625,14 +1615,7 @@ async function runSimulation() {
                 });
             }, 3000);
         }
-        
-        // Info messages - just log them quietly
-        const infoMessages = warnings.filter(w => w.severity === "info");
-        if (infoMessages.length > 0) {
-            infoMessages.forEach(w => {
-                console.info(`Info: ${w.message}`);
-            });
-        }
+    }
     
     consoleDiv.innerHTML = ''; 
     isRunning = true;
@@ -1669,18 +1652,22 @@ async function runSimulation() {
             } else if (e.toString().includes("TypeError")) {
                 log("Hint: Check data types (int vs str)", "error");
             } else if (e.toString().includes("ValueError")) {
-                log("Hint: Invalid value provided", "error");
-            } else if (e.toString().includes("IndentationError")) {
-                log("Hint: Check indentation in generated code", "error");
-            }
-        } else {
-            log("Stopped by user.", "error");
-        }
-    } finally {
-        stopSimulation();
-    }
+log("Hint: Invalid value provided", "error");
+} else if (e.toString().includes("IndentationError")) {
+log("Hint: Check indentation in generated code", "error");
+}
+} else {
+log("Stopped by user.", "error");
+}
+} finally {
+stopSimulation();
+}
 }
 
+
+
+
+                       
 function stopSimulation() {
     isRunning = false; 
     document.getElementById('btn-run').style.display = 'inline-block';
