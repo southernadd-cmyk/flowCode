@@ -384,6 +384,35 @@
     const nodesLayer = document.getElementById("nodes-layer");
     const svgLayer = document.getElementById("connections-layer");
     const consoleDiv = document.getElementById("console");
+
+
+    
+function drawConnections() {
+    svgLayer.innerHTML = "";
+    connections.forEach(conn => {
+        const fromXY = getPortXY(conn.from, conn.port);
+        const toXY = getPortXY(conn.to, "in");
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("stroke", "#000");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("fill", "none");
+
+        const dx = toXY.x - fromXY.x;
+        const dy = toXY.y - fromXY.y;
+        const ctrl1X = fromXY.x + dx * 0.25;
+        const ctrl2X = fromXY.x + dx * 0.75;
+
+        path.setAttribute(
+            "d",
+            `M ${fromXY.x} ${fromXY.y} C ${ctrl1X} ${fromXY.y}, ${ctrl2X} ${toXY.y}, ${toXY.x} ${toXY.y}`
+        );
+
+        svgLayer.appendChild(path);
+    });
+}
+
+
     
     /*=============================================================================
         1. SKULPT CONFIGURATION
