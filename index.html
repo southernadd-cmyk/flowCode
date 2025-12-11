@@ -986,6 +986,22 @@ function updateCode() {
     });
 
     const loopInfo = new Map();
+            // Find the actual cycle path (not including predecessors)
+        const cyclePath = findCyclePath(header);
+        
+        const info = {
+            type: loopType,
+            header,
+            controller,
+            loopNodes,
+            cyclePath,  // <-- ADD THIS
+            exits,
+            entry: entryNode,
+            entries: loopEntries,
+            details: forLoopDetails
+        };
+
+        loopInfo.set(header, info);
 
     // Enhanced loop set detection
     for (const be of backEdges) {
@@ -1161,7 +1177,44 @@ function updateCode() {
             conditionNode: headerId
         };
     }
-
+    /* ---------------------------------------------------
+       FIND ACTUAL CYCLE PATH (not including predecessors)
+    --------------------------------------------------- */
+    function findCyclePath(startId) {
+        const cyclePath = [];
+        const visited = new Set();
+        const path = [];
+        
+        function dfs(current) {
+            if (visited.has(current)) {
+                // Found a cycle
+                const cycleStart = path.indexOf(current);
+                if (cycleStart !== -1) {
+                    return path.slice(cycleStart);
+                }
+                return [];
+            }
+            
+            visited.add(current);
+            path.push(current);
+            
+            for (const edge of (adj[current] || [])) {
+                if (!edge || !edge.to) continue;
+                
+                // Check if this edge leads back to start (cycle)
+                const result = dfs(edge.to);
+                if (result.length > 0) {
+                    return result;
+                }
+            }
+            
+            path.pop();
+            visited.delete(current);
+            return [];
+        }
+        
+        return dfs(startId) || [startId];
+    }
     /* ---------------------------------------------------
        GRAPH VALIDATION (IMPROVED - LESS STRICT)
     --------------------------------------------------- */
@@ -1376,9 +1429,24 @@ function updateCode() {
     
     const sp = "    ".repeat(indent);
     
-    // Mark ALL loop nodes as processed FIRST (before generating loop body)
-    if (info.loopNodes && info.loopNodes.forEach) {
-        info.loopNodes.forEach(id => processed.add(id));
+    // Mark ONLY CYCLE NODES as processed (not all loopNodes)
+    if (info.cyclePath && info.cyclePath.forEach) {
+        info.cyclePath.forEach(id => processed.add(id));
+    }
+    
+    // Check if we need to generate any pre-loop nodes
+    // (nodes that are in loopNodes but NOT in cyclePath)
+    if (info.loopNodes && info.cyclePath) {
+        const preLoopNodes = Array.from(info.loopNodes).filter(
+            id => !info.cyclePath.includes(id) && id !== headerId
+        );
+        
+        // Generate pre-loop nodes BEFORE the loop
+        preLoopNodes.forEach(nodeId => {
+            if (!processed.has(nodeId)) {
+                generateBlock(nodeId, indent, headerId);
+            }
+        });
     }
 
     // ===========================
@@ -1386,39 +1454,41 @@ function updateCode() {
     // ===========================
     if (info.type === "for") {
         const d = info.details;
-        if (!d) return;
+        if (!d) {
+            // Fall back to while-true if for-loop detection failed
+            info.type = "while-true";
+        } else {
+            // The init node should already be processed from pre-loop generation
+            // but add highlight for it
+            execCode.push(`${sp}highlight_node('${d.initNode}')`);
 
-        // The init node should already be processed from the generateBlock call
-        // but add highlight for it
-        execCode.push(`${sp}highlight_node('${d.initNode}')`);
+            let limit = d.limit;
+            if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
+            else if (d.op === "<=") limit = `${d.limit} + 1`;
 
-        let limit = d.limit;
-        if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
-        else if (d.op === "<=") limit = `${d.limit} + 1`;
+            let rangeArgs = `${d.start}, ${limit}`;
+            if (d.step !== "1") rangeArgs += `, ${d.step}`;
 
-        let rangeArgs = `${d.start}, ${limit}`;
-        if (d.step !== "1") rangeArgs += `, ${d.step}`;
+            execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
+            displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
 
-        execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
-        displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
+            execCode.push(`${sp}    highlight_node('${headerId}')`);
 
-        execCode.push(`${sp}    highlight_node('${headerId}')`);
+            const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
+            if (bodyStart && bodyStart.to !== d.incrementNode)
+                generateBlock(bodyStart.to, indent + 1, d.incrementNode, true);
+            else {
+                execCode.push(`${sp}    pass`);
+                displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+            }
 
-        const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-        if (bodyStart && bodyStart.to !== d.incrementNode)
-            generateBlock(bodyStart.to, indent + 1, d.incrementNode, true); // Pass inLoop = true
-        else {
-            execCode.push(`${sp}    pass`);
-            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+            execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
+            
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+                generateBlock(info.exits[0].to, indent, stopNode);
+            }
+            return;
         }
-
-        execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-        
-        // SAFE access to exits
-        if (info.exits && info.exits.length > 0 && info.exits[0]) {
-            generateBlock(info.exits[0].to, indent, stopNode);
-        }
-        return;
     }
 
     // ===========================
@@ -1426,12 +1496,13 @@ function updateCode() {
     // ===========================
     if (info.type === "while") {
         // Generate code before the loop (entry point)
-        generateBlock(info.entry, indent, headerId);
+        if (info.entry) {
+            generateBlock(info.entry, indent, headerId);
+        }
 
         const condNode = nodes.find(n => n.id === info.controller);
         let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
 
-        // SAFE access to exits
         const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
         const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
 
@@ -1441,7 +1512,7 @@ function updateCode() {
         execCode.push(`${sp}    highlight_node('${headerId}')`);
 
         const bodyStart = adj[headerId].find(e => e.port !== exitPort);
-        if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId, true); // Pass inLoop = true
+        if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId, true);
 
         if (info.exits && info.exits.length > 0 && info.exits[0]) {
             generateBlock(info.exits[0].to, indent, stopNode);
@@ -1456,20 +1527,35 @@ function updateCode() {
     displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
 
     const sp2 = "    ".repeat(indent + 1);
-    const hNode = nodes.find(n => n.id === headerId);
-
+    
+    // Highlight the loop header
     execCode.push(`${sp2}highlight_node('${headerId}')`);
-    if (hNode && hNode.type === "process")
+    
+    // Get the header node
+    const hNode = nodes.find(n => n.id === headerId);
+    if (hNode && hNode.type === "process") {
         execCode.push(`${sp2}${hNode.text}`);
+    }
 
-    const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-    if (bodyStart && bodyStart.to !== info.controller)
-        generateBlock(bodyStart.to, indent + 1, info.controller, true); // Pass inLoop = true
+    // Find where the loop body starts
+    let bodyStart = null;
+    if (info.exits && info.exits.length > 0) {
+        // Find an edge that doesn't lead to an exit
+        bodyStart = adj[headerId].find(e => {
+            return !info.exits.some(x => x.port === e.port && x.to === e.to);
+        });
+    } else {
+        // No exits defined, take the first edge
+        bodyStart = adj[headerId][0];
+    }
+    
+    if (bodyStart && bodyStart.to !== info.controller) {
+        generateBlock(bodyStart.to, indent + 1, info.controller, true);
+    }
 
     const condNode = nodes.find(n => n.id === info.controller);
     let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
     
-    // SAFE access to exits
     const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
     let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
 
@@ -1477,7 +1563,7 @@ function updateCode() {
     execCode.push(`${sp2}if ${breakCond}: break`);
 
     const loopBack = adj[info.controller].find(e => e.port !== exitPort);
-    if (loopBack) generateBlock(loopBack.to, indent + 1, headerId, true); // Pass inLoop = true
+    if (loopBack) generateBlock(loopBack.to, indent + 1, headerId, true);
 
     if (info.exits && info.exits.length > 0 && info.exits[0]) {
         generateBlock(info.exits[0].to, indent, stopNode);
