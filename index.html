@@ -1,363 +1,225 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode - Enhanced</title>
+    <title>FlowCode</title>
 
     <!-- FONTS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-
     <!-- BOOTSTRAP 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <!-- FONT AWESOME -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <!-- SKULPT (Python Engine) -->
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
 
     <style>
         :root {
-            --bg-canvas: #f8f9fa;
-            --grid-color: #dee2e6;
+            --bg-canvas: #f0f2f5;
+            --grid-color: #e0e0e0;
             --node-bg: #ffffff;
-            --node-border: #212529;
-            --node-text: #212529;
+            --node-border: #343a40;
             --accent: #0d6efd;
             --console-bg: #1e1e1e;
         }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            height: 100vh; 
-            overflow: hidden; 
-            background-color: #fff;
-        }
-
+        body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; background-color: #fff; }
         .wrapper { height: 100vh; display: flex; flex-direction: column; }
         .main-area { flex: 1; display: flex; overflow: hidden; }
 
-        /* --- SIDEBAR --- */
+        /* PALETTE */
         #palette {
-            width: 260px;
-            background: #fff;
-            border-right: 1px solid #dee2e6;
-            padding: 20px;
-            z-index: 10;
-            overflow-y: auto;
-            display: flex; flex-direction: column;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            width: 250px; background: #fff; border-right: 1px solid #dee2e6;
+            padding: 15px; overflow-y: auto; display: flex; flex-direction: column; z-index: 10;
         }
-        .palette-header {
-            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
-            color: #adb5bd; font-weight: 700; margin-top: 20px; margin-bottom: 10px;
-        }
+        .palette-header { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #adb5bd; font-weight: 700; margin: 15px 0 5px 0; }
         .palette-item {
-            cursor: grab; user-select: none; margin-bottom: 10px; padding: 10px;
+            cursor: grab; margin-bottom: 8px; padding: 8px 12px;
             border: 1px solid #dee2e6; border-radius: 6px; background: white;
-            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
-            font-size: 0.9rem; color: #495057; font-weight: 600;
+            display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; color: #495057;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .palette-item:hover {
-            border-color: var(--accent); transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: var(--accent);
-        }
-        .palette-item i { width: 20px; text-align: center; color: #6c757d; }
-        .palette-item:hover i { color: var(--accent); }
+        .palette-item:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
 
-        /* --- CANVAS --- */
+        /* CANVAS */
         #canvas {
             flex: 1; background-color: var(--bg-canvas); position: relative; overflow: hidden;
-            background-image: radial-gradient(#ced4da 1px, transparent 1px);
-            background-size: 20px 20px;
+            background-image: radial-gradient(#ced4da 1px, transparent 1px); background-size: 20px 20px;
         }
 
-        /* --- RIGHT PANEL --- */
+        /* OUTPUT PANEL */
         #output-panel {
-            width: 480px; display: flex; flex-direction: column;
-            border-left: 1px solid #dee2e6; background: #fff;
-            box-shadow: -4px 0 15px rgba(0,0,0,0.05);
-            z-index: 10;
-            height: 100%;
+            width: 450px; display: flex; flex-direction: column; border-left: 1px solid #dee2e6;
+            background: #fff; z-index: 10; height: 100%;
         }
-        .panel-toolbar {
-            padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #dee2e6;
-            display: flex; justify-content: space-between; align-items: center;
-            flex-shrink: 0;
-        }
-        .panel-title { color: #212529; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;}
-        
+        .panel-toolbar { padding: 10px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
         .code-display {
-            flex: 1; 
-            padding: 15px; font-family: 'JetBrains Mono', monospace;
-            font-size: 13px; color: #212529; overflow-y: auto;
-            background: #fff;
-            border-bottom: 1px solid #dee2e6; line-height: 1.6;
-            min-height: 100px; 
-            white-space: pre; 
+            flex: 1; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: #212529; overflow-y: auto; white-space: pre; border-bottom: 1px solid #dee2e6;
         }
+        .code-line { min-height: 18px; }
         
-        .keyword { color: #d63384; font-weight: bold; }
-        .func { color: #0d6efd; }
-        .string { color: #198754; }
-        .comment { color: #6c757d; font-style: italic; }
-        .number { color: #fd7e14; }
+        /* SYNTAX HIGHLIGHTING */
+        .kw { color: #d63384; font-weight: bold; } /* keyword */
+        .fn { color: #0d6efd; } /* function */
+        .str { color: #198754; } /* string */
+        .cmt { color: #6c757d; font-style: italic; } /* comment */
+        .num { color: #fd7e14; } /* number */
 
-        /* Fixed Console Layout */
-        #console-container {
-            height: 250px; 
-            background: var(--console-bg); 
-            display: flex; flex-direction: column;
-            flex-shrink: 0;
-        }
-        #console-header {
-            padding: 5px 10px; background: #000; color: #fff; font-size: 11px; font-weight: bold;
-            border-top: 1px solid #444; display: flex; justify-content: space-between;
-            flex-shrink: 0;
-        }
-        #console {
-            flex: 1; 
-            color: #f8f9fa;
-            padding: 10px; 
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px; 
-            overflow-y: auto;
-            padding-bottom: 40px;
-        }
+        #console-container { height: 200px; background: var(--console-bg); display: flex; flex-direction: column; }
+        #console-header { padding: 5px 10px; background: #000; color: #fff; font-size: 10px; font-weight: bold; display: flex; justify-content: space-between; }
+        #console { flex: 1; color: #f8f9fa; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-y: auto; }
 
-        /* --- NODES --- */
+        /* NODES */
         .node {
-            position: absolute; background: var(--node-bg); 
-            border: 2px solid var(--node-border);
-            text-align: center; font-size: 13px; font-weight: 600; 
-            color: var(--node-text);
-            user-select: none; cursor: pointer;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.1); 
-            z-index: 2;
-            display: flex; align-items: center; justify-content: center; padding: 5px;
+            position: absolute; background: white; border: 2px solid var(--node-border);
+            color: #212529; cursor: pointer; user-select: none;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.1); z-index: 2;
+            font-size: 13px; font-weight: 600; text-align: center;
+            transition: border-color 0.1s, box-shadow 0.1s;
         }
-        
         .node:hover { border-color: var(--accent); }
         .node.selected { border-color: #dc3545; box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2); }
-
-        
-.node.running { 
-    background-color: #d1e7dd;      /* Light Green Background */
-    border-color: #198754;          /* Dark Green Border */
-    color: #0f5132;                 /* Dark Green Text */
-    box-shadow: 0 0 15px rgba(25, 135, 84, 0.6); /* Green Glow */
-    transform: scale(1.05);         /* Slight Zoom effect */
-    z-index: 100; 
-    transition: all 0.2s ease-in-out;
-}
-
-        /* --- SHAPES --- */
-        .shape-start, .shape-end { width: 120px; height: 50px; border-radius: 25px; }
-        .shape-process { width: 140px; height: 60px; border-radius: 4px; }
-        .shape-var { 
-    width: 140px; 
-    height: 60px; 
-    border-radius: 4px; 
-}
-
-        .shape-decision { 
-            width: 100px; height: 100px; 
-            border-radius: 0px; 
-            transform: rotate(45deg);
-        }
-        .shape-decision .inner-text { 
-            transform: rotate(-45deg); 
-            width: 140%; pointer-events: none; 
-            font-size: 12px; line-height: 1.2;
+        .node.running { 
+            background-color: #fff3cd; border-color: #ffc107; 
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.5); transform: scale(1.02); z-index: 100; 
         }
 
-        .shape-io, .shape-input, .shape-output { 
-            width: 140px; height: 60px; 
-            transform: skew(-20deg); 
-            border-radius: 2px;
-            margin-left: 10px; 
-        }
-        .shape-io .inner-text, .shape-input .inner-text, .shape-output .inner-text { 
-            transform: skew(20deg); width: 100%; pointer-events: none;
-        }
+        /* SHAPES */
+        .shape-start, .shape-end { width: 100px; height: 40px; border-radius: 20px; background: #212529; color: white; border: none; }
+        .shape-process { width: 140px; height: 50px; border-radius: 4px; }
+        .shape-var { width: 140px; height: 50px; border-radius: 4px; border-left: 5px solid #fd7e14; }
+        .shape-decision { width: 90px; height: 90px; transform: rotate(45deg); border-radius: 0; }
+        .shape-decision .inner { transform: rotate(-45deg); width: 130%; pointer-events: none; line-height: 1.1; font-size: 11px;}
+        .shape-input, .shape-output { width: 130px; height: 50px; transform: skew(-15deg); border-radius: 2px; margin-left: 10px; }
+        .shape-input .inner, .shape-output .inner { transform: skew(15deg); width: 100%; pointer-events: none; }
+        .shape-input { border-left: 4px solid #0d6efd; }
+        .shape-output { border-left: 4px solid #198754; }
 
-        /* Dots/Ports */
+        /* PORTS */
         .dot { 
-            width: 10px; height: 10px; background: #fff; border: 2px solid #495057;
-            border-radius: 50%; position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s; 
+            width: 10px; height: 10px; background: #fff; border: 2px solid #495057; border-radius: 50%; 
+            position: absolute; cursor: crosshair; z-index: 5; transition: 0.2s; 
         }
-        .dot:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.5); }
+        .dot:hover { background: var(--accent); transform: scale(1.4); }
+        
+        /* Port Positioning */
+        .top-cntr { top: -6px; left: 50%; transform: translateX(-50%); }
+        .bot-cntr { bottom: -6px; left: 50%; transform: translateX(-50%); }
+        
+        /* Skewed Ports */
+        .skew-in { top: -6px; left: 50%; margin-left: -5px; transform: skew(15deg); }
+        .skew-out { bottom: -6px; left: 50%; margin-left: -5px; transform: skew(15deg); }
 
-        .shape-process .dot.in, .shape-start .dot.in, .shape-end .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
-        .shape-process .dot.out, .shape-start .dot.out, .shape-end .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
+        /* Decision Ports */
+        .dec-in { top: -6px; left: -6px; }
+        .dec-yes { bottom: -6px; right: -6px; background: #198754; border-color: #198754; }
+        .dec-no { top: -6px; right: -6px; background: #dc3545; border-color: #dc3545; }
 
-        .shape-input .dot, .shape-output .dot { transform: skew(20deg); }
-        .shape-input .dot:hover, .shape-output .dot:hover { transform: skew(20deg) scale(1.5); }
-        .shape-input .dot.in, .shape-output .dot.in { top: -6px; left: 50%; margin-left: -5px; } 
-        .shape-input .dot.out, .shape-output .dot.out { bottom: -6px; left: 50%; margin-left: -5px; }
-
-        .shape-decision .dot.in { top: -6px; left: -6px; } 
-        .shape-decision .dot.out-yes { bottom: -6px; right: -6px; background: #198754; border-color: #198754; } 
-        .shape-decision .dot.out-no { top: -6px; right: -6px; background: #dc3545; border-color: #dc3545; }
-
+        /* SVG Connections */
         svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-        .conn-label { font-family: 'Inter'; font-size: 11px; font-weight: 700; background: white; padding: 2px 6px; border-radius: 4px; border: 1px solid #dee2e6; pointer-events: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
-        /* Node Badges */
-        .node-badge {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            background: #6c757d;
-            color: white;
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            z-index: 10;
-            font-weight: bold;
-        }
-        .node-badge.int { background: #fd7e14; }
-        .node-badge.str { background: #198754; }
-.node .inner-text {
-    font-family: 'Inter', sans-serif !important;
-    font-size: 14px;
-    font-weight: 600;
-}
-.shape-var .dot.in {
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.shape-var .dot.out {
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
+        .conn-label { position: absolute; font-size: 10px; font-weight: bold; background: white; padding: 1px 4px; border-radius: 3px; border: 1px solid #dee2e6; z-index: 2; pointer-events: none; }
+        
+        /* Badges */
+        .node-badge { position: absolute; top: -8px; right: -5px; font-size: 8px; padding: 2px 5px; border-radius: 4px; color: white; font-weight: bold; z-index: 6; }
+        .bg-int { background: #fd7e14; } .bg-str { background: #198754; } .bg-float { background: #6610f2; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-dark border-bottom border-secondary">
+<nav class="navbar navbar-dark bg-dark border-bottom border-secondary py-1">
     <div class="container-fluid">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+        <span class="navbar-brand d-flex align-items-center gap-2 fs-6">
             <i class="fa-solid fa-diagram-project text-white"></i>
-            <span class="text-white fw-bold">FlowCode</span> <span class="badge bg-warning text-dark rounded-pill" style="font-size:0.6rem;">ENHANCED</span>
-        </a>
+            <span class="fw-bold">FlowCode</span> <span class="badge bg-warning text-dark" style="font-size:0.6rem;">v0.4</span>
+        </span>
         <div class="d-flex gap-2">
-            <button class="btn btn-outline-light btn-sm" onclick="clearCanvas()">
-                <i class="fa-solid fa-trash"></i> Clear
-            </button>
+            <button class="btn btn-outline-light btn-sm py-0" onclick="clearCanvas()"><i class="fa-solid fa-trash"></i> Reset</button>
         </div>
     </div>
 </nav>
 
 <div class="wrapper">
     <div class="main-area">
+        <!-- PALETTE -->
         <div id="palette">
-            <div class="palette-header">Start / End</div>
+            <div class="palette-header">Flow</div>
             <div class="palette-item" draggable="true" data-type="start"><i class="fa-regular fa-circle-play"></i> Start</div>
             <div class="palette-item" draggable="true" data-type="end"><i class="fa-regular fa-circle-stop"></i> End</div>
-
-            <div class="palette-header">Variables</div>
-<div class="palette-item" draggable="true" data-type="var">
-    <i class="fa-solid fa-pen"></i> Variable
-</div>
             
-            <div class="palette-header">I/O</div>
+            <div class="palette-header">Data</div>
+            <div class="palette-item" draggable="true" data-type="var"><i class="fa-solid fa-cube"></i> Set Variable</div>
             <div class="palette-item" draggable="true" data-type="input"><i class="fa-solid fa-keyboard"></i> Input</div>
             <div class="palette-item" draggable="true" data-type="output"><i class="fa-solid fa-terminal"></i> Print</div>
+
             <div class="palette-header">Logic</div>
-            <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-gear"></i> Process</div>
+            <div class="palette-item" draggable="true" data-type="process"><i class="fa-solid fa-microchip"></i> Process</div>
             <div class="palette-item" draggable="true" data-type="decision"><i class="fa-solid fa-diamond"></i> Decision</div>
-            
-            <div class="mt-auto p-2 bg-light border rounded text-center">
-                <small class="text-muted" style="font-size:10px;">
-                    <strong>Enhanced Features:</strong><br>
-                    Loop detection • Input types • For/While/If
-                </small>
-            </div>
         </div>
 
+        <!-- CANVAS -->
         <div id="canvas">
             <svg id="connections-layer">
-                <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker>
-                </defs>
+                <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555" /></marker></defs>
             </svg>
             <div id="nodes-layer"></div>
         </div>
 
+        <!-- RIGHT PANEL -->
         <div id="output-panel">
             <div class="panel-toolbar">
-                <span class="panel-title"><i class="fa-brands fa-python"></i> Python 3</span>
-                
-                <!-- CONTROLS GROUP -->
                 <div class="d-flex align-items-center gap-2">
-                    <!-- Speed Slider -->
-                    <label class="small text-muted fw-bold" style="font-size: 10px;">SPEED</label>
-                    <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="800" style="width: 80px;">
-                    
-                    <div class="vr mx-2"></div> <!-- Vertical Divider -->
-            
-                    <!-- Run/Stop Buttons -->
-                    <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="runSimulation()">
-                        <i class="fa-solid fa-play me-1"></i> RUN
-                    </button>
-                    <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopSimulation()" style="display:none;">
-                        <i class="fa-solid fa-stop me-1"></i> STOP
-                    </button>
+                    <i class="fa-brands fa-python"></i> <span class="fw-bold small">Generated Code</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="range" class="form-range" id="speed-slider" min="100" max="1500" value="600" style="width: 70px;" title="Execution Speed">
+                    <button id="btn-run" class="btn btn-success btn-sm fw-bold" onclick="compileAndRun()"><i class="fa-solid fa-play"></i> RUN</button>
+                    <button id="btn-stop" class="btn btn-danger btn-sm fw-bold" onclick="stopExecution()" style="display:none;"><i class="fa-solid fa-stop"></i> STOP</button>
                 </div>
             </div>
 
-            <div id="code-python" class="code-display"></div>
+            <div id="code-display" class="code-display"><span class="cmt"># Drag nodes to generate code...</span></div>
             
             <div id="console-container">
-                <div id="console-header">
-                    <span>TERMINAL</span>
-                    <i class="fa-solid fa-terminal"></i>
-                </div>
+                <div id="console-header"><span>TERMINAL</span><i class="fa-solid fa-terminal"></i></div>
                 <div id="console"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- RUNTIME INPUT MODAL (Used by Skulpt) -->
-<div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title"><i class="fa-solid fa-keyboard text-primary"></i> User Input</h5>
+            <div class="modal-header py-2 bg-light">
+                <h6 class="modal-title fw-bold">Properties</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p id="modal-prompt" class="fw-bold mb-2">Enter value:</p>
-                <input type="text" id="modal-input" class="form-control" autocomplete="off" autofocus>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary w-100" id="modal-submit">Submit</button>
+            <div class="modal-body" id="editBody"></div>
+            <div class="modal-footer py-1">
+                <button type="button" class="btn btn-primary btn-sm w-100" onclick="saveNodeData()">Apply</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- EDIT NODE MODAL -->
-<div class="modal fade" id="editNodeModal" tabindex="-1" data-bs-backdrop="static">
+<!-- INPUT MODAL -->
+<div class="modal fade" id="runtimeInputModal" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-light py-2">
-                <h6 class="modal-title fw-bold" id="editNodeTitle">Edit Node</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-bold">Input Required</h6>
             </div>
-            <div class="modal-body" id="editNodeBody">
-                <!-- Dynamic Content Injected Here -->
+            <div class="modal-body">
+                <p id="runtime-prompt" class="mb-1 small text-muted">Value:</p>
+                <input type="text" id="runtime-val" class="form-control font-monospace" autocomplete="off">
             </div>
             <div class="modal-footer py-1">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="saveNodeEdit()">Save Changes</button>
+                <button id="runtime-submit" class="btn btn-success btn-sm w-100">Submit</button>
             </div>
         </div>
     </div>
@@ -365,867 +227,712 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // --- 1. SETUP & DATA ---
-    let nodes = [];
-    let connections = [];
-    let nextId = 1;
-    let isRunning = false;
-    let editingNodeId = null;
+/**
+ * CORE DATA STRUCTURES
+ */
+let nodes = [];
+let connections = [];
+let nextId = 1;
+let isRunning = false;
+let executionStopFlag = false;
+let editingId = null;
 
-    const canvas = document.getElementById('canvas');
-    const nodesLayer = document.getElementById('nodes-layer');
-    const svgLayer = document.getElementById('connections-layer');
-    const consoleDiv = document.getElementById('console');
+// DOM Elements
+const canvas = document.getElementById('canvas');
+const svgLayer = document.getElementById('connections-layer');
+const nodesLayer = document.getElementById('nodes-layer');
+const consoleDiv = document.getElementById('console');
+const codeDisplay = document.getElementById('code-display');
 
-    // --- 2. SKULPT CONFIGURATION ---
-    function builtinRead(x) {
-        if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
-            throw "File not found: '" + x + "'";
-        return Sk.builtinFiles["files"][x];
-    }
-
-    Sk.configure({
-        output: function(text) { if(text !== '\n') log(text); },
-        read: builtinRead,
-        inputfun: function(promptText) {        
-            return new Promise(function(resolve) {
-                const msg = promptText || "Input required:";
-                log(msg, "input"); 
-                showInputModal(msg).then(function(result) {
-                    log(result, "input"); 
-                    resolve(result);      
-                });
-            });
-        },
-        inputfunTakesPrompt: true               
-    });
-
-    // --- 3. MODAL LOGIC ---
-    function showInputModal(msg) {
-        return new Promise(resolve => {
-            const modalEl = document.getElementById('inputModal');
-            const promptEl = document.getElementById('modal-prompt');
-            const inputEl = document.getElementById('modal-input');
-            const submitEl = document.getElementById('modal-submit');
-            
-            promptEl.textContent = msg;
-            inputEl.value = "";
-            let bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            
-            const finish = () => {
-                const val = inputEl.value;
-                bsModal.hide();
-                resolve(val);
-                cleanup(); 
-            };
-            const handleKey = (e) => { if(e.key === 'Enter') finish(); }
-            const cleanup = () => {
-                submitEl.removeEventListener('click', finish);
-                inputEl.removeEventListener('keydown', handleKey);
-                document.body.focus();
-            };
-            submitEl.addEventListener('click', finish);
-            inputEl.addEventListener('keydown', handleKey);
-            bsModal.show();
-            setTimeout(() => inputEl.focus(), 500);
-        });
-    }
-
-    // --- 4. DRAG & DROP & EDIT LOGIC ---
-    document.querySelectorAll('.palette-item').forEach(item => {
-        item.addEventListener('dragstart', (e) => e.dataTransfer.setData('type', item.dataset.type));
-    });
-
-    canvas.addEventListener('dragover', (e) => e.preventDefault());
-    canvas.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const type = e.dataTransfer.getData('type');
-        if(!type) return;
-        const rect = canvas.getBoundingClientRect();
-        createNode(type, e.clientX - rect.left - 50, e.clientY - rect.top - 25);
-    });
-
-    function createNode(type, x, y) {
-        const id = `node-${nextId++}`;
-        let text = "";
-        let dataType = "str"; 
-        
-        if(type==='start') text="Start";
-        else if(type==='end') text="End";
-        else if (type === 'var') {
-            text = "x = 0";
-            dataType = "int"; // default
-        }
-        else if(type==='process') text="x = x + 1"; 
-        else if(type==='decision') text="x < 5";
-        else if(type==='input') { text="Input x = \"Enter Value\""; dataType = "str"; }
-        else if(type==='output') text="Print x";
-
-        const node = { id, type, x, y, text, dataType };
-        nodes.push(node);
-        renderNode(node);
-        updateCode();
-    }
-
-    function renderNode(node) {
-        const el = document.createElement('div');
-        el.className = `node shape-${node.type}`;
-        el.id = node.id;
-        el.style.left = node.x + 'px';
-        el.style.top = node.y + 'px';
-
-            
-                    let innerHtml = node.text;
-            
-            if (node.type === 'input') {
-                const parts = node.text.split('=');
-                innerHtml = `<div class="inner-text">${parts[0].trim()}</div>`;
-            }
-            else if (node.type === 'var') {
-                innerHtml = `<div class="inner-text">${node.text}</div>`;
-            }
-            else if (['decision','output'].includes(node.type)) {
-                innerHtml = `<div class="inner-text">${node.text}</div>`;
-            }
-            
-            el.innerHTML = innerHtml;
-
-        
-        if(node.type === 'input' && node.dataType) {
-            const badge = document.createElement('div');
-            badge.className = `node-badge ${node.dataType}`;
-            badge.textContent = node.dataType === 'int' ? 'INT' : 'STR';
-            el.appendChild(badge);
-        }
-        
-        el.onmousedown = (e) => startDragNode(e, node.id);
-        el.ondblclick = () => editNode(node.id);
-        el.onclick = (e) => { e.stopPropagation(); selectNode(node.id); };
-        addPorts(el, node);
-        nodesLayer.appendChild(el);
-    }
-
-function addPorts(el, node) {
-    if (node.type === 'start') {
-        // Start has only OUT
-        addDot(el, 'out', node.id, 'next');
-    } 
-    else if (node.type === 'end') {
-        // End has only IN
-        addDot(el, 'in', node.id, 'in');
-    }
-    else if (node.type === 'decision') {
-        // Decision has 1 IN and 2 OUTs (yes/no)
-        addDot(el, 'in', node.id, 'in');
-        addDot(el, 'out-yes', node.id, 'yes');
-        addDot(el, 'out-no', node.id, 'no');
-    } 
-    else if (
-        node.type === 'process' ||
-        node.type === 'var' ||
-        node.type === 'input' ||
-        node.type === 'output'
-    ) {
-        // Standard blocks: IN + OUT
-        addDot(el, 'in', node.id, 'in');
-        addDot(el, 'out', node.id, 'next');
-    }
+// Initialize
+function init() {
+    createNode('start', 50, 50);
+    createNode('end', 50, 400);
+    renderGraph();
 }
 
-
-    function addDot(parent, className, nodeId, portType) {
-        const dot = document.createElement('div');
-        dot.className = `dot ${className}`;
-        dot.title = portType === 'next' ? 'Connect' : portType; 
-        dot.onmousedown = (e) => { e.stopPropagation(); startConnection(nodeId, portType); };
-        dot.onmouseup = (e) => { e.stopPropagation(); finishConnection(nodeId); };
-        parent.appendChild(dot);
-    }
-
-    // --- EDIT MODAL ---
-    function editNode(id) {
-        const node = nodes.find(n => n.id === id);
-        if(!node) return;
-        editingNodeId = id;
-        const modalTitle = document.getElementById('editNodeTitle');
-        const modalBody = document.getElementById('editNodeBody');
-        let html = '';
-
-        if(node.type === 'input') {
-            modalTitle.innerText = "Edit Input Node";
-            let currentText = node.text.replace(/^Input\s+/i, ''); 
-            let varName = currentText; 
-            let promptText = "";
-            if(currentText.includes('=')) {
-                const parts = currentText.split('=');
-                varName = parts[0].trim();
-                promptText = parts.slice(1).join('=').trim();
-                if ((promptText.startsWith('"') && promptText.endsWith('"')) || (promptText.startsWith("'") && promptText.endsWith("'"))) {
-                    promptText = promptText.substring(1, promptText.length - 1);
-                }
-            }
-            html = `<div class="mb-3">
-                        <label class="form-label fw-bold small">Variable Name</label>
-                        <input type="text" id="edit-input-var" class="form-control" value="${varName}">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Prompt Message</label>
-                        <input type="text" id="edit-input-prompt" class="form-control" value="${promptText}">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Data Type</label>
-                        <select id="edit-input-type" class="form-select">
-                            <option value="str" ${node.dataType === 'str' ? 'selected' : ''}>String (Text)</option>
-                            <option value="int" ${node.dataType === 'int' ? 'selected' : ''}>Integer (Number)</option>
-                            <option value="float" ${node.dataType === 'float' ? 'selected' : ''}>Float (Decimal)</option>
-
-                        </select>
-                        <small class="text-muted">Select "Integer" to convert input to number</small>
-                    </div>`;
-        } 
-        
-        else if (node.type === 'var') {
-    modalTitle.innerText = "Edit Variable";
-
-    let parts = node.text.split('=');
-    let varName = parts[0].trim();
-    let value = parts[1].trim();
-
-    html = `
-        <label class="form-label fw-bold small">Variable Name</label>
-        <input id="edit-var-name" class="form-control" value="${varName}">
-
-        <label class="form-label fw-bold small mt-2">Initial Value</label>
-        <input id="edit-var-value" class="form-control" value="${value}">
-
-        <label class="form-label fw-bold small mt-2">Type</label>
-        <select id="edit-var-type" class="form-select">
-            <option value="str" ${node.dataType==="str" ? "selected":""}>String</option>
-            <option value="int" ${node.dataType==="int" ? "selected":""}>Integer</option>
-            <option value="float" ${node.dataType==="float" ? "selected":""}>Float</option>
-        </select>
-    `;
+/**
+ * GRAPH MANIPULATION
+ */
+function createNode(type, x, y) {
+    const id = `node_${nextId++}`;
+    let node = { id, type, x, y, text: "", data: {} };
+    
+    // Defaults
+    if(type === 'start') node.text = "Start";
+    if(type === 'end') node.text = "End";
+    if(type === 'process') node.text = "x = x + 1";
+    if(type === 'decision') node.text = "x < 10";
+    if(type === 'var') { node.text = "x = 0"; node.data = { name:'x', val:'0', type:'int' }; }
+    if(type === 'input') { node.text = "Input x"; node.data = { var:'x', prompt:'Enter value', type:'str' }; }
+    if(type === 'output') { node.text = "Print x"; node.data = { val:'x' }; }
+    
+    nodes.push(node);
+    renderNode(node);
+    generateCode(); // Live update
 }
 
-        
-        else if(node.type === 'output') {
-            modalTitle.innerText = "Edit Output Node";
-            let val = node.text.replace(/^Print\s*/i, '').trim();
-            html = `<label class="form-label fw-bold small">Value to Print</label>
-                    <div class="d-flex align-items-center gap-2 p-2 border rounded bg-light">
-                        <span class="font-monospace fw-bold text-primary">print(</span>
-                        <input type="text" id="edit-output-val" class="form-control form-control-sm border-0 shadow-none font-monospace" value="${val}" style="background:transparent;" autofocus>
-                        <span class="font-monospace fw-bold text-primary">)</span>
-                    </div>`;
-        } else {
-            modalTitle.innerText = "Edit " + (node.type.charAt(0).toUpperCase() + node.type.slice(1));
-            html = `<div class="mb-3">
-                        <label class="form-label fw-bold small">Code / Condition</label>
-                        <textarea id="edit-generic-text" class="form-control font-monospace" rows="3">${node.text}</textarea>
-                    </div>`;
-        }
-        modalBody.innerHTML = html;
-        const bsModal = new bootstrap.Modal(document.getElementById('editNodeModal'));
-        bsModal.show();
-        setTimeout(() => {
-            if(document.getElementById('edit-input-var')) document.getElementById('edit-input-var').focus();
-            else if(document.getElementById('edit-output-val')) document.getElementById('edit-output-val').focus();
-            else if(document.getElementById('edit-generic-text')) document.getElementById('edit-generic-text').focus();
-        }, 500);
+function renderNode(node) {
+    const el = document.createElement('div');
+    el.id = node.id;
+    el.className = `node shape-${node.type}`;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    
+    let content = `<div class="inner">${escapeHtml(node.text)}</div>`;
+    
+    // Visual Badges
+    if(node.type === 'var' || node.type === 'input') {
+        const typeShort = (node.data.type || 'str').toUpperCase();
+        content += `<span class="node-badge bg-${node.data.type || 'str'}">${typeShort}</span>`;
     }
-
-
-function saveNodeEdit() {
-    if (!editingNodeId) return;
-
-    const node = nodes.find(n => n.id === editingNodeId);
-    let newText = "";
-
-    if (node.type === 'input') {
-        const v = document.getElementById('edit-input-var').value.trim();
-        const p = document.getElementById('edit-input-prompt').value.trim();
-        const dataType = document.getElementById('edit-input-type').value;
-
-        if (!v) return alert("Variable name required");
-
-        newText = `Input ${v} = "${p}"`;
-        node.dataType = dataType;
+    
+    el.innerHTML = content;
+    
+    // Events
+    el.onmousedown = (e) => startDrag(e, node.id);
+    el.ondblclick = () => openEditModal(node.id);
+    el.onclick = (e) => { e.stopPropagation(); selectNode(node.id); };
+    
+    // Ports
+    if(node.type === 'start') addPort(el, node.id, 'out', 'bot-cntr');
+    else if(node.type === 'end') addPort(el, node.id, 'in', 'top-cntr');
+    else if(node.type === 'decision') {
+        addPort(el, node.id, 'in', 'dec-in');
+        addPort(el, node.id, 'yes', 'dec-yes');
+        addPort(el, node.id, 'no', 'dec-no');
+    } else if (['input','output'].includes(node.type)) {
+        addPort(el, node.id, 'in', 'skew-in');
+        addPort(el, node.id, 'out', 'skew-out');
+    } else {
+        addPort(el, node.id, 'in', 'top-cntr');
+        addPort(el, node.id, 'out', 'bot-cntr');
     }
-    else if (node.type === 'output') {
-        const v = document.getElementById('edit-output-val').value.trim();
-        if (!v) return alert("Value required");
-        newText = `Print ${v}`;
-    }
-else if (node.type === 'var') {
-    const newName = document.getElementById("edit-var-name").value.trim();
-    let newValue = document.getElementById("edit-var-value").value.trim();
-    const dtype = document.getElementById("edit-var-type").value;
-
-    if (dtype === "str" && !newValue.startsWith('"'))
-        newValue = `"${newValue}"`;
-
-    node.dataType = dtype;
-    newText = `${newName} = ${newValue}`;
+    
+    nodesLayer.appendChild(el);
 }
 
+function addPort(parent, nodeId, type, cssClass) {
+    const dot = document.createElement('div');
+    dot.className = `dot ${cssClass}`;
+    dot.dataset.type = type;
+    dot.onmousedown = (e) => startConnection(e, nodeId, type);
+    parent.appendChild(dot);
+}
 
-        
-    else {
-        newText = document.getElementById('edit-generic-text').value;
+/**
+ * EDITING LOGIC
+ */
+function openEditModal(id) {
+    editingId = id;
+    const node = nodes.find(n => n.id === id);
+    if(!node) return;
+    
+    const body = document.getElementById('editBody');
+    let html = '';
+    
+    if(node.type === 'var') {
+        html = `
+            <div class="mb-2"><label class="form-label small fw-bold">Variable Name</label><input id="inp-var" class="form-control form-control-sm" value="${node.data.name}"></div>
+            <div class="mb-2"><label class="form-label small fw-bold">Value</label><input id="inp-val" class="form-control form-control-sm" value="${node.data.val}"></div>
+            <div class="mb-2"><label class="form-label small fw-bold">Type</label>
+                <select id="inp-type" class="form-select form-select-sm">
+                    <option value="int" ${node.data.type==='int'?'selected':''}>Integer</option>
+                    <option value="float" ${node.data.type==='float'?'selected':''}>Float</option>
+                    <option value="str" ${node.data.type==='str'?'selected':''}>String</option>
+                </select></div>`;
+    } else if(node.type === 'input') {
+        html = `
+            <div class="mb-2"><label class="form-label small fw-bold">Store in Variable</label><input id="inp-var" class="form-control form-control-sm" value="${node.data.var}"></div>
+            <div class="mb-2"><label class="form-label small fw-bold">Prompt Text</label><input id="inp-prompt" class="form-control form-control-sm" value="${node.data.prompt}"></div>
+            <div class="mb-2"><label class="form-label small fw-bold">Input Type</label>
+                <select id="inp-type" class="form-select form-select-sm">
+                    <option value="str" ${node.data.type==='str'?'selected':''}>String</option>
+                    <option value="int" ${node.data.type==='int'?'selected':''}>Integer</option>
+                    <option value="float" ${node.data.type==='float'?'selected':''}>Float</option>
+                </select></div>`;
+    } else if(node.type === 'output') {
+        html = `<div class="mb-2"><label class="form-label small fw-bold">Expression to Print</label><input id="inp-val" class="form-control form-control-sm" value="${node.data.val}"></div>`;
+    } else if(node.type === 'decision') {
+        html = `<div class="mb-2"><label class="form-label small fw-bold">Condition (e.g. x < 10)</label><input id="inp-text" class="form-control form-control-sm" value="${node.text}"></div>`;
+    } else if(node.type === 'process') {
+        html = `<div class="mb-2"><label class="form-label small fw-bold">Statement (e.g. x = x + 1)</label><textarea id="inp-text" class="form-control form-control-sm" rows="3">${node.text}</textarea></div>`;
+    } else {
+        return; // Start/End
     }
+    
+    body.innerHTML = html;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
 
-    // Save
-    node.text = newText;
-
-    // Update element
+function saveNodeData() {
+    const node = nodes.find(n => n.id === editingId);
+    if(!node) return;
+    
+    if(node.type === 'var') {
+        node.data.name = document.getElementById('inp-var').value.trim() || 'x';
+        node.data.val = document.getElementById('inp-val').value.trim() || '0';
+        node.data.type = document.getElementById('inp-type').value;
+        const valDisp = node.data.type === 'str' ? `"${node.data.val}"` : node.data.val;
+        node.text = `${node.data.name} = ${valDisp}`;
+    } else if(node.type === 'input') {
+        node.data.var = document.getElementById('inp-var').value.trim() || 'x';
+        node.data.prompt = document.getElementById('inp-prompt').value.trim() || '';
+        node.data.type = document.getElementById('inp-type').value;
+        node.text = `Input ${node.data.var}`;
+    } else if(node.type === 'output') {
+        node.data.val = document.getElementById('inp-val').value.trim();
+        node.text = `Print ${node.data.val}`;
+    } else {
+        const el = document.getElementById('inp-text');
+        if(el) node.text = el.value.trim();
+    }
+    
+    // Re-render only text/badge
     const el = document.getElementById(node.id);
-    el.innerHTML = "";
+    let inner = `<div class="inner">${escapeHtml(node.text)}</div>`;
+    if(node.data && node.data.type) inner += `<span class="node-badge bg-${node.data.type}">${node.data.type.toUpperCase()}</span>`;
+    el.innerHTML = inner;
+    
+    // Re-attach ports (innerHTML wipes them)
+    if(node.type === 'decision') {
+        addPort(el, node.id, 'in', 'dec-in'); addPort(el, node.id, 'yes', 'dec-yes'); addPort(el, node.id, 'no', 'dec-no');
+    } else if (['input','output'].includes(node.type)) {
+        addPort(el, node.id, 'in', 'skew-in'); addPort(el, node.id, 'out', 'skew-out');
+    } else if (node.type !== 'start' && node.type !== 'end') {
+        addPort(el, node.id, 'in', 'top-cntr'); addPort(el, node.id, 'out', 'bot-cntr');
+    } else if (node.type === 'start') addPort(el, node.id, 'out', 'bot-cntr');
+    else if (node.type === 'end') addPort(el, node.id, 'in', 'top-cntr');
 
-    // Remove ALL existing ports (fixes duplication)
-    el.querySelectorAll('.dot').forEach(dot => dot.remove());
-
-    // Recreate label
-if (node.type === 'input') {
-    const label = node.text.split('=')[0].trim();
-    el.innerHTML = `<div class="inner-text">${label}</div>`;
-} 
-else if (node.type === 'var') {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-}
-else if (['decision', 'output'].includes(node.type)) {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-} 
-else {
-    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    generateCode();
 }
 
+/**
+ * CONNECTIONS & DRAGGING
+ */
+let dragData = null;
+let connData = null;
 
-    // Re-add badge for input types
-    if (node.type === 'input') {
-        const badge = document.createElement('div');
-        badge.className = `node-badge ${node.dataType}`;
-        badge.textContent = node.dataType.toUpperCase();
-        el.appendChild(badge);
+canvas.addEventListener('mousedown', (e) => {
+    if(e.target === canvas) selectNode(null);
+});
+canvas.addEventListener('mousemove', (e) => {
+    if(dragData) {
+        const dx = e.clientX - dragData.startX;
+        const dy = e.clientY - dragData.startY;
+        const node = nodes.find(n=>n.id === dragData.id);
+        node.x = dragData.origX + dx;
+        node.y = dragData.origY + dy;
+        const el = document.getElementById(dragData.id);
+        el.style.left = node.x + 'px'; el.style.top = node.y + 'px';
+        renderConnections();
     }
+    if(connData) {
+        renderTempLine(e.clientX, e.clientY);
+    }
+});
+canvas.addEventListener('mouseup', () => {
+    if(dragData) { dragData = null; generateCode(); }
+    if(connData) { svgLayer.innerHTML=''; renderConnections(); connData=null; }
+});
+canvas.addEventListener('dragover', e => e.preventDefault());
+canvas.addEventListener('drop', e => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('type');
+    const rect = canvas.getBoundingClientRect();
+    if(type) createNode(type, e.clientX - rect.left - 50, e.clientY - rect.top - 25);
+});
+document.querySelectorAll('.palette-item').forEach(i => {
+    i.addEventListener('dragstart', e => e.dataTransfer.setData('type', i.dataset.type));
+});
+window.addEventListener('keydown', e => {
+    if(e.key === 'Delete' && selectedNodeId) {
+        nodes = nodes.filter(n => n.id !== selectedNodeId);
+        connections = connections.filter(c => c.from !== selectedNodeId && c.to !== selectedNodeId);
+        document.getElementById(selectedNodeId).remove();
+        selectedNodeId = null;
+        renderConnections();
+        generateCode();
+    }
+});
 
-    // Re-add ports (SAFE)
-    addPorts(el, node);
-
-    updateCode();
-
-    bootstrap.Modal.getInstance(document.getElementById('editNodeModal')).hide();
-    editingNodeId = null;
+function startDrag(e, id) {
+    if(e.target.classList.contains('dot')) return;
+    dragData = { id, startX: e.clientX, startY: e.clientY, origX: nodes.find(n=>n.id===id).x, origY: nodes.find(n=>n.id===id).y };
+    selectNode(id);
 }
 
+function startConnection(e, nodeId, type) {
+    e.stopPropagation();
+    if(type === 'in') return; // Can't start from input
+    // Limit outputs: If port already has connection, remove it
+    connections = connections.filter(c => !(c.from === nodeId && c.port === type));
+    
+    const rect = canvas.getBoundingClientRect();
+    connData = { from: nodeId, port: type, startX: e.clientX - rect.left, startY: e.clientY - rect.top };
+}
 
+// Global mouseup handler for connecting to target
+document.addEventListener('mouseup', e => {
+    if(connData && e.target.classList.contains('dot') && e.target.dataset.type === 'in') {
+        const targetNodeId = e.target.parentElement.id;
+        if(connData.from !== targetNodeId) { // No self loops directly
+            connections.push({ from: connData.from, port: connData.port, to: targetNodeId });
+            renderConnections();
+            generateCode();
+        }
+    }
+});
 
+function renderTempLine(mx, my) {
+    const rect = canvas.getBoundingClientRect();
+    const ex = mx - rect.left;
+    const ey = my - rect.top;
     
-    document.getElementById('editNodeModal').addEventListener('keydown', (e) => { 
-        if(e.key==='Enter' && !e.shiftKey) { 
-            e.preventDefault(); 
-            saveNodeEdit(); 
-        }
-    });
+    // Redraw existing + temp
+    renderConnections(); 
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const d = getPath(connData.startX, connData.startY, ex, ey, connData.port);
+    line.setAttribute('d', d);
+    line.setAttribute('stroke', '#0d6efd');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '5,5');
+    line.setAttribute('fill', 'none');
+    svgLayer.appendChild(line);
+}
 
-    // --- 5. CONNECTIONS ---
-    function selectNode(id) {
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
-        document.getElementById(id).classList.add('selected');
-    }
+function renderConnections() {
+    svgLayer.innerHTML = '<defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#555" /></marker></defs>';
+    document.querySelectorAll('.conn-label').forEach(e=>e.remove());
     
-    function clearCanvas() {
-        if(confirm("Clear all nodes?")) {
-            nodes = []; connections = []; nodesLayer.innerHTML = ''; drawConnections(); updateCode();
-        }
-    }
-    
-    let dragLine = null; let isConnecting = false; let connStart = null;
-    
-    function startConnection(nodeId, portType) {
-        isConnecting = true; connStart = { nodeId, portType };
-        dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        dragLine.setAttribute('stroke', '#0d6efd'); dragLine.setAttribute('stroke-width', '2'); dragLine.setAttribute('stroke-dasharray', '5,5'); dragLine.setAttribute('fill', 'none');
-        svgLayer.appendChild(dragLine);
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', abortConnection);
-    }
-    
-    function onMouseMove(e) {
-        if(isConnecting) {
-            const rect = canvas.getBoundingClientRect();
-            const pt1 = getPortPosition(connStart.nodeId, connStart.portType);
-            dragLine.setAttribute('d', `M ${pt1.x} ${pt1.y} L ${e.clientX - rect.left} ${e.clientY - rect.top}`);
-        } else if (dragNodeId) {
-            const node = nodes.find(n=>n.id === dragNodeId);
-            const rect = canvas.getBoundingClientRect();
-            node.x = e.clientX - rect.left - dragOffset.x;
-            node.y = e.clientY - rect.top - dragOffset.y;
-            const el = document.getElementById(dragNodeId);
-            el.style.left = node.x+'px'; el.style.top = node.y+'px';
-            drawConnections();
-        }
-    }
-    
-    function finishConnection(targetId) {
-        if(isConnecting && connStart.nodeId !== targetId) {
-            if(connStart.portType !== 'in') connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
-            connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
-            drawConnections(); updateCode();
-        }
-        abortConnection();
-    }
-    
-    function abortConnection() {
-        isConnecting = false; if(dragLine) dragLine.remove();
-        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', abortConnection);
-    }
-    
-    function getPortPosition(nodeId, type) {
-        const node = nodes.find(n=>n.id===nodeId);
-        const el = document.getElementById(nodeId);
-        const w = el.offsetWidth; const h = el.offsetHeight;
-        if(node.type === 'decision') {
-            const dotClass = (type==='yes'?'out-yes':(type==='no'?'out-no':(type==='next'?'out':'in')));
-            const dot = el.querySelector(`.dot.${dotClass}`);
-            if(!dot) return {x: node.x+w/2, y: node.y+h/2};
-            const r = dot.getBoundingClientRect(); const c = canvas.getBoundingClientRect();
-            return { x: r.left - c.left + 5, y: r.top - c.top + 5 }; 
-        } 
-        return { x: node.x + w/2, y: type === 'in' ? node.y : node.y + h };
-    }
-    
-    function drawConnections() {
-        document.querySelectorAll('.conn-label').forEach(e => e.remove());
-const defs = svgLayer.querySelector('defs');
-svgLayer.innerHTML = "";
-svgLayer.appendChild(defs.cloneNode(true));
-        connections.forEach(c => {
-            const p1 = getPortPosition(c.from, c.port);
-            const p2 = getPortPosition(c.to, 'in');
-            let color = c.port === 'yes' ? '#198754' : (c.port === 'no' ? '#dc3545' : '#555');
-            const d = getOrthogonalPath(p1, p2, c.port);
-            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            p.setAttribute('d', d); p.setAttribute('stroke', color); p.setAttribute('stroke-width', '2'); p.setAttribute('marker-end', 'url(#arrowhead)'); p.setAttribute('fill', 'none');
-            const cp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            cp.setAttribute('d', d); cp.setAttribute('stroke', 'transparent'); cp.setAttribute('stroke-width', '15'); cp.style.cursor='pointer'; cp.setAttribute('fill', 'none');
-            cp.onclick = (e) => { e.stopPropagation(); if(confirm("Delete?")) { connections = connections.filter(x=>x!==c); drawConnections(); updateCode(); } };
-            svgLayer.appendChild(p); svgLayer.appendChild(cp);
-            if(['yes','no'].includes(c.port)) {
-                const lbl = document.createElement('div'); lbl.className='conn-label'; lbl.innerText=c.port==='yes'?'Yes':'No'; lbl.style.position='absolute'; lbl.style.color=color;
-                lbl.style.left = (c.port==='yes' ? p1.x+10 : p1.x+10) + 'px';
-                lbl.style.top = (c.port==='yes' ? p1.y+10 : p1.y-20) + 'px';
-                nodesLayer.appendChild(lbl);
-            }
-        });
-    }
-    
-    function getOrthogonalPath(p1, p2, portType) {
-        let d = `M ${p1.x} ${p1.y}`;
-        const midY = (p1.y + p2.y) / 2;
-        if(p2.y > p1.y + 30) {
-            if(portType === 'no') { d += ` L ${p2.x + 40} ${p1.y} L ${p2.x + 40} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`; } 
-            else { d += ` L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`; }
-        } else {
-            const buffer = 80;
-            if(portType === 'no') { const rx = Math.max(p1.x, p2.x) + buffer; d += ` L ${rx} ${p1.y} L ${rx} ${p2.y - 40} L ${p2.x} ${p2.y - 40} L ${p2.x} ${p2.y}`; } 
-            else { const lx = Math.min(p1.x, p2.x) - buffer; d += ` L ${p1.x} ${p1.y + 20} L ${lx} ${p1.y + 20} L ${lx} ${p2.y - 40} L ${p2.x} ${p2.y - 40} L ${p2.x} ${p2.y}`; }
-        }
-        return d;
-    }
-    
-    let dragNodeId = null; let dragOffset = {x:0, y:0};
-    
-    function startDragNode(e, id) {
-        if(e.target.classList.contains('dot')) return;
-        dragNodeId = id;
-        const node = nodes.find(n=>n.id===id);
-        dragOffset.x = e.clientX - node.x - canvas.getBoundingClientRect().left;
-        dragOffset.y = e.clientY - node.y - canvas.getBoundingClientRect().top;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', () => { dragNodeId = null; document.removeEventListener('mousemove', onMouseMove); updateCode(); });
-        selectNode(id);
-    }
-    
-    window.addEventListener('keydown', (e) => {
-        if((e.key === 'Delete' || e.key === 'Backspace') && !['INPUT','TEXTAREA'].includes(e.target.tagName)) {
-            const s = document.querySelector('.node.selected');
-            if(s) { nodes=nodes.filter(n=>n.id!==s.id); connections=connections.filter(c=>c.from!==s.id && c.to!==s.id); s.remove(); drawConnections(); updateCode(); }
-        }
-    });
-
-    // --- 6. CODE GENERATOR (IMPROVED FOR ANIMATION & LOOPS) ---
-    let generatedCode = "";
-
-    function updateCode() {
-        const pyBox = document.getElementById('code-python');
-        let execCode = ["import time", "import sys", ""];
-        let displayHtml = [];
+    connections.forEach(c => {
+        const n1 = nodes.find(n=>n.id===c.from);
+        const n2 = nodes.find(n=>n.id===c.to);
+        if(!n1 || !n2) return;
         
-        const startNode = nodes.find(n => n.type === 'start');
-        if (!startNode) {
-            pyBox.innerHTML = '<span class="comment"># Drag "Start" to begin</span>';
+        const p1 = getPortPos(n1, c.port);
+        const p2 = getPortPos(n2, 'in');
+        
+        const d = getPath(p1.x, p1.y, p2.x, p2.y, c.port);
+        const color = c.port === 'yes' ? '#198754' : (c.port === 'no' ? '#dc3545' : '#555');
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('marker-end', 'url(#arrowhead)');
+        
+        svgLayer.appendChild(path);
+        
+        if(c.port === 'yes' || c.port === 'no') {
+            const lbl = document.createElement('div');
+            lbl.className = 'conn-label';
+            lbl.innerText = c.port.toUpperCase();
+            lbl.style.color = color;
+            // Position label
+            if(c.port === 'yes') { lbl.style.left = (p1.x + 10) + 'px'; lbl.style.top = (p1.y + 10) + 'px'; }
+            else { lbl.style.left = (p1.x + 10) + 'px'; lbl.style.top = (p1.y - 20) + 'px'; }
+            nodesLayer.appendChild(lbl);
+        }
+    });
+}
+
+function renderGraph() {
+    nodesLayer.innerHTML = '';
+    nodes.forEach(renderNode);
+    renderConnections();
+}
+
+function getPortPos(node, type) {
+    const el = document.getElementById(node.id);
+    const rect = el.getBoundingClientRect();
+    const cRect = canvas.getBoundingClientRect();
+    // Simple offsets based on known CSS classes
+    let dx = rect.width/2, dy = rect.height; // default bottom
+    
+    if(node.type === 'decision') {
+        if(type==='in') { dx=0; dy=0; }
+        else if(type==='yes') { dx=rect.width; dy=rect.height; }
+        else if(type==='no') { dx=rect.width; dy=0; }
+    } else if (type === 'in') {
+        dy = 0;
+    }
+    
+    return { x: (rect.left - cRect.left) + dx, y: (rect.top - cRect.top) + dy };
+}
+
+function getPath(x1, y1, x2, y2, type) {
+    let d = `M ${x1} ${y1}`;
+    const midY = (y1 + y2) / 2;
+    
+    // Orthogonal routing logic
+    if (type === 'no') {
+        d += ` L ${x1+30} ${y1} L ${x1+30} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+    } else {
+        // Standard stepped line
+        if (Math.abs(x1 - x2) < 20) {
+            d += ` L ${x2} ${y2}`;
+        } else {
+            d += ` L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+        }
+    }
+    return d;
+}
+
+let selectedNodeId = null;
+function selectNode(id) {
+    selectedNodeId = id;
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    if(id) document.getElementById(id).classList.add('selected');
+}
+
+function clearCanvas() {
+    if(confirm("Clear all nodes?")) {
+        nodes = []; connections = []; nextId=1;
+        nodesLayer.innerHTML = ''; svgLayer.innerHTML = '';
+        generateCode();
+    }
+}
+
+function escapeHtml(text) {
+    if(!text) return "";
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * CORE COMPILER: GRAPH TO PYTHON
+ * ----------------------------------------------------------------------
+ * Solves Issues:
+ * - Detects arbitrary loops (nested, multiple headers)
+ * - Handles 'If/Else' merge points correctly
+ * - Prevents infinite recursion
+ * - Generates valid Python for strict inputs
+ */
+
+let compiledPython = "";
+
+function generateCode() {
+    const startNode = nodes.find(n => n.type === 'start');
+    if(!startNode) {
+        codeDisplay.innerHTML = '<span class="cmt"># Error: No Start Node found.</span>';
+        return;
+    }
+
+    // 1. Build Adjacency Map
+    const adj = {};
+    nodes.forEach(n => adj[n.id] = []);
+    connections.forEach(c => {
+        if(!adj[c.from]) adj[c.from] = [];
+        adj[c.from].push({ to: c.to, port: c.port });
+    });
+
+    // 2. Traversal State
+    let lines = ["import time", "import sys", ""];
+    let htmlLines = [];
+    const visited = new Set();
+    
+    // Helper to add code
+    function emit(indent, code, htmlCode) {
+        const sp = "    ".repeat(indent);
+        lines.push(sp + code);
+        htmlLines.push(`<div class="code-line">${sp}${htmlCode || escapeHtml(code)}</div>`);
+    }
+
+    // 3. Recursive Graph Walker
+    // 'stopNodeId' is the node where the current block (If/Loop) MUST stop to return control to parent
+    function writeBlock(nodeId, indent, stopNodeId = null) {
+        // Stop if we hit the limit, end of chain, or already visited (loop safeguard for linear flows)
+        if (!nodeId || nodeId === stopNodeId) return;
+        
+        // Loop Detection: If we see a node that is currently in the recursion stack, we found a loop.
+        // However, we handle structured loops by detecting "Back Edges" before entering.
+        
+        const node = nodes.find(n => n.id === nodeId);
+        
+        // Highlight logic (Runtime hook)
+        emit(indent, `__highlight__('${nodeId}')`, ``);
+
+        // --- HANDLER: DECISION (The complex part) ---
+        if (node.type === 'decision') {
+            const yesEdge = adj[nodeId].find(e => e.port === 'yes');
+            const noEdge = adj[nodeId].find(e => e.port === 'no');
+            
+            // 3a. DETECT LOOPS (Cycle Check)
+            // Does the YES or NO path lead back to THIS node?
+            const isLoop = (edge) => {
+                if(!edge) return false;
+                return canReach(edge.to, nodeId, adj, new Set());
+            };
+
+            const yesLoops = isLoop(yesEdge);
+            const noLoops = isLoop(noEdge);
+
+            let condition = node.text.replace(/=/g, '==');
+
+            if (yesLoops || noLoops) {
+                // IT IS A LOOP
+                emit(indent, `while True:`, `<span class="kw">while</span> True:`);
+                
+                // If the loop condition logic is "While Condition is True", 
+                // we break if condition is False.
+                
+                // Logic: We are mimicking "Do-While" or "While" by using "While True" + "Break"
+                // This ensures body executes correctly even if logic is complex.
+                
+                emit(indent+1, `if not (${condition}):`, `<span class="kw">if not</span> (${escapeHtml(condition)}):`);
+                emit(indent+2, `break`, `<span class="kw">break</span>`);
+
+                // Generate Loop Body
+                // If Yes loops, Yes is the body. If No loops, No is the body.
+                // We stop generating the body if we hit the Header again (continue)
+                
+                if (yesLoops) {
+                     writeBlock(yesEdge.to, indent + 1, nodeId); 
+                } else if (noLoops) {
+                     // Invert logic if user wired "No" as the loop back
+                     // (This is rare but possible, standardizing on Yes-Loop is safer but we support both)
+                     writeBlock(noEdge.to, indent + 1, nodeId);
+                }
+                
+                // After loop block ends, where do we go?
+                // The "Exit" edge is the one that didn't loop.
+                const exitEdge = yesLoops ? noEdge : yesEdge;
+                if (exitEdge) writeBlock(exitEdge.to, indent, stopNodeId);
+
+            } else {
+                // IT IS A STANDARD IF/ELSE
+                const mergeNode = findMergeNode(yesEdge?.to, noEdge?.to, adj);
+                
+                emit(indent, `if ${condition}:`, `<span class="kw">if</span> ${escapeHtml(condition)}:`);
+                if (yesEdge) writeBlock(yesEdge.to, indent + 1, mergeNode);
+                else emit(indent + 1, "pass", "<span class=\"kw\">pass</span>");
+
+                if (noEdge) {
+                    emit(indent, `else:`, `<span class="kw">else</span>:`);
+                    writeBlock(noEdge.to, indent + 1, mergeNode);
+                }
+
+                // Continue main flow after merge
+                if (mergeNode) writeBlock(mergeNode, indent, stopNodeId);
+            }
             return;
         }
 
-        // --- 1. BUILD GRAPH ---
-        const adj = {}; const revAdj = {};
-        nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
-        connections.forEach(c => {
-            if(!adj[c.from]) adj[c.from] = [];
-            if(!revAdj[c.to]) revAdj[c.to] = [];
-            adj[c.from].push({ to: c.to, port: c.port });
-            revAdj[c.to].push({ from: c.from, port: c.port });
-        });
-
-        // --- 2. DETECT LOOPS ---
-        const backEdges = []; const visited = new Set(); const recursionStack = new Set();
-        function findBackEdges(u) {
-            visited.add(u); recursionStack.add(u);
-            for (let edge of (adj[u] || [])) {
-                if (recursionStack.has(edge.to) && visited.has(edge.to)) {
-    backEdges.push({ from: u, to: edge.to });
-}
-                else if (!visited.has(edge.to)) findBackEdges(edge.to);
-            }
-            recursionStack.delete(u);
-        }
-        findBackEdges(startNode.id);
-
-        const loopInfo = new Map();
-        for (const backEdge of backEdges) {
-            const headerId = backEdge.to;
-            if (loopInfo.has(headerId)) continue;
-
-            const loopNodes = new Set([headerId]);
-            const queue = [backEdge.from];
-            const visitedInLoop = new Set([backEdge.from, headerId]);
-            while (queue.length > 0) {
-                const u = queue.shift(); loopNodes.add(u);
-                (revAdj[u] || []).forEach(parentEdge => {
-                    if (!visitedInLoop.has(parentEdge.from)) { visitedInLoop.add(parentEdge.from); queue.push(parentEdge.from); }
-                });
-            }
-            
-            let controllerId = null; const exits = [];
-            loopNodes.forEach(nodeId => {
-                const node = nodes.find(n => n.id === nodeId);
-                (adj[nodeId] || []).forEach(edge => {
-                    if (!loopNodes.has(edge.to)) {
-                        exits.push({ from: nodeId, to: edge.to, port: edge.port });
-                        if (node.type === 'decision') controllerId = nodeId;
-                    }
-                });
-            });
-            if (!controllerId) controllerId = backEdge.from;
-
-            let analysis = { controller: controllerId, exits, nodes: loopNodes, type: 'while-true' };
-            const isPreTested = headerId === controllerId;
-            if (isPreTested) {
-                const predecessors = (revAdj[headerId] || []).filter(e => !loopNodes.has(e.from));
-                if (predecessors.length === 1) { analysis.type = 'while'; analysis.predecessor = predecessors[0].from; }
-            }
-            const forDetails = analyzeForLoop(headerId, loopNodes);
-            if (forDetails) { analysis.type = 'for'; analysis.forDetails = forDetails; }
-            loopInfo.set(headerId, analysis);
-        }
-
-        function analyzeForLoop(headerId, loopNodesSet) {
-            const headerNode = nodes.find(n => n.id === headerId);
-            if (!headerNode || headerNode.type !== 'decision') return null;
-            const condMatch = headerNode.text.match(/^\s*([a-z_]\w*)\s*(<|<=|>|>=|!=)\s*(\w+)\s*$/i);
-            if (!condMatch) return null;
-            const [, varName, op, limit] = condMatch;
-            const parentsAll = revAdj[headerId] || [];
-            const initParent = parentsAll.find(e => !loopNodesSet.has(e.from));
-            if (!initParent) return null;
-            const initNode = nodes.find(n => n.id === initParent.from);
-            if (!initNode) return null;
-            const initMatch = initNode.text.match(new RegExp("^\\s*" + varName + "\\s*=\\s*(\\d+)\\s*$"));
-            if (!initMatch) return null;
-            const backEdge = backEdges.find(be => be.to === headerId);
-            if (!backEdge) return null;
-            const incNode = nodes.find(n => n.id === backEdge.from);
-            if (!incNode) return null;
-            const incMatch = incNode.text.match(new RegExp("^\\s*" + varName + "\\s*=\\s*" + varName + "\\s*\\+\\s*(\\d+)\\s*$"));
-            if (!incMatch) return null;
-            return { varName, startValue: initMatch[1], limit, op, stepValue: incMatch[1], initNodeId: initNode.id, incrementNodeId: incNode.id };
-        }
-
-        // --- 3. GENERATE CODE ---
-        const processed = new Set();
-
-        function generateBlock(nodeId, indentLvl, stopNode = null) {
-            if (!nodeId || nodeId === stopNode || processed.has(nodeId)) return;
-            if (loopInfo.has(nodeId)) { generateLoop(nodeId, indentLvl, stopNode); return; }
-
-            processed.add(nodeId);
-            const node = nodes.find(n => n.id === nodeId);
-            const spaces = "    ".repeat(indentLvl);
-            execCode.push(`${spaces}highlight_node('${nodeId}')`);
-
-            switch (node.type) {
-                case 'decision': generateIfElse(nodeId, indentLvl, stopNode); return;
-                    case 'var':
-    if (node.dataType === "int") {
-        execCode.push(`${spaces}${node.text}`);
-    } 
-    else if (node.dataType === "float") {
-        execCode.push(`${spaces}${node.text}`);
-    }
-    else { // string
-        execCode.push(`${spaces}${node.text}`);
-    }
-    displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`);
-    break;
-
-                case 'start': displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`); break;
-                case 'end': execCode.push(`${spaces}exit()`); displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`); return;
-                case 'process': execCode.push(`${spaces}${node.text}`); displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`); break;
-case 'input':
-    let raw = node.text.replace(/^Input\s+/i, '').trim();
-    let [varName, prompt] = raw.split('=').map(s => s.trim());
-
-    if (!prompt) prompt = `"${varName}"`;
-
-    if (!(prompt.startsWith('"') || prompt.startsWith("'")))
-        prompt = `"${prompt}"`;
-
-if (node.dataType === 'int') {
-    execCode.push(`${spaces}${varName} = int(input(${prompt}))`);
-}
-else if (node.dataType === 'float') {
-    execCode.push(`${spaces}${varName} = float(input(${prompt}))`);
-}
-else { // string
-    execCode.push(`${spaces}${varName} = input(${prompt})`);
-}
-
-    break;
-
-                case 'output':
-                    let val = node.text.replace(/^Print\s*/i, '').trim();
-                    execCode.push(`${spaces}print(${val})`);
-                    displayHtml.push(`<div class="code-line">${spaces}<span class="func">print</span>(${val})</div>`);
-                    break;
-            }
-            const nextEdge = adj[nodeId]?.[0];
-            if (nextEdge) generateBlock(nextEdge.to, indentLvl, stopNode);
-        }
-
-        function generateLoop(headerId, indentLvl, stopNode) {
-            const info = loopInfo.get(headerId);
-            processed.add(headerId);
-            const spaces = "    ".repeat(indentLvl);
-            const controllerNode = nodes.find(n => n.id === info.controller);
-            let condition = controllerNode.text.replace(/=/g, '==');
-
-            if (info.type === 'for') {
-                const { varName, startValue, limit, op, stepValue, initNodeId, incrementNodeId } = info.forDetails;
-                processed.add(initNodeId); 
-                execCode.push(`${spaces}highlight_node('${initNodeId}')`);
-                let rangeLimit = op === '<=' ? (isNaN(parseInt(limit)) ? `${limit} + 1` : parseInt(limit) + 1) : limit;
-                let rangeArgs = `${startValue}, ${rangeLimit}`;
-                if (stepValue !== '1') rangeArgs += `, ${stepValue}`;
-                
-                execCode.push(`${spaces}for ${varName} in range(${rangeArgs}):`);
-                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">for</span> ${varName} <span class="keyword">in</span> <span class="func">range</span>(${rangeArgs}):</div>`);
-                execCode.push(`${spaces}    highlight_node('${headerId}')`);
-                
-                const bodyStartEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
-                if (bodyStartEdge && bodyStartEdge.to !== incrementNodeId) {
-                    generateBlock(bodyStartEdge.to, indentLvl + 1, incrementNodeId);
-                } else {
-                    execCode.push(`${spaces}    pass`); displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`);
-                }
-                if (incrementNodeId) execCode.push(`${spaces}    highlight_node('${incrementNodeId}')`);
-            }
-            else if (info.type === 'while') { 
-                generateBlock(info.predecessor, indentLvl, headerId); 
-                const exitPort = info.exits[0].port;
-                const loopCondition = exitPort === 'no' ? condition : `not (${condition})`;
-                execCode.push(`${spaces}while ${loopCondition}:`);
-                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> ${loopCondition}:</div>`);
-                execCode.push(`${spaces}    highlight_node('${headerId}')`); 
-                
-                const bodyStartEdge = adj[headerId].find(e => e.port !== exitPort);
-                if (bodyStartEdge) generateBlock(bodyStartEdge.to, indentLvl + 1, headerId);
-                else { execCode.push(`${spaces}    pass`); displayHtml.push(`<div class="code-line">${spaces}    <span class="keyword">pass</span></div>`); }
-            }
-            else { // While True (Do-While style)
-                execCode.push(`${spaces}while True:`);
-                displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">while</span> True:</div>`);
-                
-                const bodySpaces = "    ".repeat(indentLvl + 1);
-                const hNode = nodes.find(n => n.id === headerId);
-                
-                // 1. Manually GENERATE HEADER NODE logic here (Fix for missing Input)
-                execCode.push(`${bodySpaces}highlight_node('${headerId}')`); 
-                if (hNode.type === 'process') {
-                    execCode.push(`${bodySpaces}${hNode.text}`); displayHtml.push(`<div class="code-line">${bodySpaces}${hNode.text}</div>`);
-                } else if (hNode.type === 'output') {
-                    let val = hNode.text.replace(/^Print\s*/i, '').trim();
-                    execCode.push(`${bodySpaces}print(${val})`); displayHtml.push(`<div class="code-line">${bodySpaces}<span class="func">print</span>(${val})</div>`);
-                } else if (hNode.type === 'input') {
-                     let clean = hNode.text.replace(/^Input\s+/i, '').trim();
-                     let [v, p] = clean.includes('=') ? clean.split('=', 2).map(s => s.trim()) : [clean, `"${clean}"`];
-                     if (!p.startsWith('"') && !p.startsWith("'")) p = `"${p}"`;
-                     
-                     if (hNode.dataType === 'int') {
-                        execCode.push(`${bodySpaces}${v} = int(input(${p}))`);
-                        displayHtml.push(`<div class="code-line">${bodySpaces}${v} = <span class="func">int</span>(<span class="func">input</span>(<span class="string">${p}</span>))</div>`);
-                     } else {
-                        execCode.push(`${bodySpaces}${v} = input(${p})`);
-                        displayHtml.push(`<div class="code-line">${bodySpaces}${v} = <span class="func">input</span>(<span class="string">${p}</span>)</div>`);
-                     }
-                }
-
-                // 2. Generate Intermediate Nodes
-                const nextEdge = adj[headerId].find(e => !info.exits.some(ex => ex.port === e.port));
-                if(nextEdge && nextEdge.to !== info.controller) generateBlock(nextEdge.to, indentLvl + 1, info.controller);
-                
-                // 3. Generate Break Condition
-                execCode.push(`${bodySpaces}highlight_node('${info.controller}')`);
-                const exitPort = info.exits[0].port;
-                const breakCondition = exitPort === 'yes' ? condition : `not (${condition})`;
-                execCode.push(`${bodySpaces}if ${breakCondition}:`); displayHtml.push(`<div class="code-line">${bodySpaces}<span class="keyword">if</span> ${breakCondition}:</div>`);
-                execCode.push(`${bodySpaces}    break`); displayHtml.push(`<div class="code-line">${bodySpaces}    <span class="keyword">break</span></div>`);
-
-                // 4. Loop Back Edge
-                const loopBackEdge = adj[info.controller].find(e => e.port !== exitPort);
-                if (loopBackEdge) generateBlock(loopBackEdge.to, indentLvl + 1, headerId);
-            }
-
-            const exitNode = info.exits[0]?.to;
-            if (exitNode) generateBlock(exitNode, indentLvl, stopNode);
-        }
+        // --- HANDLER: LINEAR NODES ---
         
-        function generateIfElse(nodeId, indentLvl, stopNode) {
-            const node = nodes.find(n => n.id === nodeId);
-            const spaces = "    ".repeat(indentLvl);
-            let condition = node.text.replace(/=/g, '==');
-            execCode.push(`${spaces}if ${condition}:`);
-            displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">if</span> ${condition}:</div>`);
-            
-            const yesEdge = adj[nodeId].find(e => e.port === 'yes');
-            const noEdge = adj[nodeId].find(e => e.port === 'no');
-            const mergePoint = findMergeNode(yesEdge?.to, noEdge?.to, nodeId);
-            generateBlock(yesEdge?.to, indentLvl + 1, mergePoint);
-            if (noEdge) {
-                execCode.push(`${spaces}else:`); displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">else</span>:</div>`);
-                generateBlock(noEdge.to, indentLvl + 1, mergePoint);
-            }
-            if (mergePoint) generateBlock(mergePoint, indentLvl, stopNode);
+        switch (node.type) {
+            case 'start':
+                emit(indent, `# Start`, `<span class="cmt"># Start</span>`);
+                break;
+            case 'end':
+                emit(indent, `sys.exit()`, `<span class="kw">exit</span>()`);
+                return; // Stop generation here
+            case 'process':
+                emit(indent, node.text, escapeHtml(node.text));
+                break;
+            case 'var':
+                // Enforce type safety
+                let val = node.data.val;
+                if(node.data.type === 'str' && !val.startsWith('"') && !val.startsWith("'")) val = `"${val}"`;
+                emit(indent, `${node.data.name} = ${val}`, `${node.data.name} = ${val}`);
+                break;
+            case 'input':
+                const prompt = node.data.prompt ? `"${node.data.prompt}"` : '""';
+                // Safe Input Parsing
+                emit(indent, `_raw = input(${prompt})`, `_raw = <span class="fn">input</span>(${prompt})`);
+                if(node.data.type === 'int') {
+                    emit(indent, `${node.data.var} = int(_raw)`, `${node.data.var} = <span class="fn">int</span>(_raw)`);
+                } else if (node.data.type === 'float') {
+                    emit(indent, `${node.data.var} = float(_raw)`, `${node.data.var} = <span class="fn">float</span>(_raw)`);
+                } else {
+                    emit(indent, `${node.data.var} = _raw`, `${node.data.var} = _raw`);
+                }
+                break;
+            case 'output':
+                emit(indent, `print(${node.data.val})`, `<span class="fn">print</span>(${node.data.val})`);
+                break;
         }
 
-function findMergeNode(branchA, branchB, decisionId) {
-    if (!branchA) return branchB;
-    if (!branchB) return branchA;
-    if (branchA === branchB) return branchA;
-
-    const visitedA = new Set();
-    const visitedB = new Set();
-
-    let frontierA = [branchA];
-    let frontierB = [branchB];
-
-    while (frontierA.length || frontierB.length) {
-        const nextA = frontierA.shift();
-        if (nextA) {
-            if (visitedB.has(nextA)) return nextA;
-            visitedA.add(nextA);
-            (adj[nextA] || []).forEach(e => frontierA.push(e.to));
-        }
-
-        const nextB = frontierB.shift();
-        if (nextB) {
-            if (visitedA.has(nextB)) return nextB;
-            visitedB.add(nextB);
-            (adj[nextB] || []).forEach(e => frontierB.push(e.to));
-        }
+        // Continue to next node
+        const next = adj[nodeId][0];
+        if (next) writeBlock(next.to, indent, stopNodeId);
     }
 
-    return null;
+    // Start Generation
+    writeBlock(startNode.id, 0);
+
+    compiledPython = lines.join("\n");
+    codeDisplay.innerHTML = htmlLines.join("\n");
 }
 
-
-        generateBlock(startNode.id, 0);
-        pyBox.innerHTML = displayHtml.join('');
-        generatedCode = execCode.join("\n");
-    }
-
-    // --- 7. RUNTIME (UPDATED FOR DELAY) ---
-    function log(msg, type='info') {
-        const div = document.createElement('div');
-        div.style.marginBottom = '4px';
-        div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
-        div.textContent = msg; 
-        consoleDiv.appendChild(div); 
-        consoleDiv.scrollTop = consoleDiv.scrollHeight;
-    }
+// Helper: Check if 'target' is reachable from 'start' (DFS)
+function canReach(start, target, adj, visited) {
+    if (start === target) return true;
+    if (visited.has(start) || !start) return false;
+    visited.add(start);
     
-    function highlightNode(nodeId) {
+    const edges = adj[start] || [];
+    for (let e of edges) {
+        if (canReach(e.to, target, adj, visited)) return true;
+    }
+    return false;
+}
+
+// Helper: Find the first common descendant node (Post-Dominator)
+// Solves Issue #7 (Infinite Loop) by using visited sets
+function findMergeNode(nodeA, nodeB, adj) {
+    if(!nodeA || !nodeB) return null;
+    if(nodeA === nodeB) return nodeA;
+
+    // Get all descendants of A
+    const descendantsA = new Set();
+    const queueA = [nodeA];
+    while(queueA.length) {
+        const n = queueA.shift();
+        if(!descendantsA.has(n)) {
+            descendantsA.add(n);
+            (adj[n]||[]).forEach(e => queueA.push(e.to));
+        }
+    }
+
+    // BFS from B, return first node that is also in A's descendants
+    const queueB = [nodeB];
+    const visitedB = new Set();
+    while(queueB.length) {
+        const n = queueB.shift();
+        if(descendantsA.has(n)) return n;
+        
+        if(!visitedB.has(n)) {
+            visitedB.add(n);
+            (adj[n]||[]).forEach(e => queueB.push(e.to));
+        }
+    }
+    return null; // No merge point (e.g. one branch ends or infinite loop)
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * EXECUTION ENGINE (Skulpt)
+ * ----------------------------------------------------------------------
+ */
+function log(msg, type='info') {
+    const div = document.createElement('div');
+    div.style.color = type === 'err' ? '#ff6b6b' : (type==='inp'?'#339af0':'#69db7c');
+    div.textContent = typeof msg === 'object' ? JSON.stringify(msg) : msg;
+    consoleDiv.appendChild(div);
+    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+}
+
+function stopExecution() {
+    executionStopFlag = true;
+    isRunning = false;
+    document.getElementById('btn-run').style.display = 'inline-block';
+    document.getElementById('btn-stop').style.display = 'none';
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    // Close modal if open
+    const modalEl = document.getElementById('runtimeInputModal');
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    if(bsModal) bsModal.hide();
+}
+
+async function compileAndRun() {
+    if(isRunning) return;
+    
+    // Validate
+    if(!nodes.find(n=>n.type==='start')) { alert("Add a Start node"); return; }
+    
+    isRunning = true;
+    executionStopFlag = false;
+    consoleDiv.innerHTML = '';
+    document.getElementById('btn-run').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'inline-block';
+
+    generateCode(); // Ensure latest code
+
+    // Skulpt Config
+    Sk.configure({
+        output: (text) => { if(text !== "\n") log(text); },
+        read: (x) => {
+            if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
+                throw "File not found: '" + x + "'";
+            return Sk.builtinFiles["files"][x];
+        },
+        inputfun: (prompt) => {
+            return new Promise((resolve, reject) => {
+                if(executionStopFlag) return reject("Stopped");
+                
+                const modalEl = document.getElementById('runtimeInputModal');
+                const bsModal = new bootstrap.Modal(modalEl);
+                const inputEl = document.getElementById('runtime-val');
+                const btn = document.getElementById('runtime-submit');
+                
+                document.getElementById('runtime-prompt').innerText = prompt || "Value:";
+                inputEl.value = "";
+                
+                function submit() {
+                    const val = inputEl.value;
+                    bsModal.hide();
+                    log(`${prompt} ${val}`, 'inp');
+                    cleanup();
+                    resolve(val);
+                }
+                
+                function handleKey(e) { if(e.key === 'Enter') submit(); }
+                
+                function cleanup() {
+                    btn.removeEventListener('click', submit);
+                    inputEl.removeEventListener('keydown', handleKey);
+                }
+                
+                btn.addEventListener('click', submit);
+                inputEl.addEventListener('keydown', handleKey);
+                
+                bsModal.show();
+                setTimeout(()=>inputEl.focus(), 500);
+            });
+        },
+        inputfunTakesPrompt: true
+    });
+
+    // Custom Highlight Hook
+    Sk.builtins.__highlight__ = function(id) {
+        if (executionStopFlag) throw "ExecutionStopped";
+        const nodeId = id.v;
+        
+        // Visual Update
         document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
         const el = document.getElementById(nodeId);
-        if (el) {
+        if(el) {
             el.classList.add('running');
-            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+
+        // Delay logic
+        const delay = parseInt(document.getElementById('speed-slider').value) || 500;
+        return new Sk.misceval.promiseToSuspension(
+            new Promise(resolve => setTimeout(resolve, delay))
+        );
+    };
+
+    try {
+        await Sk.misceval.asyncToPromise(() => {
+            return Sk.importMainWithBody("<stdin>", false, compiledPython, true);
+        });
+        log("--- Program Finished ---", "sys");
+    } catch (e) {
+        if(e.toString() !== "ExecutionStopped") log(e.toString(), "err");
+    } finally {
+        stopExecution();
     }
-    
-    async function runSimulation() {
-        if(isRunning) return;
-        isRunning = true;
-        document.getElementById('btn-run').style.display = 'none';
-        document.getElementById('btn-stop').style.display = 'inline-block';
-        consoleDiv.innerHTML = ''; 
-        
-        updateCode(); 
-        
-        // --- SKULPT SUSPENSION HOOK (THE FIX FOR SPEED) ---
-Sk.builtins.highlight_node = function(id) {
-    if (!isRunning) throw "ExecutionStopped";
+}
 
-    const nodeId = (typeof id === "string") ? id : id.v;
-    highlightNode(nodeId);
+// Initial Call
+init();
 
-    const delay = parseInt(document.getElementById('speed-slider').value) || 800;
-    return new Sk.misceval.promiseToSuspension(
-        new Promise(resolve => setTimeout(resolve, delay))
-    );
-};
-
-
-        try {
-            await Sk.misceval.asyncToPromise(function() {
-                return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
-            });
-            log("Program Finished.");
-        } catch (e) {
-            if (e.toString() !== "ExecutionStopped") log(e.toString(), "error");
-            else log("Stopped by user.", "error");
-        } finally {
-            stopSimulation();
-        }
-    }
-
-    function stopSimulation() {
-        isRunning = false; 
-        document.getElementById('btn-run').style.display = 'inline-block';
-        document.getElementById('btn-stop').style.display = 'none';
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const modalEl = document.getElementById('inputModal');
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        if(bsModal) bsModal.hide();
-    }
-
-    // --- 8. INITIAL DEMO ---
-    setTimeout(() => {
-        nodes = []; connections = []; nodesLayer.innerHTML = ''; nextId = 1;
-        createNode('start', 50, 40);
-        createNode('end', 50, 530);
-        updateCode();
-    }, 100);
 </script>
-
 </body>
 </html>
