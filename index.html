@@ -1506,14 +1506,17 @@ function updateCode() {
     }
 
 
-    function generateLoop(headerId, indent, stopNode) {
+   /* ---------------------------------------------------
+   LOOP GENERATION (FIXED - SAFER ACCESS)
+--------------------------------------------------- */
+function generateLoop(headerId, indent, stopNode) {
     const info = loopInfo.get(headerId);
     if (!info) return;
     
     const sp = "    ".repeat(indent);
     
-    // DON'T mark ANY nodes as processed here
-    // Let generateBlock handle it with inLoop=true
+    // DON'T mark ANY nodes as processed here - let generateBlock handle it
+    // This was the main bug: nodes were being marked as processed too early
     
     // Check if we need to generate any pre-loop nodes
     if (info.loopNodes && info.cyclePath) {
@@ -1600,36 +1603,68 @@ function updateCode() {
     }
 
     // ===========================
-    // 3. WHILE-TRUE or DO-WHILE
+    // 3. DO-WHILE (post-tested) or WHILE-TRUE
     // ===========================
     execCode.push(`${sp}while True:`);
     displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
 
     const sp2 = "    ".repeat(indent + 1);
     
-    // Generate code for the header node
+    // Highlight the loop header
     execCode.push(`${sp2}highlight_node('${headerId}')`);
     
-    // Generate header node's actual code (if any)
-    const headerNode = nodes.find(n => n.id === headerId);
-    if (headerNode && headerNode.type === 'process') {
-        execCode.push(`${sp2}${headerNode.text}`);
-    } else if (headerNode && headerNode.type === 'var') {
-        execCode.push(`${sp2}${headerNode.text}`);
+    // Get the header node and generate ITS ACTUAL CODE (CRITICAL FIX!)
+    const hNode = nodes.find(n => n.id === headerId);
+    if (hNode && hNode.type !== 'start' && hNode.type !== 'end' && hNode.type !== 'decision') {
+        // Generate actual code for the header
+        switch (hNode.type) {
+            case "process":
+                execCode.push(`${sp2}${hNode.text}`);
+                displayHtml.push(`<div class="code-line">${sp2}${hNode.text}</div>`);
+                break;
+            case "var":
+                execCode.push(`${sp2}${hNode.text}`);
+                displayHtml.push(`<div class="code-line">${sp2}${hNode.text}</div>`);
+                break;
+            case "input": {
+                let raw = hNode.text.replace(/^Input\s+/i, "").trim();
+                let [v, p] = raw.split("=").map(x => x.trim());
+                if (!p) p = `"${v}"`;
+                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+                
+                if (hNode.dataType === "int") {
+                    execCode.push(`${sp2}${v} = int(input(${p}))`);
+                    displayHtml.push(`<div class="code-line">${sp2}${v} = int(input(${p}))</div>`);
+                } else if (hNode.dataType === "float") {
+                    execCode.push(`${sp2}${v} = float(input(${p}))`);
+                    displayHtml.push(`<div class="code-line">${sp2}${v} = float(input(${p}))</div>`);
+                } else {
+                    execCode.push(`${sp2}${v} = input(${p})`);
+                    displayHtml.push(`<div class="code-line">${sp2}${v} = input(${p})</div>`);
+                }
+                break;
+            }
+            case "output": {
+                let val = hNode.text.replace(/^Print\s*/i, "").trim();
+                execCode.push(`${sp2}print(${val})`);
+                displayHtml.push(`<div class="code-line">${sp2}print(${val})</div>`);
+                break;
+            }
+        }
     }
-    // Note: input/output nodes as headers are unusual in while-true loops
-    
+
     // Find where the loop body starts
     let bodyStart = null;
     if (info.exits && info.exits.length > 0) {
+        // Find an edge that doesn't lead to an exit
         bodyStart = adj[headerId].find(e => {
             return !info.exits.some(x => x.port === e.port && x.to === e.to);
         });
     } else {
+        // No exits defined, take the first edge
         bodyStart = adj[headerId][0];
     }
     
-    // Generate the loop body using generateBlock with inLoop=true
     if (bodyStart && bodyStart.to !== info.controller) {
         generateBlock(bodyStart.to, indent + 1, info.controller, true);
     }
@@ -1643,11 +1678,8 @@ function updateCode() {
     execCode.push(`${sp2}highlight_node('${info.controller}')`);
     execCode.push(`${sp2}if ${breakCond}: break`);
 
-    // Continue with loop back (if any)
     const loopBack = adj[info.controller].find(e => e.port !== exitPort);
-    if (loopBack && loopBack.to === headerId) {
-        execCode.push(`${sp2}# Loop back`);
-    }
+    if (loopBack) generateBlock(loopBack.to, indent + 1, headerId, true);
 
     if (info.exits && info.exits.length > 0 && info.exits[0]) {
         generateBlock(info.exits[0].to, indent, stopNode);
