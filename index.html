@@ -848,23 +848,10 @@ svgLayer.appendChild(defs.cloneNode(true));
         }
     });
 
-    // --- 6. CODE GENERATOR (IMPROVED FOR ANIMATION & LOOPS) ---
-
-/**************************************************************************************************
- *  FLOWCODE COMPILER — STRUCTURED, STABLE, AND LOOP-CORRECT
- *  Generates:
- *      • for-loops  (counter pattern)
- *      • while-loops (pre-tested)
- *      • do-while loops (post-tested)
- *  PLUS:
- *      • correct merge detection
- *      • safe traversal (no infinite recursion)
- *      • stable indentation
- **************************************************************************************************/
 
 let generatedCode = "";
 
-/* ---------------------------------------------------------
+    /* ---------------------------------------------------------
    MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
 --------------------------------------------------------- */
 function updateCode() {
@@ -890,125 +877,321 @@ function updateCode() {
     });
 
     /* ---------------------------------------------------
-       LOOP DETECTION — back edges + loop node sets
+       ENHANCED LOOP DETECTION & GRAPH ANALYSIS
     --------------------------------------------------- */
     const backEdges = [];
     const visited = new Set();
     const recursionStack = new Set();
-
+    
+    // Find all back edges from start
     function findBackEdges(u) {
+        if (!u) return;
+        
         visited.add(u);
         recursionStack.add(u);
 
-        for (let edge of adj[u]) {
+        for (let edge of (adj[u] || [])) {
+            if (!edge || !edge.to) continue;
+            
             if (recursionStack.has(edge.to)) {
-                backEdges.push({ from: u, to: edge.to });
+                // Found a back edge
+                backEdges.push({ 
+                    from: u, 
+                    to: edge.to,
+                    port: edge.port,
+                    type: 'back-edge'
+                });
             } else if (!visited.has(edge.to)) {
                 findBackEdges(edge.to);
             }
         }
         recursionStack.delete(u);
     }
+    
     findBackEdges(startNode.id);
+
+    // Also check for unreachable nodes (they might create hidden loops)
+    const allReachable = new Set();
+    function markReachable(u) {
+        if (!u || allReachable.has(u)) return;
+        allReachable.add(u);
+        (adj[u] || []).forEach(e => markReachable(e.to));
+    }
+    markReachable(startNode.id);
+
+    // Check for unreachable nodes that might have internal loops
+    nodes.forEach(n => {
+        if (!allReachable.has(n.id) && n.id !== startNode.id) {
+            // This node is unreachable - check if it has internal cycles
+            const localVisited = new Set();
+            const localStack = new Set();
+            
+            function checkLocalCycles(id) {
+                localVisited.add(id);
+                localStack.add(id);
+                
+                (adj[id] || []).forEach(e => {
+                    if (!e || !e.to) return;
+                    
+                    if (localStack.has(e.to)) {
+                        // Found internal cycle in unreachable subgraph
+                        backEdges.push({
+                            from: id,
+                            to: e.to,
+                            port: e.port,
+                            type: 'unreachable-cycle'
+                        });
+                    } else if (!localVisited.has(e.to)) {
+                        checkLocalCycles(e.to);
+                    }
+                });
+                
+                localStack.delete(id);
+            }
+            
+            checkLocalCycles(n.id);
+        }
+    });
 
     const loopInfo = new Map();
 
-    /* ---------------------------------------------------------
-       BUILD LOOP SETS, CONTROLLER, TYPE (for/while/do-while)
-    --------------------------------------------------------- */
+    // Enhanced loop set detection
     for (const be of backEdges) {
         const header = be.to;
         if (loopInfo.has(header)) continue;
 
+        // Use BFS to find all nodes in the loop
         const loopNodes = new Set([header]);
         const queue = [be.from];
         const seen = new Set([be.from, header]);
+        const entryPoints = new Set();
 
         while (queue.length) {
             const u = queue.shift();
             loopNodes.add(u);
-            revAdj[u].forEach(e => {
-                if (!seen.has(e.from)) {
-                    seen.add(e.from);
-                    queue.push(e.from);
+            
+            // Check predecessors
+            (revAdj[u] || []).forEach(e => {
+                if (e && e.from) {
+                    if (!loopNodes.has(e.from)) {
+                        entryPoints.add(e.from);
+                    }
+                    if (!seen.has(e.from)) {
+                        seen.add(e.from);
+                        queue.push(e.from);
+                    }
                 }
             });
         }
 
-        // collect exits
+        // Find exits and categorize loop type
         let controller = null;
         const exits = [];
+        const loopEntries = Array.from(entryPoints);
 
         loopNodes.forEach(id => {
-            const n = nodes.find(x => x.id === id);
-            adj[id].forEach(edge => {
-                if (!loopNodes.has(edge.to)) {
+            (adj[id] || []).forEach(edge => {
+                if (edge && edge.to && !loopNodes.has(edge.to)) {
                     exits.push(edge);
-                    if (n.type === "decision") controller = id;
+                    const node = nodes.find(x => x.id === id);
+                    if (node && node.type === "decision") {
+                        controller = id;
+                    }
                 }
             });
         });
 
-        if (!controller) controller = be.from;
+        if (!controller) {
+            // If no decision node controls the exit, use the last node before exit
+            controller = exits.length > 0 ? exits[0].from : be.from;
+        }
 
-        const info = { type: "while-true", header, controller, loopNodes, exits };
+        // Determine loop type
+        let loopType = "while-true";
+        let entryNode = null;
 
-        // detect pre-test
-        const isPreTest = header === controller;
-        if (isPreTest) {
-            const preds = revAdj[header].filter(e => !loopNodes.has(e.from));
-            if (preds.length === 1) {
-                info.type = "while";
-                info.entry = preds[0].from;
+        // Check for pre-test (while) loop
+        if (header === controller && loopEntries.length === 1) {
+            loopType = "while";
+            entryNode = loopEntries[0];
+        }
+
+        // Check for do-while pattern
+        if (header !== controller && loopEntries.length > 0) {
+            // If the controller is inside the loop body, it's likely do-while
+            const controllerIndex = Array.from(loopNodes).indexOf(controller);
+            const headerIndex = Array.from(loopNodes).indexOf(header);
+            if (controllerIndex > headerIndex) {
+                loopType = "do-while";
             }
         }
 
-        // detect for-loop pattern
-        const fd = detectForLoop(header, loopNodes);
-        if (fd) { info.type = "for"; info.details = fd; }
+        // Check for for-loop pattern (more robust)
+        const forLoopDetails = detectForLoop(header, loopNodes);
+        if (forLoopDetails) {
+            loopType = "for";
+        }
+
+        const info = {
+            type: loopType,
+            header,
+            controller,
+            loopNodes,
+            exits,
+            entry: entryNode,
+            entries: loopEntries,
+            details: forLoopDetails
+        };
 
         loopInfo.set(header, info);
     }
 
     /* ---------------------------------------------------
-       FOR-LOOP DETECTION (strict counter pattern)
+       IMPROVED FOR-LOOP DETECTION
     --------------------------------------------------- */
     function detectForLoop(headerId, loopNodes) {
         const headerNode = nodes.find(n => n.id === headerId);
         if (!headerNode || headerNode.type !== "decision") return null;
 
-        const cond = headerNode.text.match(/^\s*([a-z_]\w*)\s*([<>]=?)\s*(\w+)\s*$/i);
-        if (!cond) return null;
+        // More flexible condition parsing
+        const condMatch = headerNode.text.match(/^\s*([a-z_]\w*)\s*([<>]=?|[!=]=)\s*(\S+)\s*$/i);
+        if (!condMatch) return null;
 
-        let [, varName, op, limit] = cond;
+        let [, varName, op, limit] = condMatch;
 
-        const preds = revAdj[headerId].filter(e => !loopNodes.has(e.from));
+        // Find initialization (should come before header)
+        const preds = (revAdj[headerId] || []).filter(e => 
+            e && e.from && !loopNodes.has(e.from)
+        );
+        
         if (preds.length !== 1) return null;
 
         const initNode = nodes.find(n => n.id === preds[0].from);
         if (!initNode) return null;
 
-        const init = initNode.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*(\\d+)\\s*$`));
-        if (!init) return null;
+        // Match initialization pattern
+        const initMatch = initNode.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*(\\S+)\\s*$`));
+        if (!initMatch) return null;
 
-        const incBE = backEdges.find(be => loopNodes.has(be.from) && be.to === headerId);
+        // Find increment (should be a back edge to header)
+        const incBE = backEdges.find(be => 
+            loopNodes.has(be.from) && 
+            be.to === headerId && 
+            be.type === 'back-edge'
+        );
+        
         if (!incBE) return null;
 
         const incNode = nodes.find(n => n.id === incBE.from);
-        const inc = incNode.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*\\+\\s*(\\d+)\\s*$`));
-        if (!inc) return null;
+        if (!incNode) return null;
+
+        // Match increment pattern (allow +=, ++, or simple assignment)
+        let step = "1";
+        const incText = incNode.text.trim();
+        
+        // Pattern 1: x = x + value
+        const incMatch1 = incText.match(new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*([+-])\\s*(\\d+)\\s*$`));
+        // Pattern 2: x += value
+        const incMatch2 = incText.match(new RegExp(`^\\s*${varName}\\s*([+-])=\\s*(\\d+)\\s*$`));
+        
+        if (incMatch1) {
+            step = incMatch1[2];
+            if (incMatch1[1] === "-") step = "-" + step;
+        } else if (incMatch2) {
+            step = incMatch2[2];
+            if (incMatch2[1] === "-") step = "-" + step;
+        } else {
+            return null; // Not a valid increment pattern
+        }
+
+        // Validate that limit is reachable
+        try {
+            const startVal = parseInt(initMatch[1]);
+            const stepVal = parseInt(step);
+            const limitVal = isNaN(parseInt(limit)) ? null : parseInt(limit);
+            
+            if (limitVal !== null) {
+                if (stepVal > 0 && startVal > limitVal) return null; // Won't execute
+                if (stepVal < 0 && startVal < limitVal) return null; // Won't execute
+            }
+        } catch (e) {
+            // Non-numeric limit, still could be valid
+        }
 
         return {
             varName,
-            start: init[1],
+            start: initMatch[1],
             limit,
             op,
-            step: inc[1],
+            step,
             initNode: initNode.id,
-            incrementNode: incNode.id
+            incrementNode: incNode.id,
+            conditionNode: headerId
         };
     }
 
+    /* ---------------------------------------------------
+       GRAPH VALIDATION (IMPROVED - LESS STRICT)
+    --------------------------------------------------- */
+    function validateGraph() {
+        const warnings = []; // Changed from errors to warnings
+        
+        // Check for multiple start nodes (actual error)
+        const startNodes = nodes.filter(n => n.type === "start");
+        if (startNodes.length > 1) {
+            warnings.push({
+                type: "multiple-starts",
+                message: "Multiple start nodes found",
+                severity: "error"
+            });
+        }
+        
+        // Check for disconnected end nodes (only warn if unreachable)
+        const endNodes = nodes.filter(n => n.type === "end");
+        if (endNodes.length === 0) {
+            warnings.push({
+                type: "no-end",
+                message: "No end node found",
+                severity: "warning"
+            });
+        } else {
+            endNodes.forEach(end => {
+                if (!allReachable.has(end.id)) {
+                    warnings.push({
+                        type: "unreachable-end",
+                        message: `End node is unreachable from start`,
+                        severity: "warning"
+                    });
+                }
+            });
+        }
+        
+        // Check for nodes with no outgoing connections (except end)
+        // This is now just a warning, not an error
+        nodes.forEach(node => {
+            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
+                warnings.push({
+                    type: "no-outgoing",
+                    message: `"${node.text}" has no outgoing connections`,
+                    severity: "info"
+                });
+            }
+        });
+        
+        return warnings;
+    }
+
+    // Run validation
+    // Run validation (only log severe errors, not warnings/info)
+    const validationErrors = validateGraph();
+    if (validationErrors.length > 0) {
+        validationErrors.forEach(err => {
+            if (err.severity === "error") {
+                console.error("Graph error:", err.message);
+            }
+            // Don't log warnings/info to avoid console spam
+        });
+    }
     /* ---------------------------------------------------
        TRAVERSAL + CODE GENERATION
     --------------------------------------------------- */
@@ -1140,10 +1323,12 @@ function updateCode() {
     }
 
     /* ---------------------------------------------------
-       LOOP GENERATION
+       LOOP GENERATION (FIXED - SAFER ACCESS)
     --------------------------------------------------- */
     function generateLoop(headerId, indent, stopNode) {
         const info = loopInfo.get(headerId);
+        if (!info) return;
+        
         const sp = "    ".repeat(indent);
 
         // ===========================
@@ -1151,6 +1336,7 @@ function updateCode() {
         // ===========================
         if (info.type === "for") {
             const d = info.details;
+            if (!d) return;
 
             processed.add(d.initNode);
             execCode.push(`${sp}highlight_node('${d.initNode}')`);
@@ -1176,7 +1362,11 @@ function updateCode() {
             }
 
             execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-            generateBlock(info.exits[0]?.to, indent, stopNode);
+            
+            // SAFE access to exits
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+                generateBlock(info.exits[0].to, indent, stopNode);
+            }
             return;
         }
 
@@ -1187,9 +1377,10 @@ function updateCode() {
             generateBlock(info.entry, indent, headerId);
 
             const condNode = nodes.find(n => n.id === info.controller);
-            let cond = condNode.text.replace(/=/g, "==");
+            let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
 
-            const exitPort = info.exits[0].port;
+            // SAFE access to exits
+            const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
             const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
 
             execCode.push(`${sp}while ${condExpr}:`);
@@ -1200,12 +1391,14 @@ function updateCode() {
             const bodyStart = adj[headerId].find(e => e.port !== exitPort);
             if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId);
 
-            generateBlock(info.exits[0]?.to, indent, stopNode);
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+                generateBlock(info.exits[0].to, indent, stopNode);
+            }
             return;
         }
 
         // ===========================
-        // 3. DO-WHILE (post-tested)
+        // 3. DO-WHILE (post-tested) or WHILE-TRUE
         // ===========================
         execCode.push(`${sp}while True:`);
         displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
@@ -1214,7 +1407,7 @@ function updateCode() {
         const hNode = nodes.find(n => n.id === headerId);
 
         execCode.push(`${sp2}highlight_node('${headerId}')`);
-        if (hNode.type === "process")
+        if (hNode && hNode.type === "process")
             execCode.push(`${sp2}${hNode.text}`);
 
         const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
@@ -1222,8 +1415,10 @@ function updateCode() {
             generateBlock(bodyStart.to, indent + 1, info.controller);
 
         const condNode = nodes.find(n => n.id === info.controller);
-        let cond = condNode.text.replace(/=/g, "==");
-        let exitPort = info.exits[0].port;
+        let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
+        
+        // SAFE access to exits
+        const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
         let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
 
         execCode.push(`${sp2}highlight_node('${info.controller}')`);
@@ -1232,7 +1427,9 @@ function updateCode() {
         const loopBack = adj[info.controller].find(e => e.port !== exitPort);
         if (loopBack) generateBlock(loopBack.to, indent + 1, headerId);
 
-        generateBlock(info.exits[0]?.to, indent, stopNode);
+        if (info.exits && info.exits.length > 0 && info.exits[0]) {
+            generateBlock(info.exits[0].to, indent, stopNode);
+        }
     }
 
     /* ---------------------------------------------------
@@ -1245,14 +1442,27 @@ function updateCode() {
 }
 
     // --- 7. RUNTIME (UPDATED FOR DELAY) ---
-    function log(msg, type='info') {
-        const div = document.createElement('div');
-        div.style.marginBottom = '4px';
-        div.style.color = type==='error'?'#ff6b6b' : (type==='input'?'#74c0fc':'#b2f2bb');
-        div.textContent = msg; 
-        consoleDiv.appendChild(div); 
-        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+function log(msg, type='info') {
+    const div = document.createElement('div');
+    div.style.marginBottom = '4px';
+    
+    // Color coding based on severity
+    if (type === 'error') {
+        div.style.color = '#ff6b6b';
+        div.style.fontWeight = 'bold';
+    } else if (type === 'warning') {
+        div.style.color = '#ffc107';
+        div.style.fontWeight = 'bold';
+    } else if (type === 'input') {
+        div.style.color = '#74c0fc';
+    } else {
+        div.style.color = '#b2f2bb';
     }
+    
+    div.textContent = msg; 
+    consoleDiv.appendChild(div); 
+    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+}
     
     function highlightNode(nodeId) {
         document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
@@ -1263,59 +1473,215 @@ function updateCode() {
         }
     }
     
-    async function runSimulation() {
-        if(isRunning) return;
-        isRunning = true;
-        document.getElementById('btn-run').style.display = 'none';
-        document.getElementById('btn-stop').style.display = 'inline-block';
-        consoleDiv.innerHTML = ''; 
+async function runSimulation() {
+    if(isRunning) return;
+    
+    // Run updateCode first to build the graph structure and generate code
+    updateCode(); 
+    
+    // Now build a simplified version of the graph to check for TRULY INFINITE loops
+    const adj = {}, revAdj = {};
+    nodes.forEach(n => { adj[n.id] = []; revAdj[n.id] = []; });
+    connections.forEach(c => {
+        adj[c.from].push({ to: c.to, port: c.port });
+        revAdj[c.to].push({ from: c.from, port: c.port });
+    });
+    
+    // Improved loop detection - only warn about TRULY infinite loops
+    const warnings = [];
+    const startNode = nodes.find(n => n.type === "start");
+    
+    if (startNode) {
+        // Check for cycles that have NO exit path (truly infinite)
+        const visited = new Set();
+        const stack = new Set();
         
-        updateCode(); 
+        // FIXED: Complete function with proper parameters
+        function analyzeLoopSafety(nodeId) {
+            if (!nodeId) return { hasExit: false, isInfinite: false };
+            if (visited.has(nodeId)) return { hasExit: false, isInfinite: false };
+            
+            visited.add(nodeId);
+            stack.add(nodeId);
+            
+            const edges = adj[nodeId] || [];
+            
+            // If no outgoing edges, it's not an infinite loop
+            if (edges.length === 0) {
+                stack.delete(nodeId);
+                return { hasExit: true, isInfinite: false };
+            }
+            
+            let hasExit = false;
+            let isPotentiallyInfinite = false;
+            
+            for (const edge of edges) {
+                if (!edge || !edge.to) continue;
+                
+                if (stack.has(edge.to)) {
+                    // Found a cycle
+                    const node = nodes.find(n => n.id === edge.to);
+                    
+                    if (node && node.type === "decision") {
+                        // Decision nodes have conditional exits - check if there's a non-loop exit
+                        const outgoingEdges = adj[edge.to] || [];
+                        const hasNonLoopExit = outgoingEdges.some(e => !stack.has(e.to));
+                        
+                        if (hasNonLoopExit) {
+                            hasExit = true;
+                        } else {
+                            // Decision loop with no exit
+                            isPotentiallyInfinite = true;
+                            warnings.push({
+                                nodeId: edge.to,
+                                message: `Loop at "${node.text}" has no exit condition`,
+                                severity: "warning"
+                            });
+                        }
+                    } else {
+                        // Non-decision node in cycle - might be infinite
+                        isPotentiallyInfinite = true;
+                        const cycleNode = nodes.find(n => n.id === edge.to);
+                        warnings.push({
+                            nodeId: edge.to,
+                            message: `Loop detected at "${cycleNode ? cycleNode.text : edge.to}"`,
+                            severity: "warning"
+                        });
+                    }
+                } else if (!visited.has(edge.to)) {
+                    const result = analyzeLoopSafety(edge.to);
+                    if (result.hasExit) {
+                        hasExit = true;
+                    }
+                    if (result.isInfinite) {
+                        isPotentiallyInfinite = true;
+                    }
+                }
+            }
+            
+            stack.delete(nodeId);
+            return { hasExit, isInfinite: isPotentiallyInfinite && !hasExit };
+        }
         
-        // --- SKULPT SUSPENSION HOOK (THE FIX FOR SPEED) ---
-Sk.builtins.highlight_node = function(id) {
-    if (!isRunning) throw "ExecutionStopped";
-
-    const nodeId = (typeof id === "string") ? id : id.v;
-    highlightNode(nodeId);
-
-    const delay = parseInt(document.getElementById('speed-slider').value) || 800;
-    return new Sk.misceval.promiseToSuspension(
-        new Promise(resolve => setTimeout(resolve, delay))
-    );
-};
-
-
-        try {
-            await Sk.misceval.asyncToPromise(function() {
-                return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
+        // Run the analysis from start
+        analyzeLoopSafety(startNode.id);
+        
+        // Check for nodes with no outgoing connections (except end)
+        nodes.forEach(node => {
+            if (node.type !== "end" && adj[node.id] && adj[node.id].length === 0) {
+                warnings.push({
+                    nodeId: node.id,
+                    message: `"${node.text}" has no outgoing connections`,
+                    severity: "info"
+                });
+            }
+        });
+        
+        // Show warnings if any (but only ask for confirmation on severe warnings)
+        const severeWarnings = warnings.filter(w => w.severity === "error");
+        const regularWarnings = warnings.filter(w => w.severity === "warning");
+        
+        if (severeWarnings.length > 0) {
+            // Show severe warnings and ask for confirmation
+            severeWarnings.forEach(w => {
+                log(`ERROR: ${w.message}`, "error");
+                const el = document.getElementById(w.nodeId);
+                if (el) el.style.borderColor = '#ff6b6b';
             });
-            log("Program Finished.");
-        } catch (e) {
-            if (e.toString() !== "ExecutionStopped") log(e.toString(), "error");
-            else log("Stopped by user.", "error");
-        } finally {
-            stopSimulation();
+            
+            if (!confirm(`${severeWarnings.length} error(s) detected. Run anyway?`)) {
+                // Reset border colors
+                severeWarnings.forEach(w => {
+                    const el = document.getElementById(w.nodeId);
+                    if (el) el.style.borderColor = '';
+                });
+                return;
+            }
+        }
+        
+        if (regularWarnings.length > 0) {
+            // Just show regular warnings, don't block or show confirmation
+            regularWarnings.forEach(w => {
+                log(`Warning: ${w.message}`, "warning");
+                const el = document.getElementById(w.nodeId);
+                if (el) el.style.borderColor = '#ffc107';
+            });
+            
+            // Auto-reset border colors after 3 seconds
+            setTimeout(() => {
+                regularWarnings.forEach(w => {
+                    const el = document.getElementById(w.nodeId);
+                    if (el) el.style.borderColor = '';
+                });
+            }, 3000);
         }
     }
+    
+    consoleDiv.innerHTML = ''; 
+    isRunning = true;
+    document.getElementById('btn-run').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'inline-block';
+    
+    // --- SKULPT SUSPENSION HOOK (THE FIX FOR SPEED) ---
+    Sk.builtins.highlight_node = function(id) {
+        if (!isRunning) throw "ExecutionStopped";
 
-    function stopSimulation() {
-        isRunning = false; 
-        document.getElementById('btn-run').style.display = 'inline-block';
-        document.getElementById('btn-stop').style.display = 'none';
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-        const modalEl = document.getElementById('inputModal');
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        if(bsModal) bsModal.hide();
-    }
+        const nodeId = (typeof id === "string") ? id : id.v;
+        highlightNode(nodeId);
 
-    // --- 8. INITIAL DEMO ---
-    setTimeout(() => {
-        nodes = []; connections = []; nodesLayer.innerHTML = ''; nextId = 1;
-        createNode('start', 50, 40);
-        createNode('end', 50, 530);
-        updateCode();
-    }, 100);
+        const delay = parseInt(document.getElementById('speed-slider').value) || 800;
+        return new Sk.misceval.promiseToSuspension(
+            new Promise(resolve => setTimeout(resolve, delay))
+        );
+    };
+
+    try {
+        await Sk.misceval.asyncToPromise(function() {
+            return Sk.importMainWithBody("<stdin>", false, generatedCode, true);
+        });
+        log("Program Finished.");
+    } catch (e) {
+        if (e.toString() !== "ExecutionStopped") {
+            log(e.toString(), "error");
+            
+            // Check for specific Python errors
+            if (e.toString().includes("NameError")) {
+                log("Hint: Make sure all variables are defined before use", "error");
+            } else if (e.toString().includes("SyntaxError")) {
+                log("Hint: Check your Python syntax in the nodes", "error");
+            } else if (e.toString().includes("TypeError")) {
+                log("Hint: Check data types (int vs str)", "error");
+            } else if (e.toString().includes("ValueError")) {
+log("Hint: Invalid value provided", "error");
+} else if (e.toString().includes("IndentationError")) {
+log("Hint: Check indentation in generated code", "error");
+}
+} else {
+log("Stopped by user.", "error");
+}
+} finally {
+stopSimulation();
+}
+}
+
+
+
+
+                       
+function stopSimulation() {
+    isRunning = false; 
+    document.getElementById('btn-run').style.display = 'inline-block';
+    document.getElementById('btn-stop').style.display = 'none';
+    document.querySelectorAll('.node').forEach(n => {
+        n.classList.remove('running');
+        n.style.borderColor = ''; // Reset any warning colors
+    });
+    const modalEl = document.getElementById('inputModal');
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    if(bsModal) bsModal.hide();
+}
+
+
 </script>
 
 </body>
