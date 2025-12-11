@@ -549,48 +549,72 @@
         }, 500);
     }
 
-    function saveNodeEdit() {
-        if(!editingNodeId) return;
-        const node = nodes.find(n => n.id === editingNodeId);
-        let newText = "";
-        
-        if(node.type === 'input') {
-            const v = document.getElementById('edit-input-var').value.trim();
-            const p = document.getElementById('edit-input-prompt').value.trim();
-            const dataType = document.getElementById('edit-input-type').value;
-            if(!v) return alert("Variable name required");
-            newText = `Input ${v} = "${p}"`;
-            node.dataType = dataType;
-        } else if(node.type === 'output') {
-            const v = document.getElementById('edit-output-val').value.trim();
-            if(!v) return alert("Value required");
-            newText = `Print ${v}`;
-        } else {
-            newText = document.getElementById('edit-generic-text').value;
-        }
-        
-        if(newText) {
-            node.text = newText;
-            const el = document.getElementById(node.id);
-            const oldBadge = el.querySelector('.node-badge');
-            if(oldBadge) oldBadge.remove();
-            
-            el.innerHTML = (node.type === 'input' || ['decision','io','output'].includes(node.type)) 
-                ? `<div class="inner-text">${node.type==='input'?node.text.split('=')[0].trim():node.text}</div>` : node.text;
-            
-            if(node.type === 'input' && node.dataType) {
-                const badge = document.createElement('div');
-                badge.className = `node-badge ${node.dataType}`;
-                badge.textContent = node.dataType === 'int' ? 'INT' : 'STR';
-                el.appendChild(badge);
-            }
-            el.querySelectorAll('.dot').forEach(d => d.remove());
-            addPorts(el, node);
-            updateCode();
-        }
-        bootstrap.Modal.getInstance(document.getElementById('editNodeModal')).hide();
-        editingNodeId = null;
+
+function saveNodeEdit() {
+    if (!editingNodeId) return;
+
+    const node = nodes.find(n => n.id === editingNodeId);
+    let newText = "";
+
+    if (node.type === 'input') {
+        const v = document.getElementById('edit-input-var').value.trim();
+        const p = document.getElementById('edit-input-prompt').value.trim();
+        const dataType = document.getElementById('edit-input-type').value;
+
+        if (!v) return alert("Variable name required");
+
+        newText = `Input ${v} = "${p}"`;
+        node.dataType = dataType;
     }
+    else if (node.type === 'output') {
+        const v = document.getElementById('edit-output-val').value.trim();
+        if (!v) return alert("Value required");
+        newText = `Print ${v}`;
+    }
+    else {
+        newText = document.getElementById('edit-generic-text').value;
+    }
+
+    // Save
+    node.text = newText;
+
+    // Update element
+    const el = document.getElementById(node.id);
+    el.innerHTML = "";
+
+    // Remove ALL existing ports (fixes duplication)
+    el.querySelectorAll('.dot').forEach(dot => dot.remove());
+
+    // Recreate label
+    if (node.type === 'input') {
+        const label = node.text.split('=')[0].trim();
+        el.innerHTML = `<div class="inner-text">${label}</div>`;
+    } else if (['decision', 'output'].includes(node.type)) {
+        el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+    } else {
+        el.textContent = node.text;
+    }
+
+    // Re-add badge for input types
+    if (node.type === 'input') {
+        const badge = document.createElement('div');
+        badge.className = `node-badge ${node.dataType}`;
+        badge.textContent = node.dataType.toUpperCase();
+        el.appendChild(badge);
+    }
+
+    // Re-add ports (SAFE)
+    addPorts(el, node);
+
+    updateCode();
+
+    bootstrap.Modal.getInstance(document.getElementById('editNodeModal')).hide();
+    editingNodeId = null;
+}
+
+
+
+    
     document.getElementById('editNodeModal').addEventListener('keydown', (e) => { 
         if(e.key==='Enter' && !e.shiftKey) { 
             e.preventDefault(); 
@@ -667,8 +691,9 @@
     
     function drawConnections() {
         document.querySelectorAll('.conn-label').forEach(e => e.remove());
-        const defs = svgLayer.querySelector('defs').outerHTML;
-        svgLayer.innerHTML = defs;
+const defs = svgLayer.querySelector('defs');
+svgLayer.innerHTML = "";
+svgLayer.appendChild(defs.cloneNode(true));
         connections.forEach(c => {
             const p1 = getPortPosition(c.from, c.port);
             const p2 = getPortPosition(c.to, 'in');
@@ -752,7 +777,9 @@
         function findBackEdges(u) {
             visited.add(u); recursionStack.add(u);
             for (let edge of (adj[u] || [])) {
-                if (recursionStack.has(edge.to)) backEdges.push({ from: u, to: edge.to });
+                if (recursionStack.has(edge.to) && visited.has(edge.to)) {
+    backEdges.push({ from: u, to: edge.to });
+}
                 else if (!visited.has(edge.to)) findBackEdges(edge.to);
             }
             recursionStack.delete(u);
@@ -836,18 +863,30 @@
                 case 'start': displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`); break;
                 case 'end': execCode.push(`${spaces}exit()`); displayHtml.push(`<div class="code-line">${spaces}<span class="keyword">exit</span>()</div>`); return;
                 case 'process': execCode.push(`${spaces}${node.text}`); displayHtml.push(`<div class="code-line">${spaces}${node.text}</div>`); break;
-                case 'input':
-                    let clean = node.text.replace(/^Input\s+/i, '').trim();
-                    let [varName, promptText] = clean.includes('=') ? clean.split('=', 2).map(s => s.trim()) : [clean, `"${clean}"`];
-                    if (!promptText.startsWith('"') && !promptText.startsWith("'")) promptText = `"${promptText}"`;
-                    if (node.dataType === 'int') {
-                        execCode.push(`${spaces}${varName} = int(input(${promptText}))`);
-                        displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">int</span>(<span class="func">input</span>(<span class="string">${promptText}</span>))</div>`);
-                    } else {
-                        execCode.push(`${spaces}${varName} = input(${promptText})`);
-                        displayHtml.push(`<div class="code-line">${spaces}${varName} = <span class="func">input</span>(<span class="string">${promptText}</span>)</div>`);
-                    }
-                    break;
+case 'input':
+    let raw = node.text.replace(/^Input\s+/i, '').trim();
+    let [varName, prompt] = raw.split('=').map(s => s.trim());
+
+    if (!prompt) prompt = `"${varName}"`;
+
+    if (!(prompt.startsWith('"') || prompt.startsWith("'")))
+        prompt = `"${prompt}"`;
+
+    if (node.dataType === 'int') {
+        execCode.push(`${spaces}${varName} = int(input(${prompt}))`);
+        displayHtml.push(
+            `<div class="code-line">${spaces}${varName} = `
+            + `<span class="func">int</span>(<span class="func">input</span>(<span class="string">${prompt}</span>))</div>`
+        );
+    } else {
+        execCode.push(`${spaces}${varName} = input(${prompt})`);
+        displayHtml.push(
+            `<div class="code-line">${spaces}${varName} = `
+            + `<span class="func">input</span>(<span class="string">${prompt}</span>)</div>`
+        );
+    }
+    break;
+
                 case 'output':
                     let val = node.text.replace(/^Print\s*/i, '').trim();
                     execCode.push(`${spaces}print(${val})`);
@@ -963,20 +1002,36 @@
             if (mergePoint) generateBlock(mergePoint, indentLvl, stopNode);
         }
 
-        function findMergeNode(branchA, branchB, decisionId) {
-            if (!branchA) return branchB; if (!branchB) return branchA; if (branchA === branchB) return branchA;
-            const q = [branchA, branchB];
-            const paths = { [branchA]: [decisionId, branchA], [branchB]: [decisionId, branchB] };
-            while(q.length > 0) {
-                const u = q.shift();
-                for (const edge of (adj[u] || [])) {
-                    const v = edge.to;
-                    if (Object.values(paths).some(p => p.includes(v))) return v;
-                    paths[v] = [...paths[u], v]; q.push(v);
-                }
-            }
-            return null;
+function findMergeNode(branchA, branchB, decisionId) {
+    if (!branchA) return branchB;
+    if (!branchB) return branchA;
+    if (branchA === branchB) return branchA;
+
+    const visitedA = new Set();
+    const visitedB = new Set();
+
+    let frontierA = [branchA];
+    let frontierB = [branchB];
+
+    while (frontierA.length || frontierB.length) {
+        const nextA = frontierA.shift();
+        if (nextA) {
+            if (visitedB.has(nextA)) return nextA;
+            visitedA.add(nextA);
+            (adj[nextA] || []).forEach(e => frontierA.push(e.to));
         }
+
+        const nextB = frontierB.shift();
+        if (nextB) {
+            if (visitedA.has(nextB)) return nextB;
+            visitedB.add(nextB);
+            (adj[nextB] || []).forEach(e => frontierB.push(e.to));
+        }
+    }
+
+    return null;
+}
+
 
         generateBlock(startNode.id, 0);
         pyBox.innerHTML = displayHtml.join('');
@@ -1012,18 +1067,18 @@
         updateCode(); 
         
         // --- SKULPT SUSPENSION HOOK (THE FIX FOR SPEED) ---
-        Sk.builtins.highlight_node = function(id) {
-            if (!isRunning) throw "ExecutionStopped"; 
-            
-            // 1. Highlight UI
-            highlightNode(id.v); 
-            
-            // 2. Force Suspension (Wait)
-            const delay = parseInt(document.getElementById('speed-slider').value) || 800;
-            return new Sk.misceval.promiseToSuspension(new Promise(resolve => {
-                setTimeout(resolve, delay);
-            }));
-        };
+Sk.builtins.highlight_node = function(id) {
+    if (!isRunning) throw "ExecutionStopped";
+
+    const nodeId = (typeof id === "string") ? id : id.v;
+    highlightNode(nodeId);
+
+    const delay = parseInt(document.getElementById('speed-slider').value) || 800;
+    return new Sk.misceval.promiseToSuspension(
+        new Promise(resolve => setTimeout(resolve, delay))
+    );
+};
+
 
         try {
             await Sk.misceval.asyncToPromise(function() {
