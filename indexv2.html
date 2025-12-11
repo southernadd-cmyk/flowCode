@@ -630,20 +630,7 @@
     /*=============================================================================
         9. CONNECTION ENGINE — STRICT MODE
     =============================================================================*/
-    function startConnection(nodeId, portType) {
-        isConnecting = true;
-        connStart = { nodeId, portType };
-    
-        dragLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        dragLine.setAttribute("stroke", "#0d6efd");
-        dragLine.setAttribute("stroke-width", "2");
-        dragLine.setAttribute("stroke-dasharray", "5,5");
-        dragLine.setAttribute("fill", "none");
-        svgLayer.appendChild(dragLine);
-    
-        document.addEventListener("mousemove", liveDragLine);
-        document.addEventListener("mouseup", abortConnection);
-    }
+
     
     function liveDragLine(e) {
         if (!isConnecting || !dragLine) return;
@@ -657,58 +644,11 @@
         );
     }
     
-    function finishConnection(targetId) {
-        if (!isConnecting) return;
-    
-        const ok = validateStrict(connStart, targetId);
-    
-        if (!ok) {
-            badLinkFX(connStart.nodeId);
-            abortConnection();
-            return;
-        }
-    
-        connections = connections.filter(
-            c => !(c.from === connStart.nodeId && c.port === connStart.portType)
-        );
-    
-        connections.push({
-            from: connStart.nodeId,
-            port: connStart.portType,
-            to: targetId
-        });
-    
-        abortConnection();
-        drawConnections();
-        updateCode();
+
+    updateCode();
     }
     
-    function abortConnection() {
-        isConnecting = false;
-        connStart = null;
-    
-        if (dragLine) dragLine.remove();
-        dragLine = null;
-    
-        document.removeEventListener("mousemove", liveDragLine);
-        document.removeEventListener("mouseup", abortConnection);
-    }
-    
-    /*=============================================================================
-        10. STRICT VALIDATION (A-mode)
-    =============================================================================*/
-    function validateStrict(start, targetId) {
-        const from = nodes.find(n => n.id === start.nodeId);
-        const to = nodes.find(n => n.id === targetId);
-    
-        if (!from || !to) return false;
-        if (start.nodeId === targetId) return false;
-        if (to.type === "start") return false;
-        if (from.type === "end") return false;
-        if (start.portType === "in") return false;
-    
-        return true;
-    }
+
     
     /*=============================================================================
         11. FX3 BAD CONNECTION FEEDBACK (SHAKE + RED)
@@ -759,57 +699,7 @@
     /*=============================================================================
         13. DRAW CONNECTIONS (orthogonal, safe defs)
     =============================================================================*/
-    function drawConnections() {
-        while (svgLayer.children.length > 1) {
-    svgLayer.removeChild(svgLayer.lastChild);
-}
 
-    
-        document.querySelectorAll(".conn-label").forEach(e => e.remove());
-    
-        connections.forEach(c => {
-            const p1 = getPortXY(c.from, c.port);
-            const p2 = getPortXY(c.to, "in");
-    
-            const color =
-                c.port === "yes" ? "#198754" :
-                c.port === "no"  ? "#dc3545" : "#555";
-    
-            const d = orthPath(p1, p2);
-    
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", d);
-            path.setAttribute("stroke", color);
-            path.setAttribute("stroke-width", "2");
-            path.setAttribute("marker-end", "url(#arrowhead)");
-            path.setAttribute("fill", "none");
-    
-            const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            hit.setAttribute("d", d);
-            hit.setAttribute("stroke", "transparent");
-            hit.setAttribute("stroke-width", "18");
-            hit.style.cursor = "pointer";
-            hit.onclick = () => {
-                if (confirm("Delete connection?")) {
-                    connections = connections.filter(x => x !== c);
-                    drawConnections();
-                    updateCode();
-                }
-            };
-    
-            svgLayer.appendChild(path);
-            svgLayer.appendChild(hit);
-    
-            if (c.port === "yes" || c.port === "no") {
-                const label = document.createElement("div");
-                label.className = "conn-label";
-                label.textContent = c.port === "yes" ? "Yes" : "No";
-                label.style.left = `${(p1.x + p2.x) / 2}px`;
-                label.style.top = `${(p1.y + p2.y) / 2}px`;
-                nodesLayer.appendChild(label);
-            }
-        });
-    }
     
     function orthPath(p1, p2) {
         const mid = (p1.y + p2.y) / 2;
@@ -1046,176 +936,7 @@ if (/^[a-zA-Z_]\w*\+=1$/.test(t)) {
 }
 
 
-    function updateCode() {
-        const box = document.getElementById("code-python");
-        const start = nodes.find(n => n.type === "start");
-    
-        if (!start) {
-            box.innerHTML = `<span class="comment"># Add a Start node</span>`;
-            return;
-        }
-    
-        const code = [];
-        const html = [];
-    
-        code.push("import time");
-        code.push("");
-    
-        const loopInfo = classifyLoops(start.id);
-        const processed = new Set();
-    
-        const edges = connections.reduce((acc, c) => {
-            if (!acc[c.from]) acc[c.from] = [];
-            acc[c.from].push(c);
-            return acc;
-        }, {});
-    
-        function walk(u, indent, stop) {
-            if (!u || u === stop) return;
-            if (processed.has(u)) return;
-    
-            const node = nodes.find(n => n.id === u);
-            const sp = "    ".repeat(indent);
-    
-            if (loopInfo.has(u)) {
-                emitLoop(u, indent, stop);
-                return;
-            }
-    
-            processed.add(u);
-            code.push(`${sp}highlight_node("${u}")`);
-    
-            switch (node.type) {
-                case "start":
-                    break;
-    
-                case "end":
-                    code.push(`${sp}exit()`);
-                    html.push(`${sp}exit()`);
-                    return;
-    
-                case "var":
-                case "process":
-                    code.push(`${sp}${node.text}`);
-                    html.push(`${sp}${node.text}`);
-                    break;
-    
-                case "output":
-                    const val = node.text.replace(/^Print\s*/i, "").trim();
-                    code.push(`${sp}print(${val})`);
-                    html.push(`${sp}print(${val})`);
-                    break;
-    
-                    case "input": {
-    let raw = node.text.replace(/^Input\s+/i, "").trim();
-    let [v, msg] = raw.split("=").map(x => x.trim());
-
-    // message fallback
-    if (!msg) msg = `"Enter value for ${v}"`;
-
-    // auto-quote if missing
-    if (!/^["'].*["']$/.test(msg)) msg = `"${msg}"`;
-
-    if (node.dataType === "int") {
-        code.push(`${sp}${v} = int(input(${msg}))`);
-    } else if (node.dataType === "float") {
-        code.push(`${sp}${v} = float(input(${msg}))`);
-    } else {
-        code.push(`${sp}${v} = input(${msg})`);
-    }
-
-    if (node.dataType === "int")
-    html.push(`${sp}${v} = int(input(${msg}))`);
-else if (node.dataType === "float")
-    html.push(`${sp}${v} = float(input(${msg}))`);
-else
-    html.push(`${sp}${v} = input(${msg})`);
-
-    break;
-}
-
-    
-                case "decision":
-                    emitDecision(u, indent, stop);
-                    return;
-            }
-    
-            const outs = edges[u] || [];
-            if (outs.length) walk(outs[0].to, indent, stop);
-        }
-    
-        function emitDecision(u, indent, stop) {
-            const yes = autoPass(u, "yes");
-            const no = autoPass(u, "no");
-    
-            const merge = findMerge(yes, no);
-            const node = nodes.find(n => n.id === u);
-            const cond = node.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
-
-    
-            const sp = "    ".repeat(indent);
-            code.push(`${sp}if ${cond}:`);
-            walk(yes, indent + 1, merge);
-    
-            code.push(`${sp}else:`);
-            walk(no, indent + 1, merge);
-    
-            if (merge) walk(merge, indent, stop);
-        }
-    
-        function emitLoop(h, indent, stop) {
-            const info = loopInfo.get(h);
-            const sp = "    ".repeat(indent);
-    
-            const ctrl = nodes.find(n => n.id === info.controller);
-            let cond = ctrl.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
-    
-            const exitPort = info.exits[0].port;
-            const breakCond = exitPort === "yes" ? cond : `not (${cond})`;
-    
-            const forInfo = detectForLoop(info.nodes);
-
-if (forInfo) {
-    const v = forInfo.variable;
-    const initVal = nodes.find(n => n.id === forInfo.initNode).text.split("=")[1].trim();
-    const condText = nodes.find(n => n.id === forInfo.condNode).text;
-    const m = condText.match(/<\s*(.+)$/);
-const maxVal = m ? m[1].trim() : "0";
-
-
-    code.push(`${sp}for ${v} in range(${initVal}, ${maxVal}):`);
-    code.push(`${sp}    highlight_node("${h}")`);
-
-    connections
-        .filter(c => c.from === h && c.port !== "in")
-        .forEach(c => walk(c.to, indent + 1, h));
-
-    const next = info.exits[0];
-    walk(next.to, indent, stop);
-    return;
-}
-
-// fallback to while-true
-code.push(`${sp}while True:`);
-code.push(`${sp}    highlight_node("${h}")`);
-
-connections
-    .filter(c => c.from === h && c.port !== "in")
-    .forEach(c => walk(c.to, indent + 1, h));
-
-code.push(`${sp}    highlight_node("${info.controller}")`);
-code.push(`${sp}    if ${breakCond}: break`);
-
-const next = info.exits[0];
-walk(next.to, indent, stop);
-
-        }
-    
-        walk(start.id, 0, null);
-    
-        generatedCode = code.join("\n");
-        box.innerText = html.join("\n");
-    }
+   
     
     /*=============================================================================
         18. RUNTIME + HIGHLIGHT HOOK
@@ -1237,52 +958,9 @@ walk(next.to, indent, stop);
         if (el) el.classList.add("running");
     }
     
-    Sk.builtins.highlight_node = function(id) {
-        if (!isRunning) throw "ExecutionStopped";
+
     
-        const n = typeof id === "string" ? id : id.v;
-        highlightNode(n);
     
-        const delay = parseInt(document.getElementById("speed-slider").value) || 800;
-    
-        return new Sk.misceval.promiseToSuspension(
-            new Promise(resolve => setTimeout(resolve, delay))
-        );
-    };
-    
-    async function runSimulation() {
-        if (isRunning) return;
-        isRunning = true;
-    
-        document.getElementById("btn-run").style.display = "none";
-        document.getElementById("btn-stop").style.display = "inline-block";
-    
-        consoleDiv.innerHTML = "";
-        updateCode();
-    
-        try {
-            await Sk.misceval.asyncToPromise(() =>
-                Sk.importMainWithBody("<stdin>", false, generatedCode, true)
-            );
-            log("Program Finished.");
-        } catch (e) {
-            if (e.toString() !== "ExecutionStopped")
-                log(e.toString(), "error");
-        } finally {
-            stopSimulation();
-        }
-    }
-    
-    function stopSimulation() {
-        isRunning = false;
-        document.getElementById("btn-run").style.display = "inline-block";
-        document.getElementById("btn-stop").style.display = "none";
-        document.querySelectorAll(".node").forEach(n => n.classList.remove("running"));
-    
-        const modalEl = document.getElementById("inputModal");
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-    }
     function clearCanvas() {
     if (!confirm("Clear all nodes?")) return;
 
@@ -1292,6 +970,305 @@ walk(next.to, indent, stop);
     drawConnections();
     updateCode();
 }
+
+
+// flowcode-patched.js
+// Combined patch for FlowCode v1 (STRICT MODE + S2 COMPILER + FX3 + M1 + MB1)
+// Drop this at the end of your HTML: <script src="flowcode-patched.js"></script>
+
+/*****************************************************************************************
+ * 1. Strict Port Validation + Connection Handling
+ *****************************************************************************************/
+function validateStrict(start, targetId) {
+    const from = nodes.find(n => n.id === start.nodeId);
+    const to = nodes.find(n => n.id === targetId);
+    if (!from || !to) return false;
+    if (start.nodeId === targetId) return false;
+    if (to.type === "start") return false;
+    if (from.type === "end") return false;
+    if (start.portType === "in") return false;
+    return true;
+}
+
+function badLinkFX(nodeId) {
+    const el = document.getElementById(nodeId);
+    if (!el) return;
+    el.style.transition = "0.15s";
+    el.style.transform = "translateX(-5px)";
+    el.style.borderColor = "#dc3545";
+    setTimeout(() => { el.style.transform = "translateX(5px)"; }, 100);
+    setTimeout(() => {
+        el.style.transform = "translateX(0)";
+        el.style.borderColor = "";
+    }, 200);
+}
+
+function startConnection(nodeId, portType) {
+    isConnecting = true;
+    connStart = { nodeId, portType };
+    dragLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    dragLine.setAttribute("stroke", "#0d6efd");
+    dragLine.setAttribute("stroke-width", "2");
+    dragLine.setAttribute("stroke-dasharray", "5,5");
+    dragLine.setAttribute("fill", "none");
+    svgLayer.appendChild(dragLine);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", abortConnection);
+}
+
+function finishConnection(targetId) {
+    if (!isConnecting || !connStart) return;
+    const ok = validateStrict(connStart, targetId);
+    if (!ok) {
+        badLinkFX(connStart.nodeId);
+        abortConnection();
+        return;
+    }
+    connections = connections.filter(c => !(c.from === connStart.nodeId && c.port === connStart.portType));
+    connections.push({ from: connStart.nodeId, port: connStart.portType, to: targetId });
+    drawConnections();
+    updateCode();
+    abortConnection();
+}
+
+function abortConnection() {
+    isConnecting = false;
+    connStart = null;
+    if (dragLine) dragLine.remove();
+    dragLine = null;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", abortConnection);
+}
+
+/*****************************************************************************************
+ * 2. Merge Detection (M1) + Auto-Pass (MB1)
+ *****************************************************************************************/
+function autoPass(nodeId, port) {
+    const c = connections.find(x => x.from === nodeId && x.port === port);
+    return c ? c.to : null;
+}
+
+function findMerge(a, b) {
+    if (!a && !b) return null;
+    if (a === b) return a;
+    if (!a || !b) return null;
+    const visitedA = new Set();
+    const visitedB = new Set();
+    const walk = (start, set) => {
+        let q = [start];
+        while (q.length) {
+            const u = q.shift();
+            if (set.has(u)) continue;
+            set.add(u);
+            connections.filter(c => c.from === u).forEach(c => q.push(c.to));
+        }
+    };
+    walk(a, visitedA);
+    walk(b, visitedB);
+    for (const id of visitedA)
+        if (visitedB.has(id)) return id;
+    return null;
+}
+
+/*****************************************************************************************
+ * 3. Loop Detection + Classification (for / while / do-while)
+ *****************************************************************************************/
+function detectBackEdges(startId) {
+    const visited = new Set();
+    const stack = new Set();
+    const back = [];
+    function dfs(u) {
+        visited.add(u);
+        stack.add(u);
+        connections.filter(c => c.from === u).forEach(e => {
+            if (!visited.has(e.to)) dfs(e.to);
+            else if (stack.has(e.to)) back.push({ from: u, to: e.to });
+        });
+        stack.delete(u);
+    }
+    dfs(startId);
+    return back;
+}
+
+function classifyLoops(startId) {
+    const edges = detectBackEdges(startId);
+    const info = new Map();
+    edges.forEach(be => {
+        const header = be.to;
+        if (info.has(header)) return;
+        const set = new Set([header]);
+        const queue = [be.from];
+        while (queue.length) {
+            const u = queue.shift();
+            set.add(u);
+            connections.filter(c => c.to === u).map(c => c.from).forEach(v => {
+                if (!set.has(v)) queue.push(v);
+            });
+        }
+        let controller = null;
+        const exits = [];
+        set.forEach(id => {
+            const n = nodes.find(x => x.id === id);
+            connections.filter(c => c.from === id).forEach(c => {
+                if (!set.has(c.to)) exits.push(c);
+                if (n.type === "decision") controller = id;
+            });
+        });
+        if (!controller) controller = be.from;
+        info.set(header, {
+            type: "while-true",
+            header,
+            controller,
+            nodes: set,
+            exits
+        });
+    });
+    return info;
+}
+
+/*****************************************************************************************
+ * 4. Compiler (S2) ā€” For / While / Do-While / If-Else / Merge-Aware / Indented
+ *****************************************************************************************/
+function updateCode() {
+    const box = document.getElementById("code-python");
+    const start = nodes.find(n => n.type === "start");
+    if (!start) {
+        box.innerHTML = '<span class="comment"># Add a Start node</span>';
+        return;
+    }
+    const code = [];
+    const html = [];
+    code.push("import time", "");
+    const loopInfo = classifyLoops(start.id);
+    const processed = new Set();
+    const edges = connections.reduce((acc, c) => {
+        if (!acc[c.from]) acc[c.from] = [];
+        acc[c.from].push(c);
+        return acc;
+    }, {});
+
+    function walk(u, indent, stop) {
+        if (!u || u === stop) return;
+        if (processed.has(u)) return;
+        const node = nodes.find(n => n.id === u);
+        const sp = "    ".repeat(indent);
+        if (loopInfo.has(u)) return emitLoop(u, indent, stop);
+        processed.add(u);
+        code.push(`${sp}highlight_node("${u}")`);
+        if (!node) return;
+        if (node.type === "end") {
+            code.push(`${sp}exit()`); html.push(`${sp}exit()`); return;
+        }
+        if (node.type === "var" || node.type === "process") {
+            code.push(`${sp}${node.text}`); html.push(`${sp}${node.text}`);
+        } else if (node.type === "output") {
+            const val = node.text.replace(/^Print\s*/i, "").trim();
+            code.push(`${sp}print(${val})`); html.push(`${sp}print(${val})`);
+        } else if (node.type === "input") {
+            let raw = node.text.replace(/^Input\s+/i, "").trim();
+            let [v, msg] = raw.split("=").map(x => x.trim());
+            if (!msg) msg = `"Enter value for ${v}"`;
+            if (!/^["'].*["']$/.test(msg)) msg = `"${msg}"`;
+            const dt = node.dataType;
+            if (dt === "int") {
+                code.push(`${sp}${v} = int(input(${msg}))`);
+                html.push(`${sp}${v} = int(input(${msg}))`);
+            } else if (dt === "float") {
+                code.push(`${sp}${v} = float(input(${msg}))`);
+                html.push(`${sp}${v} = float(input(${msg}))`);
+            } else {
+                code.push(`${sp}${v} = input(${msg})`);
+                html.push(`${sp}${v} = input(${msg})`);
+            }
+        } else if (node.type === "decision") {
+            emitDecision(u, indent, stop);
+            return;
+        }
+        const outs = edges[u] || [];
+        if (outs.length) walk(outs[0].to, indent, stop);
+    }
+
+    function emitDecision(u, indent, stop) {
+        const yes = autoPass(u, "yes");
+        const no = autoPass(u, "no");
+        const merge = findMerge(yes, no);
+        const node = nodes.find(n => n.id === u);
+        const cond = node.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
+        const sp = "    ".repeat(indent);
+        code.push(`${sp}if ${cond}:`);
+        walk(yes, indent + 1, merge);
+        code.push(`${sp}else:`);
+        walk(no, indent + 1, merge);
+        if (merge) walk(merge, indent, stop);
+    }
+
+    function emitLoop(h, indent, stop) {
+        const info = loopInfo.get(h);
+        const sp = "    ".repeat(indent);
+        const ctrl = nodes.find(n => n.id === info.controller);
+        let cond = ctrl.text.replace(/([^=!<>])=([^=])/g, "$1==$2");
+        const exitPort = info.exits[0].port;
+        const breakCond = exitPort === "yes" ? cond : `not (${cond})`;
+        code.push(`${sp}while True:`);
+        code.push(`${sp}    highlight_node("${h}")`);
+        connections.filter(c => c.from === h && c.port !== "in").forEach(c => walk(c.to, indent + 1, h));
+        code.push(`${sp}    highlight_node("${info.controller}")`);
+        code.push(`${sp}    if ${breakCond}: break`);
+        const next = info.exits[0];
+        walk(next.to, indent, stop);
+    }
+
+    walk(start.id, 0, null);
+    generatedCode = code.join("
+");
+    box.innerText = html.join("
+");
+}
+
+/*****************************************************************************************
+ * 5. Skulpt Runtime Hook + Simulation Controls
+ *****************************************************************************************/
+function highlightNode(id) {
+    document.querySelectorAll(".node").forEach(n => n.classList.remove("running"));
+    const el = document.getElementById(id);
+    if (el) el.classList.add("running");
+}
+
+Sk.builtins.highlight_node = function(id) {
+    if (!isRunning) throw "ExecutionStopped";
+    const n = typeof id === "string" ? id : id.v;
+    highlightNode(n);
+    const delay = parseInt(document.getElementById("speed-slider").value) || 800;
+    return new Sk.misceval.promiseToSuspension(new Promise(resolve => setTimeout(resolve, delay)));
+};
+
+async function runSimulation() {
+    if (isRunning) return;
+    isRunning = true;
+    document.getElementById("btn-run").style.display = "none";
+    document.getElementById("btn-stop").style.display = "inline-block";
+    consoleDiv.innerHTML = "";
+    updateCode();
+    try {
+        await Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, generatedCode, true));
+        log("Program Finished.");
+    } catch (e) {
+        if (e.toString() !== "ExecutionStopped") log(e.toString(), "error");
+    } finally {
+        stopSimulation();
+    }
+}
+
+function stopSimulation() {
+    isRunning = false;
+    document.getElementById("btn-run").style.display = "inline-block";
+    document.getElementById("btn-stop").style.display = "none";
+    document.querySelectorAll(".node").forEach(n => n.classList.remove("running"));
+    const modalEl = document.getElementById("inputModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+}
+    
     /*=============================================================================
         19. INITIAL DEMO
     =============================================================================*/
