@@ -154,7 +154,12 @@
         /* --- SHAPES --- */
         .shape-start, .shape-end { width: 120px; height: 50px; border-radius: 25px; }
         .shape-process { width: 140px; height: 60px; border-radius: 4px; }
-        
+        .shape-var { 
+    width: 140px; 
+    height: 60px; 
+    border-radius: 4px; 
+}
+
         .shape-decision { 
             width: 100px; height: 100px; 
             border-radius: 0px; 
@@ -429,10 +434,10 @@
         
         if(type==='start') text="Start";
         else if(type==='end') text="End";
-            else if (type === 'var') {
-    text = "x = 0";
-    dataType = "int"; // default
-}
+        else if (type === 'var') {
+            text = "x = 0";
+            dataType = "int"; // default
+        }
         else if(type==='process') text="x = x + 1"; 
         else if(type==='decision') text="x < 5";
         else if(type==='input') { text="Input x = \"Enter Value\""; dataType = "str"; }
@@ -450,14 +455,23 @@
         el.id = node.id;
         el.style.left = node.x + 'px';
         el.style.top = node.y + 'px';
-        let innerHtml = node.text;
-        if(node.type === 'input') {
-             const parts = node.text.split('=');
-             innerHtml = `<div class="inner-text">${parts[0].trim()}</div>`;
-        } else if(['decision','io','output'].includes(node.type)) {
-            innerHtml = `<div class="inner-text">${node.text}</div>`;
-        }
-        el.innerHTML = innerHtml;
+
+            
+                    let innerHtml = node.text;
+            
+            if (node.type === 'input') {
+                const parts = node.text.split('=');
+                innerHtml = `<div class="inner-text">${parts[0].trim()}</div>`;
+            }
+            else if (node.type === 'var') {
+                innerHtml = `<div class="inner-text">${node.text}</div>`;
+            }
+            else if (['decision','output'].includes(node.type)) {
+                innerHtml = `<div class="inner-text">${node.text}</div>`;
+            }
+            
+            el.innerHTML = innerHtml;
+
         
         if(node.type === 'input' && node.dataType) {
             const badge = document.createElement('div');
@@ -610,17 +624,17 @@ function saveNodeEdit() {
         newText = `Print ${v}`;
     }
 else if (node.type === 'var') {
-    const name = document.getElementById('edit-var-name').value.trim();
-    let value = document.getElementById('edit-var-value').value.trim();
-    const dtype = document.getElementById('edit-var-type').value;
+    const newName = document.getElementById("edit-var-name").value.trim();
+    let newValue = document.getElementById("edit-var-value").value.trim();
+    const dtype = document.getElementById("edit-var-type").value;
+
+    if (dtype === "str" && !newValue.startsWith('"'))
+        newValue = `"${newValue}"`;
 
     node.dataType = dtype;
-    if (dtype === "str" && !(value.startsWith('"') || value.startsWith("'"))) {
-        value = `"${value}"`;
-    }
-
-    node.text = `${name} = ${value}`;
+    newText = `${newName} = ${newValue}`;
 }
+
 
         
     else {
@@ -638,14 +652,20 @@ else if (node.type === 'var') {
     el.querySelectorAll('.dot').forEach(dot => dot.remove());
 
     // Recreate label
-    if (node.type === 'input') {
-        const label = node.text.split('=')[0].trim();
-        el.innerHTML = `<div class="inner-text">${label}</div>`;
-    } else if (['decision', 'output'].includes(node.type)) {
-        el.innerHTML = `<div class="inner-text">${node.text}</div>`;
-    } else {
-        el.textContent = node.text;
-    }
+if (node.type === 'input') {
+    const label = node.text.split('=')[0].trim();
+    el.innerHTML = `<div class="inner-text">${label}</div>`;
+} 
+else if (node.type === 'var') {
+    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+}
+else if (['decision', 'output'].includes(node.type)) {
+    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+} 
+else {
+    el.innerHTML = `<div class="inner-text">${node.text}</div>`;
+}
+
 
     // Re-add badge for input types
     if (node.type === 'input') {
