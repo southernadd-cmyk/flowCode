@@ -1013,11 +1013,6 @@ else { // string
         }
 
         function generateLoop(headerId, indentLvl, stopNode) {
-            revAdj[headerId].forEach(parent => {
-                if (!loopInfo.get(headerId).nodes.has(parent.from)) {
-                    generateBlock(parent.from, indentLvl, headerId);
-                        }
-            });
             const info = loopInfo.get(headerId);
             processed.add(headerId);
             const spaces = "    ".repeat(indentLvl);
@@ -1070,12 +1065,6 @@ else { // string
                 } else if (hNode.type === 'output') {
                     let val = hNode.text.replace(/^Print\s*/i, '').trim();
                     execCode.push(`${bodySpaces}print(${val})`); displayHtml.push(`<div class="code-line">${bodySpaces}<span class="func">print</span>(${val})</div>`);
-                
-               else if (hNode.type === 'var') {
-    execCode.push(`${bodySpaces}${hNode.text}`);
-    displayHtml.push(`<div class="code-line">${bodySpaces}${hNode.text}</div>`);
-}
- 
                 } else if (hNode.type === 'input') {
                      let clean = hNode.text.replace(/^Input\s+/i, '').trim();
                      let [v, p] = clean.includes('=') ? clean.split('=', 2).map(s => s.trim()) : [clean, `"${clean}"`];
@@ -1084,7 +1073,6 @@ else { // string
                      if (hNode.dataType === 'int') {
                         execCode.push(`${bodySpaces}${v} = int(input(${p}))`);
                         displayHtml.push(`<div class="code-line">${bodySpaces}${v} = <span class="func">int</span>(<span class="func">input</span>(<span class="string">${p}</span>))</div>`);
-                     
                      } else {
                         execCode.push(`${bodySpaces}${v} = input(${p})`);
                         displayHtml.push(`<div class="code-line">${bodySpaces}${v} = <span class="func">input</span>(<span class="string">${p}</span>)</div>`);
