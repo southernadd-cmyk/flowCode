@@ -1248,31 +1248,11 @@ function isReachable(start, target, adj) {
         if (!node) return;
 
         // Check if this is a loop header
-// Check if this is a loop header
-if (!inLoop && loopInfo.has(nodeId)) {
-    // SPECIAL CASE: If the loop header is NOT a decision node and has code,
-    // generate it BEFORE the loop starts
-    const headerNode = nodes.find(n => n.id === nodeId);
-    const info = loopInfo.get(nodeId);
-    
-    if (headerNode && headerNode.type !== 'decision' && 
-        !['start', 'end'].includes(headerNode.type)) {
-        
-        // Check if this header has incoming edges from outside the loop
-        const incomingFromOutside = (revAdj[nodeId] || []).some(e => 
-            e && e.from && info && info.loopNodes && !info.loopNodes.has(e.from)
-        );
-        
-        if (incomingFromOutside) {
-            // Generate this node's code before the loop
-            generateBlock(nodeId, indent, nodeId, false); // Process it normally first
-            // Note: This will mark it as processed
+        if (!inLoop && loopInfo.has(nodeId)) {
+            generateLoop(nodeId, indent, stopNode);
+            return;
         }
-    }
-    
-    generateLoop(nodeId, indent, stopNode);
-    return;
-}
+
         processed.add(nodeId);
         const sp = "    ".repeat(indent);
 
@@ -1611,65 +1591,14 @@ if (!inLoop && loopInfo.has(nodeId)) {
 
         const sp2 = "    ".repeat(indent + 1);
 
-// Generate loop body
-const bodyStart = (adj[info.header] || []).find(e => e && e.to);
-if (bodyStart && bodyStart.to) {
-    // If header is not a decision node and hasn't been processed yet, 
-    // generate it inside the loop too
-    const headerNode = nodes.find(n => n.id === info.header);
-    if (headerNode && headerNode.type !== 'decision' && 
-        !['start', 'end'].includes(headerNode.type) &&
-        !processed.has(info.header)) {
-        
-        // Generate header code inside loop
-        const sp2 = "    ".repeat(indent + 1);
-        
-        execCode.push(`${sp2}highlight_node('${info.header}')`);
-        
-        // Generate the actual code based on node type
-        switch (headerNode.type) {
-            case "input": {
-                let raw = headerNode.text.replace(/^Input\s+/i, "").trim();
-                let [v, p] = raw.split("=").map(x => x.trim());
-                if (!p) p = `"${v}"`;
-                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
-                
-                let pythonCode;
-                if (headerNode.dataType === "int") {
-                    pythonCode = `${v} = int(input(${p}))`;
-                    execCode.push(`${sp2}${pythonCode}`);
-                } else if (headerNode.dataType === "float") {
-                    pythonCode = `${v} = float(input(${p}))`;
-                    execCode.push(`${sp2}${pythonCode}`);
-                } else {
-                    pythonCode = `${v} = input(${p})`;
-                    execCode.push(`${sp2}${pythonCode}`);
-                }
-                
-                displayHtml.push(`<div class="code-line">${sp2}${pythonCode}</div>`);
-                break;
-            }
-            case "var":
-            case "process":
-                execCode.push(`${sp2}${headerNode.text}`);
-                displayHtml.push(`<div class="code-line">${sp2}${headerNode.text}</div>`);
-                break;
-            case "output": {
-                let val = headerNode.text.replace(/^Print\s*/i, "").trim();
-                execCode.push(`${sp2}print(${val})`);
-                displayHtml.push(`<div class="code-line">${sp2}print(${val})</div>`);
-                break;
-            }
+        // Generate loop body
+        const bodyStart = (adj[info.header] || []).find(e => e && e.to);
+        if (bodyStart && bodyStart.to) {
+            generateBlock(bodyStart.to, indent + 1, null, true);
+        } else {
+            execCode.push(`${sp2}pass`);
+            displayHtml.push(`<div class="code-line">${sp2}pass</div>`);
         }
-        
-        processed.add(info.header);
-    }
-    
-    generateBlock(bodyStart.to, indent + 1, null, true);
-} else {
-    execCode.push(`${sp2}pass`);
-    displayHtml.push(`<div class="code-line">${sp2}pass</div>`);
-}
 
         // If there's a controller with exit, add break condition
         if (info.controller && info.exits.length > 0) {
