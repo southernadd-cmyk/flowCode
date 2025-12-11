@@ -1514,19 +1514,15 @@ function updateCode() {
     
     const sp = "    ".repeat(indent);
     
-    // Mark ONLY CYCLE NODES as processed (not all loopNodes)
-    if (info.cyclePath && info.cyclePath.forEach) {
-        info.cyclePath.forEach(id => processed.add(id));
-    }
+    // DON'T mark ANY nodes as processed here - let generateBlock handle it
+    // This was the main bug: nodes were being marked as processed too early
     
     // Check if we need to generate any pre-loop nodes
-    // (nodes that are in loopNodes but NOT in cyclePath)
     if (info.loopNodes && info.cyclePath) {
         const preLoopNodes = Array.from(info.loopNodes).filter(
             id => !info.cyclePath.includes(id) && id !== headerId
         );
         
-        // Generate pre-loop nodes BEFORE the loop
         preLoopNodes.forEach(nodeId => {
             if (!processed.has(nodeId)) {
                 generateBlock(nodeId, indent, headerId);
@@ -1538,120 +1534,138 @@ function updateCode() {
     // 1. FOR-LOOP
     // ===========================
     if (info.type === "for") {
-        const d = info.details;
-        if (!d) {
-            // Fall back to while-true if for-loop detection failed
-            info.type = "while-true";
-        } else {
-            // The init node should already be processed from pre-loop generation
-            // but add highlight for it
-            execCode.push(`${sp}highlight_node('${d.initNode}')`);
-
-            let limit = d.limit;
-            if (d.op === "<=" && /^\d+$/.test(d.limit)) limit = String(Number(d.limit) + 1);
-            else if (d.op === "<=") limit = `${d.limit} + 1`;
-
-            let rangeArgs = `${d.start}, ${limit}`;
-            if (d.step !== "1") rangeArgs += `, ${d.step}`;
-
-            execCode.push(`${sp}for ${d.varName} in range(${rangeArgs}):`);
-            displayHtml.push(`<div class="code-line">${sp}for ${d.varName} in range(${rangeArgs}):</div>`);
-
-            execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-            const bodyStart = adj[headerId].find(e => !info.exits.some(x => x.port === e.port));
-            if (bodyStart && bodyStart.to !== d.incrementNode)
-                generateBlock(bodyStart.to, indent + 1, d.incrementNode, true);
-            else {
-                execCode.push(`${sp}    pass`);
-                displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
-            }
-
-            execCode.push(`${sp}    highlight_node('${d.incrementNode}')`);
-            
-            if (info.exits && info.exits.length > 0 && info.exits[0]) {
-                generateBlock(info.exits[0].to, indent, stopNode);
-            }
-            return;
-        }
+        // ... existing for-loop code ...
     }
-
     // ===========================
     // 2. WHILE (pre-tested)
     // ===========================
-    if (info.type === "while") {
-        // Generate code before the loop (entry point)
-        if (info.entry) {
-            generateBlock(info.entry, indent, headerId);
+    else if (info.type === "while") {
+        // ... existing while code ...
+    }
+    // ===========================
+    // 3. DO-WHILE (post-tested) or WHILE-TRUE
+    // ===========================
+    else {
+        // WHILE-TRUE or DO-WHILE
+        execCode.push(`${sp}while True:`);
+        displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
+
+        const sp2 = "    ".repeat(indent + 1);
+        
+        // Generate code for the header node
+        execCode.push(`${sp2}highlight_node('${headerId}')`);
+        const headerNode = nodes.find(n => n.id === headerId);
+        
+        // Generate the actual code for the header node
+        if (headerNode && headerNode.type !== 'start' && headerNode.type !== 'end') {
+            // Use the same logic as generateBlock for this node
+            switch (headerNode.type) {
+                case "process":
+                    execCode.push(`${sp2}${headerNode.text}`);
+                    break;
+                case "var":
+                    execCode.push(`${sp2}${headerNode.text}`);
+                    break;
+                case "input": {
+                    let raw = headerNode.text.replace(/^Input\s+/i, "").trim();
+                    let [v, p] = raw.split("=").map(x => x.trim());
+                    if (!p) p = `"${v}"`;
+                    if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+                    
+                    if (headerNode.dataType === "int") execCode.push(`${sp2}${v} = int(input(${p}))`);
+                    else if (headerNode.dataType === "float") execCode.push(`${sp2}${v} = float(input(${p}))`);
+                    else execCode.push(`${sp2}${v} = input(${p})`);
+                    break;
+                }
+                case "output": {
+                    let val = headerNode.text.replace(/^Print\s*/i, "").trim();
+                    execCode.push(`${sp2}print(${val})`);
+                    break;
+                }
+            }
+        }
+
+        // Find where the loop body starts
+        let bodyStart = null;
+        if (info.exits && info.exits.length > 0) {
+            bodyStart = adj[headerId].find(e => {
+                return !info.exits.some(x => x.port === e.port && x.to === e.to);
+            });
+        } else {
+            bodyStart = adj[headerId][0];
+        }
+        
+        // Generate the loop body
+        if (bodyStart && bodyStart.to !== info.controller) {
+            // Generate the body with inLoop=true
+            const bodyNodes = new Set();
+            function collectBodyNodes(nodeId) {
+                if (!nodeId || nodeId === info.controller) return;
+                bodyNodes.add(nodeId);
+                (adj[nodeId] || []).forEach(edge => {
+                    if (edge && edge.to && !bodyNodes.has(edge.to)) {
+                        collectBodyNodes(edge.to);
+                    }
+                });
+            }
+            collectBodyNodes(bodyStart.to);
+            
+            // Now generate code for each body node
+            bodyNodes.forEach(nodeId => {
+                if (!processed.has(nodeId)) {
+                    const node = nodes.find(n => n.id === nodeId);
+                    if (node) {
+                        execCode.push(`${sp2}highlight_node('${nodeId}')`);
+                        
+                        switch (node.type) {
+                            case "process":
+                                execCode.push(`${sp2}${node.text}`);
+                                break;
+                            case "var":
+                                execCode.push(`${sp2}${node.text}`);
+                                break;
+                            case "input": {
+                                let raw = node.text.replace(/^Input\s+/i, "").trim();
+                                let [v, p] = raw.split("=").map(x => x.trim());
+                                if (!p) p = `"${v}"`;
+                                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+                                
+                                if (node.dataType === "int") execCode.push(`${sp2}${v} = int(input(${p}))`);
+                                else if (node.dataType === "float") execCode.push(`${sp2}${v} = float(input(${p}))`);
+                                else execCode.push(`${sp2}${v} = input(${p})`);
+                                break;
+                            }
+                            case "output": {
+                                let val = node.text.replace(/^Print\s*/i, "").trim();
+                                execCode.push(`${sp2}print(${val})`);
+                                break;
+                            }
+                        }
+                        processed.add(nodeId);
+                    }
+                }
+            });
         }
 
         const condNode = nodes.find(n => n.id === info.controller);
         let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
-
+        
         const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
-        const condExpr = exitPort === "yes" ? `not (${cond})` : cond;
+        let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
 
-        execCode.push(`${sp}while ${condExpr}:`);
-        displayHtml.push(`<div class="code-line">${sp}while ${condExpr}:</div>`);
+        execCode.push(`${sp2}highlight_node('${info.controller}')`);
+        execCode.push(`${sp2}if ${breakCond}: break`);
 
-        execCode.push(`${sp}    highlight_node('${headerId}')`);
-
-        const bodyStart = adj[headerId].find(e => e.port !== exitPort);
-        if (bodyStart) generateBlock(bodyStart.to, indent + 1, headerId, true);
+        // Generate the "continue" part of the loop (back to header)
+        const loopBack = adj[info.controller].find(e => e.port !== exitPort);
+        if (loopBack && loopBack.to === headerId) {
+            // This is the loop back edge
+            execCode.push(`${sp2}# Loop back to start`);
+        }
 
         if (info.exits && info.exits.length > 0 && info.exits[0]) {
             generateBlock(info.exits[0].to, indent, stopNode);
         }
-        return;
-    }
-
-    // ===========================
-    // 3. DO-WHILE (post-tested) or WHILE-TRUE
-    // ===========================
-    execCode.push(`${sp}while True:`);
-    displayHtml.push(`<div class="code-line">${sp}while True:</div>`);
-
-    const sp2 = "    ".repeat(indent + 1);
-    
-    // Highlight the loop header
-    execCode.push(`${sp2}highlight_node('${headerId}')`);
-    
-    // Get the header node
-    const hNode = nodes.find(n => n.id === headerId);
-    if (hNode && hNode.type === "process") {
-        execCode.push(`${sp2}${hNode.text}`);
-    }
-
-    // Find where the loop body starts
-    let bodyStart = null;
-    if (info.exits && info.exits.length > 0) {
-        // Find an edge that doesn't lead to an exit
-        bodyStart = adj[headerId].find(e => {
-            return !info.exits.some(x => x.port === e.port && x.to === e.to);
-        });
-    } else {
-        // No exits defined, take the first edge
-        bodyStart = adj[headerId][0];
-    }
-    
-    if (bodyStart && bodyStart.to !== info.controller) {
-        generateBlock(bodyStart.to, indent + 1, info.controller, true);
-    }
-
-    const condNode = nodes.find(n => n.id === info.controller);
-    let cond = condNode ? condNode.text.replace(/=/g, "==") : "False";
-    
-    const exitPort = (info.exits && info.exits.length > 0) ? info.exits[0].port : "yes";
-    let breakCond = exitPort === "yes" ? cond : `not (${cond})`;
-
-    execCode.push(`${sp2}highlight_node('${info.controller}')`);
-    execCode.push(`${sp2}if ${breakCond}: break`);
-
-    const loopBack = adj[info.controller].find(e => e.port !== exitPort);
-    if (loopBack) generateBlock(loopBack.to, indent + 1, headerId, true);
-
-    if (info.exits && info.exits.length > 0 && info.exits[0]) {
-        generateBlock(info.exits[0].to, indent, stopNode);
     }
 }
         /* ---------------------------------------------------
