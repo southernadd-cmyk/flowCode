@@ -499,10 +499,12 @@
             addDot(el, 'in', node.id, 'in');
             addDot(el, 'out-yes', node.id, 'yes'); 
             addDot(el, 'out-no', node.id, 'no');   
-        } else {
-            addDot(el, 'in', node.id, 'in');
-            addDot(el, 'out', node.id, 'next');
-        }
+        } 
+        else if (node.type === 'var' || node.type === 'process') {
+    addDot(el, 'in', node.id, 'in');
+    addDot(el, 'out', node.id, 'next');
+    }
+
     }
 
     function addDot(parent, className, nodeId, portType) {
