@@ -1233,7 +1233,7 @@ function updateCode() {
                 else if (node.dataType === "float") execCode.push(`${sp}${v} = float(input(${p}))`);
                 else execCode.push(`${sp}${v} = input(${p})`);
                 
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
+                displayHtml.push(`<div class="code-line">${sp}${pyCode}</div>`);
                 break;
             }
                 
