@@ -886,6 +886,7 @@ let generatedCode = "";
    MAIN UPDATE FUNCTION — RUNS AFTER ANY CANVAS CHANGE
 --------------------------------------------------------- */
 function updateCode() {
+    processed.clear();
     const pyBox = document.getElementById("code-python");
     let execCode = ["import time", "import sys", ""];
     let displayHtml = [];
@@ -1228,76 +1229,97 @@ function updateCode() {
     --------------------------------------------------- */
     const processed = new Set();
 
-    function generateBlock(nodeId, indent, stopNode = null) {
-        if (!nodeId || nodeId === stopNode) return;
-        if (processed.has(nodeId)) return;
-
-        // Loop header?
-        if (loopInfo.has(nodeId)) {
-            generateLoop(nodeId, indent, stopNode);
-            return;
-        }
-
+    function generateBlock(nodeId, indent, stopNode = null, inLoop = false) {
+    if (!nodeId) return;
+    
+    // Check if we've reached a stop node
+    if (nodeId === stopNode) return;
+    
+    // Check if already processed (skip if not in a loop context)
+    if (processed.has(nodeId) && !inLoop) return;
+    
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    
+    // Loop header? (only if not already inside a loop)
+    if (!inLoop && loopInfo.has(nodeId)) {
+        generateLoop(nodeId, indent, stopNode);
+        return;
+    }
+    
+    // Mark as processed if not in loop
+    if (!inLoop) {
         processed.add(nodeId);
-
-        const node = nodes.find(n => n.id === nodeId);
-        const sp = "    ".repeat(indent);
-
+    }
+    
+    const sp = "    ".repeat(indent);
+    
+    // Only add highlight if not a special control node
+    if (node.type !== 'start' && node.type !== 'end') {
         execCode.push(`${sp}highlight_node('${nodeId}')`);
-
-        /* ----------------------------------------
-           EMIT CODE FOR REGULAR BLOCK
-        ---------------------------------------- */
-        switch (node.type) {
-            case "start":
-                displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
-                break;
-
-            case "end":
-                execCode.push(`${sp}exit()`);
-                displayHtml.push(`<div class="code-line">${sp}exit()</div>`);
+    }
+    
+    // Emit code for regular block
+    switch (node.type) {
+        case "start":
+            displayHtml.push(`<div class="code-line"><span class="comment"># Start</span></div>`);
+            break;
+            
+        case "end":
+            execCode.push(`${sp}exit()`);
+            displayHtml.push(`<div class="code-line">${sp}exit()</div>`);
+            return;
+            
+        case "var":
+            execCode.push(`${sp}${node.text}`);
+            displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
+            break;
+            
+        case "process":
+            execCode.push(`${sp}${node.text}`);
+            displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
+            break;
+            
+        case "output": {
+            let val = node.text.replace(/^Print\s*/i, "").trim();
+            execCode.push(`${sp}print(${val})`);
+            displayHtml.push(`<div class="code-line">${sp}print(${val})</div>`);
+            break;
+        }
+            
+        case "input": {
+            let raw = node.text.replace(/^Input\s+/i, "").trim();
+            let [v, p] = raw.split("=").map(x => x.trim());
+            if (!p) p = `"${v}"`;
+            if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
+            
+            if (node.dataType === "int") execCode.push(`${sp}${v} = int(input(${p}))`);
+            else if (node.dataType === "float") execCode.push(`${sp}${v} = float(input(${p}))`);
+            else execCode.push(`${sp}${v} = input(${p})`);
+            
+            displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
+            break;
+        }
+            
+        case "decision":
+            // If we're already in a loop, don't generate if/else but continue
+            if (inLoop) {
+                // Just continue with the next node
+                const next = adj[nodeId][0];
+                if (next) generateBlock(next.to, indent, stopNode, inLoop);
                 return;
-
-            case "var":
-                execCode.push(`${sp}${node.text}`);
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-
-            case "process":
-                execCode.push(`${sp}${node.text}`);
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-
-            case "output": {
-                let val = node.text.replace(/^Print\s*/i, "").trim();
-                execCode.push(`${sp}print(${val})`);
-                displayHtml.push(`<div class="code-line">${sp}print(${val})</div>`);
-                break;
-            }
-
-            case "input": {
-                let raw = node.text.replace(/^Input\s+/i, "").trim();
-                let [v, p] = raw.split("=").map(x => x.trim());
-                if (!p) p = `"${v}"`;
-                if (!(p.startsWith('"') || p.startsWith("'"))) p = `"${p}"`;
-
-                if (node.dataType === "int") execCode.push(`${sp}${v} = int(input(${p}))`);
-                else if (node.dataType === "float") execCode.push(`${sp}${v} = float(input(${p}))`);
-                else execCode.push(`${sp}${v} = input(${p})`);
-
-                displayHtml.push(`<div class="code-line">${sp}${node.text}</div>`);
-                break;
-            }
-
-            case "decision":
+            } else {
                 generateIfElse(nodeId, indent, stopNode);
                 return;
-        }
-
-        const next = adj[nodeId][0];
-        if (next) generateBlock(next.to, indent, stopNode);
+            }
     }
-
+    
+    // Continue to next node
+    const next = adj[nodeId][0];
+    if (next) {
+        generateBlock(next.to, indent, stopNode, inLoop);
+    }
+}
     /* ---------------------------------------------------
        IF / ELSE
     --------------------------------------------------- */
@@ -1357,10 +1379,13 @@ function updateCode() {
        LOOP GENERATION (FIXED - SAFER ACCESS)
     --------------------------------------------------- */
     function generateLoop(headerId, indent, stopNode) {
-        const info = loopInfo.get(headerId);
-        if (!info) return;
-        
-        const sp = "    ".repeat(indent);
+    const info = loopInfo.get(headerId);
+    if (!info) return;
+    
+    const sp = "    ".repeat(indent);
+    
+    // Mark ALL loop nodes as processed so they don't get generated outside the loop
+    info.loopNodes.forEach(id => processed.add(id));
 
         // ===========================
         // 1. FOR-LOOP
@@ -1458,9 +1483,9 @@ function updateCode() {
         const loopBack = adj[info.controller].find(e => e.port !== exitPort);
         if (loopBack) generateBlock(loopBack.to, indent + 1, headerId);
 
-        if (info.exits && info.exits.length > 0 && info.exits[0]) {
-            generateBlock(info.exits[0].to, indent, stopNode);
-        }
+            if (info.exits && info.exits.length > 0 && info.exits[0]) {
+        generateBlock(info.exits[0].to, indent, stopNode);
+    }
     }
 
     /* ---------------------------------------------------
