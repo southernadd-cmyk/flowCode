@@ -1277,43 +1277,55 @@ function updateCode() {
     }
 
     function generateIfElse(nodeId, indent, stopNode, inLoop = false) {
-        const node = nodes.find(n => n.id === nodeId);
-        const sp = "    ".repeat(indent);
-        const condition = node.text.replace(/=/g, "==");
+    const node = nodes.find(n => n.id === nodeId);
+    const sp = "    ".repeat(indent);
+    const condition = node.text.replace(/=/g, "==");
 
-        execCode.push(`${sp}if ${condition}:`);
-        displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
+    execCode.push(`${sp}if ${condition}:`);
+    displayHtml.push(`<div class="code-line">${sp}if ${condition}:</div>`);
 
-        const yesEdge = (adj[nodeId] || []).find(e => e.port === "yes");
-        const noEdge = (adj[nodeId] || []).find(e => e.port === "no");
+    const yesEdge = (adj[nodeId] || []).find(e => e.port === "yes");
+    const noEdge = (adj[nodeId] || []).find(e => e.port === "no");
 
-        // Find merge point
-        const mergeNode = findMergePoint(yesEdge?.to, noEdge?.to);
+    // Find merge point
+    const mergeNode = findMergePoint(yesEdge?.to, noEdge?.to);
 
-        // Generate yes branch
-        if (yesEdge && yesEdge.to) {
-            generateBlock(yesEdge.to, indent + 1, mergeNode, inLoop);
-        } else {
-            execCode.push(`${sp}    pass`);
-            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
-        }
-
-        // Generate no branch
-        execCode.push(`${sp}else:`);
-        displayHtml.push(`<div class="code-line">${sp}else:</div>`);
-        
-        if (noEdge && noEdge.to) {
-            generateBlock(noEdge.to, indent + 1, mergeNode, inLoop);
-        } else {
-            execCode.push(`${sp}    pass`);
-            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
-        }
-
-        // Continue from merge point
-        if (mergeNode) {
-            generateBlock(mergeNode, indent, stopNode, inLoop);
-        }
+    // Generate yes branch
+    if (yesEdge && yesEdge.to) {
+        generateBlock(yesEdge.to, indent + 1, mergeNode, inLoop);
+    } else {
+        execCode.push(`${sp}    pass`);
+        displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
     }
+
+    // Generate no branch
+    execCode.push(`${sp}else:`);
+    displayHtml.push(`<div class="code-line">${sp}else:</div>`);
+    
+    if (noEdge && noEdge.to) {
+        // Check if no branch should merge with yes branch or end independently
+        if (mergeNode && mergeNode !== noEdge.to) {
+            // There's a merge point, generate code to that point
+            generateBlock(noEdge.to, indent + 1, mergeNode, inLoop);
+        } else if (mergeNode === noEdge.to) {
+            // The no branch goes directly to the merge point (it's empty)
+            // In this case, we should just pass
+            execCode.push(`${sp}    pass`);
+            displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+        } else {
+            // No merge point found - this branch should exit or end independently
+            generateBlock(noEdge.to, indent + 1, stopNode, inLoop);
+        }
+    } else {
+        execCode.push(`${sp}    pass`);
+        displayHtml.push(`<div class="code-line">${sp}    pass</div>`);
+    }
+
+    // Continue from merge point only if it exists and isn't part of the no branch
+    if (mergeNode && (!noEdge || mergeNode !== noEdge.to)) {
+        generateBlock(mergeNode, indent, stopNode, inLoop);
+    }
+}
 
     function findMergePoint(a, b) {
         if (!a || !b) return a || b;
