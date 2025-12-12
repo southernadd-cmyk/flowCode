@@ -1358,18 +1358,17 @@ if (!nodeId || processed.has(nodeId)) return;
    function findMergePoint(a, b) {
     if (!a || !b) return a || b;
     if (a === b) return a;
-
-    // Special case: if one branch goes to end, it's not a true merge point
-    // for the if statement structure
+    
     const aNode = nodes.find(n => n.id === a);
     const bNode = nodes.find(n => n.id === b);
     
-    if (aNode && aNode.type === 'end') {
-        // If one branch goes directly to end, there's no merge point
-        // (the if statement doesn't continue after)
-        return null;
-    }
-    if (bNode && bNode.type === 'end') {
+    if (aNode && aNode.type === 'end') return null;
+    if (bNode && bNode.type === 'end') return null;
+    
+    // If either node can have multiple outgoing paths (decision or in a loop),
+    // finding a true merge point is complex
+    if ((aNode && aNode.type === 'decision') || (bNode && bNode.type === 'decision')) {
+        // For now, return null to avoid incorrect merge points
         return null;
     }
 
