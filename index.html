@@ -1342,44 +1342,68 @@ function updateCode() {
 }
 
 
-    function findMergePoint(a, b) {
-        if (!a || !b) return a || b;
-        if (a === b) return a;
+   function findMergePoint(a, b) {
+    if (!a || !b) return a || b;
+    if (a === b) return a;
 
-        const visitedA = new Set();
-        const visitedB = new Set();
-        let queueA = [a], queueB = [b];
-
-        while (queueA.length > 0 || queueB.length > 0) {
-            // Expand A
-            if (queueA.length > 0) {
-                const current = queueA.shift();
-                if (visitedB.has(current)) return current;
-                visitedA.add(current);
-                
-                (adj[current] || []).forEach(e => {
-                    if (e && e.to && !visitedA.has(e.to)) {
-                        queueA.push(e.to);
-                    }
-                });
-            }
-
-            // Expand B
-            if (queueB.length > 0) {
-                const current = queueB.shift();
-                if (visitedA.has(current)) return current;
-                visitedB.add(current);
-                
-                (adj[current] || []).forEach(e => {
-                    if (e && e.to && !visitedB.has(e.to)) {
-                        queueB.push(e.to);
-                    }
-                });
-            }
-        }
-
+    // Special case: if one branch goes to end, it's not a true merge point
+    // for the if statement structure
+    const aNode = nodes.find(n => n.id === a);
+    const bNode = nodes.find(n => n.id === b);
+    
+    if (aNode && aNode.type === 'end') {
+        // If one branch goes directly to end, there's no merge point
+        // (the if statement doesn't continue after)
         return null;
     }
+    if (bNode && bNode.type === 'end') {
+        return null;
+    }
+
+    const visitedA = new Set();
+    const visitedB = new Set();
+    let queueA = [a], queueB = [b];
+
+    while (queueA.length > 0 || queueB.length > 0) {
+        // Expand A
+        if (queueA.length > 0) {
+            const current = queueA.shift();
+            const currentNode = nodes.find(n => n.id === current);
+            
+            // Don't consider 'end' as a merge point
+            if (currentNode && currentNode.type === 'end') continue;
+            
+            if (visitedB.has(current)) return current;
+            visitedA.add(current);
+            
+            (adj[current] || []).forEach(e => {
+                if (e && e.to && !visitedA.has(e.to)) {
+                    queueA.push(e.to);
+                }
+            });
+        }
+
+        // Expand B
+        if (queueB.length > 0) {
+            const current = queueB.shift();
+            const currentNode = nodes.find(n => n.id === current);
+            
+            // Don't consider 'end' as a merge point
+            if (currentNode && currentNode.type === 'end') continue;
+            
+            if (visitedA.has(current)) return current;
+            visitedB.add(current);
+            
+            (adj[current] || []).forEach(e => {
+                if (e && e.to && !visitedB.has(e.to)) {
+                    queueB.push(e.to);
+                }
+            });
+        }
+    }
+
+    return null;
+}
 
     function generateLoop(headerId, indent, stopNode) {
         const info = loopInfo.get(headerId);
