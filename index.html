@@ -1311,8 +1311,16 @@ function updateCode() {
 
         // ELSE-IF chain
         if (noNode?.type === "decision" && noEdge.to !== mergeNode) {
-            generateIfElse(noEdge.to, indent, mergeNode, inLoop, true);
-        }
+    // Check if this decision is part of a loop
+    if (!loopInfo.has(noEdge.to)) {
+        generateIfElse(noEdge.to, indent, mergeNode, inLoop, true);
+    } else {
+        // It's in a loop, generate normal else
+        execCode.push(`${sp}else:`);
+        displayHtml.push(`<div class="code-line">${sp}else:</div>`);
+        generateBlock(noEdge.to, indent + 1, mergeNode, inLoop);
+    }
+}
         // Empty else (merge directly)
         else if (mergeNode && noEdge.to === mergeNode) {
             execCode.push(`${sp}else:`);
