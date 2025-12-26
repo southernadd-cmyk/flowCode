@@ -59,6 +59,8 @@
         <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode Pro <small class="text-muted">v3.0</small></span>
         <div class="d-flex gap-2">
             <button class="btn btn-success btn-sm px-4 fw-bold" onclick="App.runSim()"><i class="fa-solid fa-play me-1"></i> RUN</button>
+            <button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.saveDiagram()"><i class="fa-solid fa-download me-1"></i> Save</button>
+            <button class="btn btn-info btn-sm px-3 fw-bold" onclick="App.loadDiagram()"><i class="fa-solid fa-upload me-1"></i> Load</button>
             <button class="btn btn-outline-light btn-sm" onclick="App.clearCanvas()">Clear All</button>
         </div>
     </div>
@@ -73,7 +75,7 @@
             
             <div class="palette-header">Logic</div>
             <div class="palette-item" draggable="true" data-type="var">Variable</div>
-            <div class="palette-item" draggable="true" data-type="process">Math</div>
+            <div class="palette-item" draggable="true" data-type="process">Process</div>
             
             <div class="palette-header">I/O</div>
             <div class="palette-item" draggable="true" data-type="input">Input</div>
@@ -226,16 +228,38 @@ class FlowchartCompiler {
         // Get next node (default 'next' port)
         const nextNodeId = this.getSuccessor(nodeId, 'next');
         
-        // If we're in a loop context, check if next node is the loop header
+        // If we're in a loop context, check if next node is any loop header in the stack
         // If so, don't follow it (it's a back edge)
         if (contextStack.length > 0) {
-            const lastContext = contextStack[contextStack.length - 1];
-            if (lastContext.startsWith('loop_')) {
-                const loopHeaderId = lastContext.replace('loop_', '');
-                if (nextNodeId === loopHeaderId) {
-                    // This is a back edge to the loop header, stop here
+            for (const ctx of contextStack) {
+                if (ctx.startsWith('loop_')) {
+                    const loopHeaderId = ctx.replace('loop_', '');
+                    if (nextNodeId === loopHeaderId) {
+                        // This is a back edge to a loop header, stop here
+                        return code;
+                    }
+                }
+            }
+        }
+        
+        // Also check if next node is a decision that's already in the context stack
+        // This prevents infinite recursion when multiple loops share nodes
+        if (nextNodeId) {
+            const nextNode = this.nodes.find(n => n.id === nextNodeId);
+            if (nextNode && nextNode.type === 'decision') {
+                const isAlreadyInStack = contextStack.some(ctx => ctx === `loop_${nextNodeId}`);
+                if (isAlreadyInStack) {
+                    // This decision is already being compiled as a loop, don't follow it
                     return code;
                 }
+            }
+            
+            // Check if next node is already visited in current context to prevent cycles
+            // This is especially important for if/else branches that might loop back
+            const nextContextId = `${nextNodeId}_${contextStack.join('_')}_${indentLevel}`;
+            if (visitedInPath.has(nextContextId)) {
+                // This node is already being compiled in this context, stop to prevent cycle
+                return code;
             }
         }
         
@@ -264,8 +288,64 @@ class FlowchartCompiler {
         
         // Check if this decision is a loop header
         // Check both YES and NO branches - either can form a loop
-        const isLoopYes = this.isLoopHeader(node.id, yesId);
-        const isLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
+        let isLoopYes = false;
+        let isLoopNo = false;
+        
+        // Check for loops, but be careful if we're in a loop context
+        const inLoopContext = contextStack.some(ctx => ctx.startsWith('loop_'));
+        
+        if (inLoopContext) {
+            // When in a loop context, be very conservative about detecting new loops
+            // Get the current loop's body start node
+            const currentLoopContext = contextStack.find(ctx => ctx.startsWith('loop_'));
+            if (currentLoopContext) {
+                const currentLoopId = currentLoopContext.replace('loop_', '');
+                const currentLoopNode = this.nodes.find(n => n.id === currentLoopId);
+                if (currentLoopNode) {
+                    // Find which branch is the loop body for the current loop
+                    const currentLoopYesId = this.getSuccessor(currentLoopId, 'yes');
+                    const currentLoopNoId = this.getSuccessor(currentLoopId, 'no');
+                    // Check cache first to avoid recursive calls
+                    const currentLoopCacheKeyYes = currentLoopYesId ? `${currentLoopId}_${currentLoopYesId}` : null;
+                    const currentLoopIsYesLoop = currentLoopCacheKeyYes && this.loopHeaderCache.has(currentLoopCacheKeyYes) 
+                        ? this.loopHeaderCache.get(currentLoopCacheKeyYes) 
+                        : (currentLoopYesId ? this.isLoopHeader(currentLoopId, currentLoopYesId) : false);
+                    const currentLoopBodyId = currentLoopIsYesLoop ? currentLoopYesId : currentLoopNoId;
+                    
+                    // If this decision's loop body would be the current loop's body start,
+                    // don't treat it as a loop - it's just part of the current loop's flow
+                    if (yesId === currentLoopBodyId || noId === currentLoopBodyId) {
+                        // This decision loops back to the current loop's body, don't treat as new loop
+                        isLoopYes = false;
+                        isLoopNo = false;
+                    } else {
+                        // Check if loop body nodes are already visited
+                        const currentContextStr = contextStack.join('_');
+                        const visitedInCurrentContext = new Set();
+                        for (const visitedKey of visitedInPath) {
+                            if (visitedKey.includes(`_${currentContextStr}_`) || visitedKey.endsWith(`_${currentContextStr}`)) {
+                                const parts = visitedKey.split('_');
+                                if (parts.length > 0) {
+                                    visitedInCurrentContext.add(parts[0]);
+                                }
+                            }
+                        }
+                        
+                        if (yesId && !visitedInCurrentContext.has(yesId)) {
+                            isLoopYes = this.isLoopHeader(node.id, yesId);
+                        }
+                        if (noId && !visitedInCurrentContext.has(noId)) {
+                            isLoopNo = this.isLoopHeader(node.id, noId);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Not in a loop context, safe to check normally
+            isLoopYes = this.isLoopHeader(node.id, yesId);
+            isLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
+        }
+        
         const isLoop = isLoopYes || isLoopNo;
         
         if (isLoop) {
@@ -289,6 +369,7 @@ class FlowchartCompiler {
  */
 isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
     if (!yesId) return false; // No YES branch means no loop
+    if (depth > maxDepth) return false; // Prevent infinite recursion
     
     // Check cache first to avoid repeated expensive checks
     const cacheKey = `${nodeId}_${yesId}`;
@@ -430,6 +511,8 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
             code += bodyCode || `${indent}    pass\n`;
             
             // Handle loop exit
+            // Use original visited set (not the loop body's visited set) for the exit path
+            // This allows proper compilation of nodes after the loop
             if (exitId) {
                 code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
@@ -666,25 +749,37 @@ findIncrementNodeBFS(startId, stopId, varName) {
             const hasBackEdge = outgoing.some(conn => 
                 conn.targetId === loopHeaderId && (conn.port === 'next' || conn.port === 'yes'));
             
-            if (hasBackEdge) {
+            // Also check if next node is any loop header in the context stack
+            const nextId = this.getSuccessor(currentId, 'next');
+            let isBackEdgeToAnyLoop = false;
+            if (nextId && contextStack.length > 0) {
+                for (const ctx of contextStack) {
+                    if (ctx.startsWith('loop_')) {
+                        const ctxLoopHeaderId = ctx.replace('loop_', '');
+                        if (nextId === ctxLoopHeaderId) {
+                            isBackEdgeToAnyLoop = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (hasBackEdge || isBackEdgeToAnyLoop) {
                 // Compile this node but don't follow the back edge
                 // We need to compile just this node's code without following its 'next' connection
-                const node = this.nodes.find(n => n.id === currentId);
-                if (node) {
-                    const indent = "    ".repeat(indentLevel);
-                    switch (node.type) {
-                        case 'output':
-                            code += `${indent}print(${node.text})\n`;
-                            break;
-                        case 'input':
-                            const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
-                            code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
-                            if (node.dtype === 'int') code = code.trimEnd() + ")\n";
-                            break;
-                        default:
-                            if (node.text) code += `${indent}${node.text}\n`;
-                            break;
-                    }
+                const indent = "    ".repeat(indentLevel);
+                switch (node.type) {
+                    case 'output':
+                        code += `${indent}print(${node.text})\n`;
+                        break;
+                    case 'input':
+                        const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
+                        code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
+                        if (node.dtype === 'int') code = code.trimEnd() + ")\n";
+                        break;
+                    default:
+                        if (node.text) code += `${indent}${node.text}\n`;
+                        break;
                 }
                 break;
             }
@@ -694,7 +789,6 @@ findIncrementNodeBFS(startId, stopId, varName) {
             code += nodeCode;
             
             // Move to next node, but check if it's the loop header first
-            const nextId = this.getSuccessor(currentId, 'next');
             if (nextId === loopHeaderId) {
                 // Next node is the loop header, stop here
                 break;
@@ -715,6 +809,9 @@ findIncrementNodeBFS(startId, stopId, varName) {
         // Compile if branch
         const ifContext = [...contextStack, `if_${node.id}`];
         const ifVisited = new Set([...visitedInPath]);
+        // Mark the decision node as visited in if context to prevent cycles back to it
+        const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
+        ifVisited.add(ifDecisionContextId);
         const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
         code += ifCode || `${indent}    pass\n`;
         
@@ -726,9 +823,13 @@ findIncrementNodeBFS(startId, stopId, varName) {
                 // It's an elif chain
                 code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
             } else {
-                // Regular else
+                // Regular else - use fresh visited set but mark decision as visited
+                const elseContext = [...contextStack, `else_${node.id}`];
+                const elseVisited = new Set([...visitedInPath]);
+                const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
+                elseVisited.add(elseDecisionContextId);
                 code += `${indent}else:\n`;
-                const elseCode = this.compileNode(noId, visitedInPath, contextStack, indentLevel + 1);
+                const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
                 code += elseCode || `${indent}    pass\n`;
             }
         }
@@ -953,10 +1054,17 @@ const App = {
     },
 
     updateCode() {
-        const comp = new FlowchartCompiler(this.nodes, this.connections, false);
-        const execComp = new FlowchartCompiler(this.nodes, this.connections, true);
-        document.getElementById('code-python').innerText = comp.compile();
-        this.fullExecCode = execComp.compile();
+        try {
+            const comp = new FlowchartCompiler(this.nodes, this.connections, false);
+            const execComp = new FlowchartCompiler(this.nodes, this.connections, true);
+            const code = comp.compile();
+            document.getElementById('code-python').innerText = code;
+            this.fullExecCode = execComp.compile();
+        } catch (error) {
+            console.error('Compilation error:', error);
+            document.getElementById('code-python').innerText = `# Compilation Error: ${error.message}\n# Check console for details.`;
+            this.fullExecCode = "";
+        }
     },
 
     async runSim() {
@@ -1104,6 +1212,92 @@ const App = {
             this.dragLine.style.display = 'block'; 
         };
         parent.appendChild(d);
+    },
+
+    saveDiagram() {
+        const diagram = {
+            nodes: this.nodes,
+            connections: this.connections,
+            version: "3.0"
+        };
+        
+        const json = JSON.stringify(diagram, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'flowchart.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
+
+    loadDiagram() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const diagram = JSON.parse(event.target.result);
+                    
+                    // Validate the diagram structure
+                    if (!diagram.nodes || !Array.isArray(diagram.nodes)) {
+                        alert('Invalid diagram file: missing nodes array');
+                        return;
+                    }
+                    if (!diagram.connections || !Array.isArray(diagram.connections)) {
+                        alert('Invalid diagram file: missing connections array');
+                        return;
+                    }
+                    
+                    // Clear current canvas
+                    this.nodes = [];
+                    this.connections = [];
+                    this.selectedNodeId = null;
+                    document.getElementById('nodes-layer').innerHTML = "";
+                    document.getElementById('code-python').innerText = "";
+                    document.getElementById('console').innerHTML = "";
+                    
+                    // Restore nodes
+                    this.nextId = 1;
+                    diagram.nodes.forEach(node => {
+                        // Update nextId to avoid ID conflicts
+                        const nodeNum = parseInt(node.id.replace('n', '')) || 0;
+                        if (nodeNum >= this.nextId) {
+                            this.nextId = nodeNum + 1;
+                        }
+                        this.nodes.push(node);
+                        this.renderNode(node);
+                    });
+                    
+                    // Restore connections
+                    this.connections = diagram.connections;
+                    
+                    // Redraw everything
+                    this.drawConns();
+                    
+                    // Update code with error handling
+                    try {
+                        this.updateCode();
+                    } catch (compileError) {
+                        console.error('Compilation error after load:', compileError);
+                        document.getElementById('code-python').innerText = `# Error compiling loaded diagram: ${compileError.message}`;
+                    }
+                } catch (error) {
+                    alert('Error loading diagram: ' + error.message);
+                    console.error('Load error:', error);
+                    console.error('Stack:', error.stack);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     },
 
     clearCanvas() { 
