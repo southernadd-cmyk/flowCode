@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode</title>
+    <title>FlowCode Pro | Stable v3.0</title>
 
     <!-- LIBS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -56,7 +56,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v0.95</small></span>
+        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode Pro <small class="text-muted">v3.0</small></span>
         <div class="d-flex gap-2">
             <button class="btn btn-success btn-sm px-4 fw-bold" onclick="App.runSim()"><i class="fa-solid fa-play me-1"></i> RUN</button>
             <button class="btn btn-outline-light btn-sm" onclick="App.clearCanvas()">Clear All</button>
@@ -116,13 +116,17 @@ class FlowchartCompiler {
         // Build adjacency maps for faster lookups
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
+        this.loopHeaderCache = new Map(); // Cache for loop header detection
         this.buildMaps();
     }
 
     buildMaps() {
-        // Clear maps
+        // Clear maps and cache
         this.outgoingMap.clear();
         this.incomingMap.clear();
+        if (this.loopHeaderCache) {
+            this.loopHeaderCache.clear();
+        }
         
         // Initialize maps for all nodes
         this.nodes.forEach(node => {
@@ -250,12 +254,27 @@ class FlowchartCompiler {
         const yesId = this.getSuccessor(node.id, 'yes');
         const noId = this.getSuccessor(node.id, 'no');
         
+        // If this decision node is already in the context stack as a loop, don't check again
+        // This prevents infinite recursion with nested loops
+        const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+        if (isAlreadyLoop) {
+            // This is already being compiled as a loop, treat it as a regular if/else to break recursion
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+        }
+        
         // Check if this decision is a loop header
-        const isLoop = this.isLoopHeader(node.id, yesId);
+        // Check both YES and NO branches - either can form a loop
+        const isLoopYes = this.isLoopHeader(node.id, yesId);
+        const isLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
+        const isLoop = isLoopYes || isLoopNo;
         
         if (isLoop) {
             // This is a loop header
-            return this.compileLoop(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+            // Use YES branch for the loop body (or NO if YES doesn't loop)
+            const loopBodyId = isLoopYes ? yesId : noId;
+            const exitId = isLoopYes ? noId : yesId;
+            const useNoBranch = !isLoopYes && isLoopNo; // If NO branch loops, we need to negate condition
+            return this.compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch);
         } else {
             // This is a regular if/else
             return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
@@ -268,11 +287,18 @@ class FlowchartCompiler {
 /**
  * Check if a decision node is a loop header by following all paths
  */
-isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 20) {
+isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
     if (!yesId) return false; // No YES branch means no loop
+    
+    // Check cache first to avoid repeated expensive checks
+    const cacheKey = `${nodeId}_${yesId}`;
+    if (this.loopHeaderCache.has(cacheKey)) {
+        return this.loopHeaderCache.get(cacheKey);
+    }
     
     // Check for direct loop: YES branch goes directly back to decision
     if (yesId === nodeId) {
+        this.loopHeaderCache.set(cacheKey, true);
         return true;
     }
     
@@ -284,16 +310,26 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 20) {
         
         // If YES branch directly connects back to decision
         if (fromId === yesId && toId === nodeId) {
+            this.loopHeaderCache.set(cacheKey, true);
             return true;
         }
     }
     
     // Use BFS to follow all paths from the YES branch
-    const queue = [yesId];
+    // Limit depth to prevent infinite recursion in complex graphs
+    const queue = [{ nodeId: yesId, depth: 0 }];
     const visited = new Set([nodeId]); // Start with decision node marked as visited
+    const maxSearchDepth = 100; // Limit search depth
     
     while (queue.length > 0) {
-        const currentId = queue.shift();
+        const current = queue.shift();
+        const currentId = current.nodeId;
+        const currentDepth = current.depth || 0;
+        
+        // Limit search depth to prevent infinite loops
+        if (currentDepth > maxSearchDepth) {
+            continue;
+        }
         
         // If we've already visited this node, skip it
         if (visited.has(currentId)) {
@@ -318,6 +354,7 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 20) {
             // CRITICAL CHECK: If this connection goes back to the decision node, it's a loop!
             // Check this FIRST, regardless of port type
             if (targetId === nodeId) {
+                this.loopHeaderCache.set(cacheKey, true);
                 return true;
             }
             
@@ -330,22 +367,24 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 20) {
             // 'no' branches typically exit the loop
             // BUT: if it's not a 'no' port, we should follow it to find the loop
             if (conn.port !== 'no') {
-                queue.push(targetId);
+                queue.push({ nodeId: targetId, depth: currentDepth + 1 });
             }
         }
     }
     
+    // Cache the result
+    this.loopHeaderCache.set(cacheKey, false);
     return false;
 }
     /**
      * Compile loop structure (while or for)
      */
-    compileLoop(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
+    compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
         const indent = "    ".repeat(indentLevel);
         let code = "";
         
-        // Try to detect if it's a for loop pattern
-        const forLoopInfo = this.detectForLoopPattern(node.id);
+        // Try to detect if it's a for loop pattern (only for YES branch loops)
+        const forLoopInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
         
         if (forLoopInfo) {
             // Compile as for loop
@@ -359,32 +398,40 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 20) {
             code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
             
             // Compile loop body (exclude the increment statement)
-            const bodyCode = this.compileLoopBody(node.id, yesId, forLoopInfo.incrementNodeId, 
+            const bodyCode = this.compileLoopBody(node.id, loopBodyId, forLoopInfo.incrementNodeId, 
                 visitedInPath, contextStack, indentLevel + 1);
             code += bodyCode || `${indent}    pass\n`;
             
-            // Handle loop exit (no branch)
-            if (noId) {
-                code += this.compileNode(noId, visitedInPath, contextStack, indentLevel);
+            // Handle loop exit
+            if (exitId) {
+                code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
             
             return code;
         } else {
             // Compile as while loop
-            code += `${indent}while ${node.text}:\n`;
+            // If NO branch loops, negate the condition
+            let condition = node.text;
+            if (useNoBranch) {
+                // Negate the condition: wrap in not() or invert operators
+                // Simple approach: wrap in not()
+                condition = `not (${node.text})`;
+            }
+            
+            code += `${indent}while ${condition}:\n`;
             
             // Push loop context
             const newContextStack = [...contextStack, `loop_${node.id}`];
             const newVisited = new Set([...visitedInPath]);
             
             // Compile loop body
-            const bodyCode = this.compileLoopBody(node.id, yesId, null, 
+            const bodyCode = this.compileLoopBody(node.id, loopBodyId, null, 
                 newVisited, newContextStack, indentLevel + 1);
             code += bodyCode || `${indent}    pass\n`;
             
-            // Handle loop exit (no branch)
-            if (noId) {
-                code += this.compileNode(noId, visitedInPath, contextStack, indentLevel);
+            // Handle loop exit
+            if (exitId) {
+                code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
             
             return code;
