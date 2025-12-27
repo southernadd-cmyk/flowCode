@@ -272,94 +272,45 @@ class FlowchartCompiler {
     /**
      * Compile decision node (could be if, while, or for)
      */
-    compileDecision(node, visitedInPath, contextStack, indentLevel) {
-        const indent = "    ".repeat(indentLevel);
-        
-        const yesId = this.getSuccessor(node.id, 'yes');
-        const noId = this.getSuccessor(node.id, 'no');
-        
-        // If this decision node is already in the context stack as a loop, don't check again
-        // This prevents infinite recursion with nested loops
-        const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
-        if (isAlreadyLoop) {
-            // This is already being compiled as a loop, treat it as a regular if/else to break recursion
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
-        }
-        
-        // Check if this decision is a loop header
-        // Check both YES and NO branches - either can form a loop
-        let isLoopYes = false;
-        let isLoopNo = false;
-        
-        // Check for loops, but be careful if we're in a loop context
-        const inLoopContext = contextStack.some(ctx => ctx.startsWith('loop_'));
-        
-        if (inLoopContext) {
-            // When in a loop context, be very conservative about detecting new loops
-            // Get the current loop's body start node
-            const currentLoopContext = contextStack.find(ctx => ctx.startsWith('loop_'));
-            if (currentLoopContext) {
-                const currentLoopId = currentLoopContext.replace('loop_', '');
-                const currentLoopNode = this.nodes.find(n => n.id === currentLoopId);
-                if (currentLoopNode) {
-                    // Find which branch is the loop body for the current loop
-                    const currentLoopYesId = this.getSuccessor(currentLoopId, 'yes');
-                    const currentLoopNoId = this.getSuccessor(currentLoopId, 'no');
-                    // Check cache first to avoid recursive calls
-                    const currentLoopCacheKeyYes = currentLoopYesId ? `${currentLoopId}_${currentLoopYesId}` : null;
-                    const currentLoopIsYesLoop = currentLoopCacheKeyYes && this.loopHeaderCache.has(currentLoopCacheKeyYes) 
-                        ? this.loopHeaderCache.get(currentLoopCacheKeyYes) 
-                        : (currentLoopYesId ? this.isLoopHeader(currentLoopId, currentLoopYesId) : false);
-                    const currentLoopBodyId = currentLoopIsYesLoop ? currentLoopYesId : currentLoopNoId;
-                    
-                    // If this decision's loop body would be the current loop's body start,
-                    // don't treat it as a loop - it's just part of the current loop's flow
-                    if (yesId === currentLoopBodyId || noId === currentLoopBodyId) {
-                        // This decision loops back to the current loop's body, don't treat as new loop
-                        isLoopYes = false;
-                        isLoopNo = false;
-                    } else {
-                        // Check if loop body nodes are already visited
-                        const currentContextStr = contextStack.join('_');
-                        const visitedInCurrentContext = new Set();
-                        for (const visitedKey of visitedInPath) {
-                            if (visitedKey.includes(`_${currentContextStr}_`) || visitedKey.endsWith(`_${currentContextStr}`)) {
-                                const parts = visitedKey.split('_');
-                                if (parts.length > 0) {
-                                    visitedInCurrentContext.add(parts[0]);
-                                }
-                            }
-                        }
-                        
-                        if (yesId && !visitedInCurrentContext.has(yesId)) {
-                            isLoopYes = this.isLoopHeader(node.id, yesId);
-                        }
-                        if (noId && !visitedInCurrentContext.has(noId)) {
-                            isLoopNo = this.isLoopHeader(node.id, noId);
-                        }
-                    }
-                }
-            }
-        } else {
-            // Not in a loop context, safe to check normally
-            isLoopYes = this.isLoopHeader(node.id, yesId);
-            isLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
-        }
-        
-        const isLoop = isLoopYes || isLoopNo;
-        
-        if (isLoop) {
-            // This is a loop header
-            // Use YES branch for the loop body (or NO if YES doesn't loop)
-            const loopBodyId = isLoopYes ? yesId : noId;
-            const exitId = isLoopYes ? noId : yesId;
-            const useNoBranch = !isLoopYes && isLoopNo; // If NO branch loops, we need to negate condition
-            return this.compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch);
-        } else {
-            // This is a regular if/else
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
-        }
+    /**
+ * Compile decision node (could be if, while, or for)
+ */
+compileDecision(node, visitedInPath, contextStack, indentLevel) {
+    const yesId = this.getSuccessor(node.id, 'yes');
+    const noId  = this.getSuccessor(node.id, 'no');
+
+    // If this decision node is *already* in a loop context,
+    // just treat it as a normal if/else to avoid re-creating the loop.
+    const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+    if (isAlreadyLoop) {
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
     }
+
+    // Simple loop detection: does this branch eventually lead back to me?
+    const isLoopYes = this.isLoopHeader(node.id, yesId);
+    const isLoopNo  = noId ? this.isLoopHeader(node.id, noId) : false;
+    const isLoop    = isLoopYes || isLoopNo;
+
+    if (isLoop) {
+        // YES or NO branch is the loop body
+        const loopBodyId  = isLoopYes ? yesId : noId;
+        const exitId      = isLoopYes ? noId  : yesId;
+        const useNoBranch = !isLoopYes && isLoopNo;  // loop on "no" branch => negate condition
+
+        return this.compileLoop(
+            node,
+            loopBodyId,
+            exitId,
+            visitedInPath,
+            contextStack,
+            indentLevel,
+            useNoBranch
+        );
+    } else {
+        // Plain if/else
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+    }
+}
 
     /**
      * Check if a decision node is a loop header
@@ -802,80 +753,114 @@ findIncrementNodeBFS(startId, stopId, varName) {
     /**
      * Compile if/else statement with support for elif
      */
-    compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
-        const indent = "    ".repeat(indentLevel);
-        let code = `${indent}if ${node.text}:\n`;
-        
-        // Compile if branch
-        const ifContext = [...contextStack, `if_${node.id}`];
-        const ifVisited = new Set([...visitedInPath]);
-        // Mark the decision node as visited in if context to prevent cycles back to it
-        const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
-        ifVisited.add(ifDecisionContextId);
-        const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
-        code += ifCode || `${indent}    pass\n`;
-        
-        // Handle else/elif
-        if (noId) {
-            // Check if the "no" branch starts with another decision (for elif)
-            const noNode = this.nodes.find(n => n.id === noId);
-            if (noNode && noNode.type === 'decision') {
-                // It's an elif chain
-                code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
-            } else {
-                // Regular else - use fresh visited set but mark decision as visited
+   /**
+ * Compile if/else statement with support for elif
+ */
+compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
+    const indent = "    ".repeat(indentLevel);
+    let code = `${indent}if ${node.text}:\n`;
+
+    // ----- IF BRANCH -----
+    const ifContext = [...contextStack, `if_${node.id}`];
+    const ifVisited = new Set(visitedInPath);
+    const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
+    ifVisited.add(ifDecisionContextId);
+
+    const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
+    code += ifCode || `${indent}    pass\n`;
+
+    // ----- ELSE / ELIF -----
+    if (noId) {
+        const noNode = this.nodes.find(n => n.id === noId);
+
+        if (noNode && noNode.type === 'decision') {
+            // Check if this "else" decision is itself a loop header.
+            // If it is, we MUST NOT turn it into an elif chain, or we get
+            // exactly the infinite recursion you’re seeing.
+            const yesOfNo        = this.getSuccessor(noNode.id, 'yes');
+            const noBranchIsLoop = this.isLoopHeader(noNode.id, yesOfNo);
+
+            if (noBranchIsLoop) {
+                // Treat it as a plain else: block, whose contents happen
+                // to start with another while-loop decision.
                 const elseContext = [...contextStack, `else_${node.id}`];
-                const elseVisited = new Set([...visitedInPath]);
+                const elseVisited = new Set(visitedInPath);
                 const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
                 elseVisited.add(elseDecisionContextId);
+
                 code += `${indent}else:\n`;
                 const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
                 code += elseCode || `${indent}    pass\n`;
+            } else {
+                // Safe to treat as an elif chain
+                code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
             }
+        } else {
+            // Simple else branch (no decision node at the top)
+            const elseContext = [...contextStack, `else_${node.id}`];
+            const elseVisited = new Set(visitedInPath);
+            const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
+            elseVisited.add(elseDecisionContextId);
+
+            code += `${indent}else:\n`;
+            const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
+            code += elseCode || `${indent}    pass\n`;
         }
-        
-        return code;
     }
+
+    return code;
+}
 
     /**
      * Handle elif chains
      */
-    compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
-        let code = "";
-        const indent = "    ".repeat(indentLevel);
-        
-        let currentElif = elifNode;
-        while (currentElif && currentElif.type === 'decision') {
-            const elifYesId = this.getSuccessor(currentElif.id, 'yes');
-            const elifNoId = this.getSuccessor(currentElif.id, 'no');
-            
-            code += `${indent}elif ${currentElif.text}:\n`;
-            
-            // Compile elif body
-            const elifContext = [...contextStack, `elif_${currentElif.id}`];
-            const elifVisited = new Set([...visitedInPath]);
-            const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1);
-            code += elifCode || `${indent}    pass\n`;
-            
-            // Check if next is another decision (more elif) or something else (else)
-            if (elifNoId) {
-                const nextNode = this.nodes.find(n => n.id === elifNoId);
-                if (nextNode && nextNode.type === 'decision') {
-                    currentElif = nextNode;
-                } else {
-                    // It's an else block
-                    code += `${indent}else:\n`;
-                    const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1);
-                    code += elseCode || `${indent}    pass\n`;
-                    break;
-                }
-            } else {
-                break;
-            }
+/**
+ * Handle elif chains safely (no infinite A ↔ B bouncing)
+ */
+ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
+    let code = "";
+    const indent = "    ".repeat(indentLevel);
+
+    let currentElif = elifNode;
+    const seen = new Set();   // prevent the same decision reappearing in the chain
+
+    while (currentElif && currentElif.type === 'decision') {
+        // Stop if we’ve already emitted this decision in the chain
+        if (seen.has(currentElif.id)) break;
+        seen.add(currentElif.id);
+
+        const elifYesId = this.getSuccessor(currentElif.id, 'yes');
+        const elifNoId  = this.getSuccessor(currentElif.id, 'no');
+
+        code += `${indent}elif ${currentElif.text}:\n`;
+
+        const elifContext = [...contextStack, `elif_${currentElif.id}`];
+        const elifVisited = new Set(visitedInPath);
+
+        const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1);
+        code += elifCode || `${indent}    pass\n`;
+
+        if (!elifNoId) break;
+
+        const nextNode = this.nodes.find(n => n.id === elifNoId);
+
+        // Another elif in the chain?
+        if (nextNode && nextNode.type === 'decision') {
+            currentElif = nextNode;
+            continue;
         }
-        
-        return code;
+
+        // Final else clause
+        code += `${indent}else:\n`;
+        const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1);
+        code += elseCode || `${indent}    pass\n`;
+
+        break;
     }
+
+    return code;
+}
+
 }
 
 const App = {
