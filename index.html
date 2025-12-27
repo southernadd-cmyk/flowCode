@@ -414,7 +414,7 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
     compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
         const indent = "    ".repeat(indentLevel);
         let code = "";
-        
+
         // Try to detect if it's a for loop pattern (only for YES branch loops)
         const forLoopInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
         
@@ -428,11 +428,19 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
             rangeStr += ')';
             
             code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
+            if (this.useHighlighting) {
+    code += `${indent}    highlight('${node.id}')\n`;
+}
             
             // Compile loop body (exclude the increment statement)
-            const bodyCode = this.compileLoopBody(node.id, loopBodyId, forLoopInfo.incrementNodeId, 
-                visitedInPath, contextStack, indentLevel + 1);
-            code += bodyCode || `${indent}    pass\n`;
+// compile loop body normally so highlight runs every iteration
+const forBodyContext = [...contextStack, `loop_${node.id}`];
+const forVisited = new Set();  // fresh per-loop context
+
+code +=
+    this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
+    || `${indent}    pass\n`;
+
             
             // Handle loop exit
             if (exitId) {
@@ -451,15 +459,22 @@ isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
             }
             
             code += `${indent}while ${condition}:\n`;
-            
+            if (this.useHighlighting) {
+    code += `${indent}    highlight('${node.id}')\n`;
+}
             // Push loop context
             const newContextStack = [...contextStack, `loop_${node.id}`];
             const newVisited = new Set([...visitedInPath]);
             
             // Compile loop body
-            const bodyCode = this.compileLoopBody(node.id, loopBodyId, null, 
-                newVisited, newContextStack, indentLevel + 1);
-            code += bodyCode || `${indent}    pass\n`;
+// compile loop body with normal compiler — highlight works per-iteration
+const whileBodyContext = [...contextStack, `loop_${node.id}`];
+const whileVisited = new Set();  // do NOT reuse visitedInPath here
+
+code +=
+    this.compileNode(loopBodyId, whileVisited, whileBodyContext, indentLevel + 1)
+    || `${indent}    pass\n`;
+
             
             // Handle loop exit
             // Use original visited set (not the loop body's visited set) for the exit path
@@ -686,6 +701,12 @@ findIncrementNodeBFS(startId, stopId, varName) {
         const visitedInLoop = new Set([...visitedInPath]);
         
         while (currentId && currentId !== loopHeaderId) {
+            // >>> ALWAYS highlight loop body nodes <<<
+        if (this.useHighlighting) {
+            const indentHL = "    ".repeat(indentLevel);
+            code += `${indentHL}highlight('${currentId}')\n`;
+        }
+
             // Check if we should skip this node (for increment in for loops)
             if (currentId === skipNodeId) {
                 currentId = this.getSuccessor(currentId, 'next');
@@ -718,11 +739,19 @@ findIncrementNodeBFS(startId, stopId, varName) {
             if (hasBackEdge || isBackEdgeToAnyLoop) {
                 // Compile this node but don't follow the back edge
                 // We need to compile just this node's code without following its 'next' connection
-                const indent = "    ".repeat(indentLevel);
-                switch (node.type) {
-                    case 'output':
-                        code += `${indent}print(${node.text})\n`;
-                        break;
+               // Compile this node but don't follow the back edge
+            const indent = "    ".repeat(indentLevel);
+
+
+            if (this.useHighlighting) {
+                code += `${indent}highlight('${node.id}')\n`;
+            }
+
+            switch (node.type) {
+                case 'output':
+                    code += `${indent}print(${node.text})\n`;
+                    break;
+
                     case 'input':
                         const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
                         code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
@@ -736,8 +765,15 @@ findIncrementNodeBFS(startId, stopId, varName) {
             }
             
             // Compile the node
+// Always highlight body nodes
+            if (this.useHighlighting) {
+                code += `${"    ".repeat(indentLevel)}highlight('${currentId}')\n`;
+            }
+
+            // Compile the node normally
             const nodeCode = this.compileNode(currentId, visitedInLoop, contextStack, indentLevel, true);
             code += nodeCode;
+
             
             // Move to next node, but check if it's the loop header first
             if (nextId === loopHeaderId) {
@@ -1059,13 +1095,19 @@ const App = {
         document.getElementById('console').innerHTML = ">>> Running...\n";
         
         // Define highlight function for Skulpt
-        Sk.builtins.highlight = (id) => {
-            const nid = (typeof id === "string") ? id : id.v;
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-            document.getElementById(nid)?.classList.add('running');
-            const d = 2100 - document.getElementById('speed-slider').value;
-            return new Sk.misceval.promiseToSuspension(new Promise(r => setTimeout(r, d)));
-        };
+        Sk.builtins.highlight = new Sk.builtin.func(function (id) {
+    const nid = (typeof id === "string") ? id : id.v;
+
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    document.getElementById(nid)?.classList.add('running');
+
+    const delay = 2100 - document.getElementById('speed-slider').value;
+
+    return new Sk.misceval.promiseToSuspension(
+        new Promise(resolve => setTimeout(resolve, delay))
+    );
+});
+
         
         try { 
             await Sk.misceval.asyncToPromise(() => 
