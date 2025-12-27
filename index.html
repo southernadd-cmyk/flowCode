@@ -67,6 +67,20 @@
             <button class="btn btn-success btn-sm px-4 fw-bold" onclick="App.runSim()"><i class="fa-solid fa-play me-1"></i> RUN</button>
             <button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.saveDiagram()"><i class="fa-solid fa-download me-1"></i> Save</button>
             <button class="btn btn-info btn-sm px-3 fw-bold" onclick="App.loadDiagram()"><i class="fa-solid fa-upload me-1"></i> Load</button>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-sm dropdown-toggle fw-bold" data-bs-toggle="dropdown">
+                  Examples
+                </button>
+              
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Max of Three</a></li>
+                  <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Two Loops</a></li>
+                  <li><a class="dropdown-item" onclick="App.loadExampleFromFile('whileloop.json')">While Loop</a></li>
+                  <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
+                  <li><a class="dropdown-item" onclick="App.loadExampleFromFile('spaghettiLoop.json')">Spaghetti Loop</a></li>
+                </ul>
+              </div>
+              
             <button class="btn btn-outline-light btn-sm" onclick="App.clearCanvas()">Clear All</button>
         </div>
     </div>
@@ -918,6 +932,63 @@ viewportX: 0,
 viewportY: 0,
 minScale: 0.3,
 maxScale: 2.5,
+
+async loadExampleFromFile(filename) {
+    try {
+        const res = await fetch(`flows/${filename}`);
+        if (!res.ok) {
+            alert(`Could not load ${filename}`);
+            return;
+        }
+
+        const diagram = await res.json();
+        this.loadDiagramObject(diagram);
+
+    } catch (err) {
+        console.error(err);
+        alert("Error loading example file");
+    }
+},
+loadDiagramObject(diagram) {
+    if (!diagram.nodes || !Array.isArray(diagram.nodes)) {
+        alert("Invalid diagram file (missing nodes)");
+        return;
+    }
+
+    if (!diagram.connections || !Array.isArray(diagram.connections)) {
+        alert("Invalid diagram file (missing connections)");
+        return;
+    }
+
+    // reset
+    this.nodes = [];
+    this.connections = [];
+    this.selectedNodeId = null;
+
+    document.getElementById('nodes-layer').innerHTML = "";
+    document.getElementById('console').innerHTML = "";
+    document.getElementById('code-python').innerText = "";
+
+    this.nextId = 1;
+
+    // restore nodes
+    diagram.nodes.forEach(node => {
+        const num = parseInt(node.id.replace("n", "")) || 0;
+        if (num >= this.nextId) this.nextId = num + 1;
+
+        this.nodes.push(node);
+        this.renderNode(node);
+    });
+
+    // restore connections
+    this.connections = diagram.connections;
+
+    this.drawConns();
+    this.updateCode();
+
+    if (this.resetView) this.resetView();
+},
+
 zoomIn() {
     this.viewportScale = Math.min(this.maxScale, this.viewportScale * 1.2);
     this.applyViewportTransform();
@@ -1287,11 +1358,15 @@ window.addEventListener("pointerup", () => {
                     <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
                     <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>String</option>
                 </select>`;
-        } else {
-            body.innerHTML = `
-                <label class="small fw-bold">Code Text</label>
-                <input id="edit-generic-text" class="form-control" value="${node.text}">`;
-        }
+            } else {
+    body.innerHTML = `
+        <label class="small fw-bold">Code Text</label>
+        <input id="edit-generic-text" class="form-control">
+    `;
+
+    // set value safely AFTER inserting the element
+    document.getElementById("edit-generic-text").value = node.text ?? "";
+}
         
         new bootstrap.Modal(document.getElementById('editModal')).show();
     },
