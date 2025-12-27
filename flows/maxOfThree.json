@@ -1,0 +1,34 @@
+{
+  "version": "3.0",
+  "nodes": [
+    {"id": "n1", "type": "start", "x": 200, "y": 40, "text": "Start"},
+
+    {"id": "n2", "type": "input", "x": 200, "y": 110, "text": "", "varName": "a", "prompt": "enter a", "dtype": "int"},
+    {"id": "n3", "type": "input", "x": 200, "y": 170, "text": "", "varName": "b", "prompt": "enter b", "dtype": "int"},
+    {"id": "n4", "type": "input", "x": 200, "y": 230, "text": "", "varName": "c", "prompt": "enter c", "dtype": "int"},
+
+    {"id": "n5", "type": "decision", "x": 200, "y": 300, "text": "a > b"},
+    {"id": "n6", "type": "decision", "x": 110, "y": 380, "text": "b > c"},
+    {"id": "n7", "type": "decision", "x": 290, "y": 380, "text": "a > c"},
+
+    {"id": "n8", "type": "output", "x": 60, "y": 470, "text": "\"b is the largest\""},
+    {"id": "n9", "type": "output", "x": 200, "y": 470, "text": "\"c is the largest\""},
+    {"id": "n10", "type": "output", "x": 340, "y": 470, "text": "\"a is the largest\""}
+  ],
+
+  "connections": [
+    {"from": "n1", "to": "n2", "port": "next"},
+    {"from": "n2", "to": "n3", "port": "next"},
+    {"from": "n3", "to": "n4", "port": "next"},
+    {"from": "n4", "to": "n5", "port": "next"},
+
+    {"from": "n5", "to": "n6", "port": "no"},
+    {"from": "n5", "to": "n7", "port": "yes"},
+
+    {"from": "n6", "to": "n8", "port": "yes"},
+    {"from": "n6", "to": "n9", "port": "no"},
+
+    {"from": "n7", "to": "n10", "port": "yes"},
+    {"from": "n7", "to": "n9", "port": "no"}
+  ]
+}
