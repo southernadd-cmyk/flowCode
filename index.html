@@ -128,8 +128,81 @@
 <!-- INPUT MODAL -->
 <div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body p-4"><h6 id="modal-prompt" class="fw-bold mb-3">Input:</h6><input type="text" id="modal-field" class="form-control mb-3"><button class="btn btn-primary w-100 fw-bold" id="modal-submit">Continue</button></div></div></div></div>
 <div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header py-2 bg-light"><h6 class="modal-title fw-bold">Edit Node</h6></div><div class="modal-body" id="edit-modal-body"></div><div class="modal-footer py-2 bg-light"><button class="btn btn-primary btn-sm px-4 fw-bold" id="save-node-btn">Save Changes</button></div></div></div></div>
-
+<!-- WELCOME / INSTRUCTIONS MODAL -->
+<div class="modal fade" id="welcomeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+  
+        <div class="modal-header bg-dark text-white py-2">
+          <h5 class="modal-title fw-bold">Welcome to FlowCode Pro</h5>
+        </div>
+  
+        <div class="modal-body">
+          <p><strong>FlowCode Pro</strong> lets you build <em>flowcharts that actually run</em> and automatically generate Python code.</p>
+  
+          <h6 class="fw-bold mt-3">How to use</h6>
+          <ol>
+            <li>Drag blocks from the palette onto the canvas</li>
+            <li>Connect them using the small circles (ports)</li>
+            <li>Double-click a block to edit text / conditions / variables</li>
+            <li>Click <strong>RUN</strong> to execute the flowchart step-by-step</li>
+            <li>See the generated Python on the right</li>
+          </ol>
+  
+          <h6 class="fw-bold mt-3">Supported features</h6>
+          <ul>
+            <li>Input / Output</li>
+            <li>Variables and processes</li>
+            <li>If / Elif / Else</li>
+            <li>While and For loops (auto-detected)</li>
+          </ul>
+  
+          <h6 class="fw-bold mt-3">Tips</h6>
+          <ul>
+            <li>Green arrows = YES paths</li>
+            <li>Red arrows = NO paths</li>
+            <li>Start block is required</li>
+            <li>Save → JSON you can reload later</li>
+          </ul>
+  
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="dontShowAgainCheck">
+            <label class="form-check-label" for="dontShowAgainCheck">
+              Don’t show this again
+            </label>
+          </div>
+        </div>
+  
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-primary fw-bold" id="welcomeCloseBtn">Get Started</button>
+        </div>
+  
+      </div>
+    </div>
+  </div>
+  
 <script>
+
+    // Show welcome modal on first visit
+document.addEventListener("DOMContentLoaded", function () {
+
+// if user previously disabled it, don't show
+if (localStorage.getItem("hideWelcomeModal") === "true") return;
+
+const welcomeModal = new bootstrap.Modal(
+    document.getElementById('welcomeModal')
+);
+
+welcomeModal.show();
+
+document.getElementById("welcomeCloseBtn").onclick = function () {
+    if (document.getElementById("dontShowAgainCheck").checked) {
+        localStorage.setItem("hideWelcomeModal", "true");
+    }
+    welcomeModal.hide();
+};
+});
+
 /**
  * ENHANCED FLOWCHART COMPILER
  * Handles nested loops, if/else, for/while loops, and complex structures
@@ -1140,49 +1213,97 @@ applyViewportTransform() {
     },
 
     drawConns() {
-        // Remove old connection labels
-        document.querySelectorAll('.conn-label').forEach(l => l.remove());
-        
-        // Clear and recreate SVG paths
-        const d = this.svgLayer.querySelector('defs'); 
-        this.svgLayer.innerHTML = ""; 
-        this.svgLayer.appendChild(d); 
-        this.svgLayer.appendChild(this.dragLine);
-        
-        this.connections.forEach(c => {
-            const p1 = this.getPortPos(c.from, c.port);
-            const p2 = this.getPortPos(c.to, 'in');
-            
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const midY = p1.y + (p2.y - p1.y) / 2;
-            
-            // Simple path: vertical from start, horizontal, vertical to end
-            let dStr = `M ${p1.x} ${p1.y} V ${midY} H ${p2.x} V ${p2.y}`;
-            
-            // Handle upward connections with an offset
-            if (p2.y < p1.y) {
-                const offsetX = p1.x > p2.x ? 70 : -70;
-                dStr = `M ${p1.x} ${p1.y} V ${p1.y + 20} H ${p1.x + offsetX} V ${p2.y - 20} H ${p2.x} V ${p2.y}`;
-            }
-            
-            path.setAttribute('d', dStr);
-            path.setAttribute('stroke', c.port === 'yes' ? '#16a34a' : (c.port === 'no' ? '#dc2626' : '#555'));
-            path.setAttribute('stroke-width', '2');
-            path.setAttribute('fill', 'none');
-            path.setAttribute('marker-end', 'url(#arrowhead)');
-            this.svgLayer.appendChild(path);
-            
-            // Add label for yes/no connections
-            if (c.port === 'yes' || c.port === 'no') {
-                const l = document.createElement('div');
-                l.className = 'conn-label';
-                l.innerText = c.port.toUpperCase();
-                l.style.left = (p1.x + 10) + 'px';
-                l.style.top = (p1.y + 10) + 'px';
-                this.nodesLayer.appendChild(l);
-            }
-        });
-    },
+
+// Remove old labels
+document.querySelectorAll('.conn-label').forEach(l => l.remove());
+
+// Reset SVG paths
+const d = this.svgLayer.querySelector('defs');
+this.svgLayer.innerHTML = "";
+this.svgLayer.appendChild(d);
+this.svgLayer.appendChild(this.dragLine);
+
+// Manhattan router
+function orthogonal(p1, p2) {
+
+    const GAP = 25;   // spacing away from shapes
+    const SIDE = 90;  // width for loopbacks
+
+    // ---------- NORMAL DOWNWARD FLOW ----------
+    if (p2.y >= p1.y) {
+
+        // go straight down a bit to clear node
+        const y1 = p1.y + GAP;
+
+        // midpoint between source and target
+        const midY = (y1 + p2.y - GAP) / 2;
+
+        return `
+            M ${p1.x} ${p1.y}
+            V ${y1}
+            V ${midY}
+            H ${p2.x}
+            V ${p2.y - GAP}
+            V ${p2.y}
+        `.replace(/\s+/g, ' ');
+    }
+
+    // ---------- LOOPBACK / TARGET ABOVE ----------
+    // route sideways, then up, then across
+    const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
+
+    return `
+        M ${p1.x} ${p1.y}
+        V ${p1.y + GAP}
+        H ${sideX}
+        V ${p2.y - GAP}
+        H ${p2.x}
+        V ${p2.y}
+    `.replace(/\s+/g, ' ');
+}
+
+// Draw each connection
+this.connections.forEach(c => {
+
+    const p1 = this.getPortPos(c.from, c.port);
+    const p2 = this.getPortPos(c.to, 'in');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    const dStr = orthogonal(p1, p2);
+
+    path.setAttribute('d', dStr);
+
+    // colors by port
+    path.setAttribute(
+        'stroke',
+        c.port === 'yes' ? '#16a34a' :
+        c.port === 'no'  ? '#dc2626' :
+                           '#444'
+    );
+
+    path.setAttribute('stroke-width', 2.5);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+
+    // tidy corners
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-linecap', 'round');
+
+    this.svgLayer.appendChild(path);
+
+    // YES / NO labels
+    if (c.port === 'yes' || c.port === 'no') {
+        const l = document.createElement('div');
+        l.className = 'conn-label';
+        l.innerText = c.port.toUpperCase();
+        l.style.left = (p1.x + 8) + 'px';
+        l.style.top  = (p1.y + 8) + 'px';
+        this.nodesLayer.appendChild(l);
+    }
+});
+}
+,
 
     updateCode() {
         try {
