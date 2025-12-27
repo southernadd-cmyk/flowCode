@@ -50,6 +50,12 @@
         .shape-decision .dot.out-yes { bottom: -6px; right: -6px; background: #16a34a; } 
         .shape-decision .dot.out-no { top: -6px; right: -6px; background: #dc2626; }
         .conn-label { position: absolute; font-size: 10px; font-weight: 800; background: white; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 3; pointer-events: none; }
+        
+        #nodes-layer, #connections-layer {
+            transform-origin: 0 0;
+        }
+
+    
     </style>
 </head>
 <body>
@@ -91,6 +97,11 @@
                 <path id="drag-line" stroke="#0d6efd" stroke-width="2" stroke-dasharray="4,4" fill="none" style="display:none;"></path>
             </svg>
             <div id="nodes-layer"></div>
+            <div id="zoom-controls" style="position:absolute; right:10px; bottom:10px; z-index:20;">
+                <button onclick="App.zoomIn()" class="btn btn-sm btn-light">+</button>
+                <button onclick="App.zoomOut()" class="btn btn-sm btn-light">−</button>
+                <button onclick="App.resetView()" class="btn btn-sm btn-light">Reset</button>
+            </div>
         </div>
         
         <div id="output-panel">
@@ -902,7 +913,33 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
 const App = {
     nodes: [], connections: [], nextId: 1, isRunning: false,
     isConnecting: false, connStart: null, fullExecCode: "",
-    editingNode: null, selectedNodeId: null,
+    editingNode: null, selectedNodeId: null,viewportScale: 1,
+viewportX: 0,
+viewportY: 0,
+minScale: 0.3,
+maxScale: 2.5,
+zoomIn() {
+    this.viewportScale = Math.min(this.maxScale, this.viewportScale * 1.2);
+    this.applyViewportTransform();
+},
+
+zoomOut() {
+    this.viewportScale = Math.max(this.minScale, this.viewportScale / 1.2);
+    this.applyViewportTransform();
+},
+
+resetView() {
+    this.viewportScale = 1;
+    this.viewportX = 0;
+    this.viewportY = 0;
+    this.applyViewportTransform();
+},
+
+applyViewportTransform() {
+    const t = `translate(${this.viewportX}px, ${this.viewportY}px) scale(${this.viewportScale})`;
+    this.nodesLayer.style.transform = t;
+    this.svgLayer.style.transform   = t;
+},
 
     init() {
         Sk.configure({ 
@@ -919,6 +956,8 @@ const App = {
         this.setupDragDrop();
         this.createNode('start', 50, 50);
         document.getElementById('save-node-btn').onclick = () => this.saveNodeEdit();
+        this.applyViewportTransform();
+
     },
 
     log(t) { 
@@ -1123,6 +1162,51 @@ const App = {
     },
 
     setupGlobalEvents() {
+
+        this.canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+
+    const scaleBefore = this.viewportScale;
+
+    if (e.deltaY < 0) this.viewportScale *= 1.1;
+    else this.viewportScale /= 1.1;
+
+    this.viewportScale = Math.min(this.maxScale, Math.max(this.minScale, this.viewportScale));
+
+    // zoom towards mouse pointer
+    const rect = this.canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    this.viewportX = mx - (mx - this.viewportX) * (this.viewportScale / scaleBefore);
+    this.viewportY = my - (my - this.viewportY) * (this.viewportScale / scaleBefore);
+
+    this.applyViewportTransform();
+}, { passive: false });
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+
+this.canvas.addEventListener("pointerdown", (e) => {
+    // only pan if clicking empty canvas background
+    if (e.target.id === "canvas" || e.target.id === "connections-layer") {
+        isPanning = true;
+        panStartX = e.clientX - this.viewportX;
+        panStartY = e.clientY - this.viewportY;
+    }
+});
+
+window.addEventListener("pointermove", (e) => {
+    if (!isPanning) return;
+    this.viewportX = e.clientX - panStartX;
+    this.viewportY = e.clientY - panStartY;
+    this.applyViewportTransform();
+});
+
+window.addEventListener("pointerup", () => {
+    isPanning = false;
+});
+
         window.onkeydown = (e) => {
             if ((e.key === "Delete" || e.key === "Backspace") && this.selectedNodeId) {
                 if (document.activeElement.tagName === "INPUT") return;
