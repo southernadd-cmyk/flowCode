@@ -120,6 +120,41 @@
         #nodes-layer, #connections-layer {
             transform-origin: 0 0;
         }
+/* LIST BLOCK STYLE */
+.shape-list {
+    width: 130px;
+    height: 45px;
+    border-radius: 6px;
+    background: var(--node-bg);
+    border: 2px solid var(--node-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+
+/* Optional visual identity (subtle blue accent stripe) */
+.shape-list::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: rgba(13, 110, 253, 0.35);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+/* highlight and selection reuse your existing behaviour */
+.shape-list .inner-text {
+    width: 100%;
+    transform: none;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+/* Running state inherits from .node.running automatically */
 
     
     </style>
@@ -177,6 +212,7 @@ onclick="App.stopSim()">
             
             <div class="palette-header">Logic</div>
             <div class="palette-item" draggable="true" data-type="var">Variable</div>
+            <div class="palette-item" draggable="true" data-type="list">List</div>
             <div class="palette-item" draggable="true" data-type="process">Process</div>
             
             <div class="palette-header">I/O</div>
@@ -1229,10 +1265,15 @@ this.svgLayer.appendChild(this.dragLine);
         let dtype = "int";
         
         switch(type) {
+            
     case 'start': text = 'Start'; break;
     case 'end':   text = 'End'; break;
     case 'decision': text = 'x < 10'; break;
     case 'var': text = 'x = 0'; break;
+    case 'list':
+    text = 'myList = []';
+    break;
+
     case 'output': text = 'x'; break;
     case 'process': text = 'x = x + 1'; break;
     case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
@@ -1704,6 +1745,92 @@ window.addEventListener("pointerup", () => {
             updatePreview();
         }, 0);
     }
+
+    else if (node.type === 'list') {
+
+// defaults
+let listName = "myList";
+let values = [];
+
+if (node.text && node.text.includes("=")) {
+    const parts = node.text.split("=");
+    listName = parts[0].trim();
+
+    // parse array literal
+    try {
+        values = JSON.parse(parts[1].trim().replace(/'/g,'"'));
+    } catch {
+        values = [];
+    }
+}
+
+const length = values.length || 3;
+
+// build initial element inputs
+let elementsHtml = "";
+for (let i = 0; i < length; i++) {
+    elementsHtml += `
+        <input class="form-control mb-1 list-element"
+               value="${values[i] ?? ''}"
+               placeholder="Element ${i}">
+    `;
+}
+
+body.innerHTML = `
+    <label class="small fw-bold">List name</label>
+    <input id="edit-list-name" class="form-control mb-2" value="${listName}">
+
+    <label class="small fw-bold">List length</label>
+    <input id="edit-list-length" type="number"
+           min="0" class="form-control mb-2" value="${length}">
+
+    <label class="small fw-bold">Elements</label>
+    <div id="list-elements-box">${elementsHtml}</div>
+
+    <div class="mt-2 small text-muted">
+        Preview:
+        <code id="list-preview"></code>
+    </div>
+`;
+
+// dynamic behaviour
+setTimeout(() => {
+
+    const listBox = document.getElementById("list-elements-box");
+
+    const rebuild = () => {
+        const len = parseInt(document.getElementById("edit-list-length").value) || 0;
+
+        listBox.innerHTML = "";
+        for (let i = 0; i < len; i++) {
+            listBox.innerHTML += `
+                <input class="form-control mb-1 list-element"
+                       placeholder="Element ${i}">
+            `;
+        }
+        updatePreview();
+    };
+
+    const updatePreview = () => {
+        const name = document.getElementById("edit-list-name").value || "myList";
+        const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+
+        const quoted = elems.map(v =>
+            isNaN(v) || v === "" ? `"${v}"` : v
+        );
+
+        document.getElementById("list-preview").innerText =
+            `${name} = [${quoted.join(", ")}]`;
+    };
+
+    document.getElementById("edit-list-length").oninput = rebuild;
+    document.getElementById("edit-list-name").oninput = updatePreview;
+    listBox.oninput = updatePreview;
+
+    updatePreview();
+}, 0);
+}
+
     else {
         body.innerHTML = `
             <label class="small fw-bold">Code Text</label>
@@ -1733,6 +1860,19 @@ saveNodeEdit() {
         const value = document.getElementById('edit-var-value').value || "0";
         n.text = `${name} = ${value}`;
     }
+    else if (n.type === 'list') {
+
+const name = document.getElementById("edit-list-name").value || "myList";
+
+const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+
+const formatted = elems.map(v =>
+    isNaN(v) || v === "" ? `"${v}"` : v
+);
+
+n.text = `${name} = [${formatted.join(", ")}]`;
+}
+
     else {
         n.text = document.getElementById('edit-generic-text').value;
     }
