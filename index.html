@@ -1205,10 +1205,13 @@ applyViewportTransform() {
         if (node.type === 'end') {
     el.classList.add('shape-start'); // same pill shape
 }
+// END node has only an input port — no outgoing
 if (node.type === 'end') {
-    this.nodesLayer.appendChild(el);
-    return;
+    // do NOT add outgoing dot
+} else {
+    this.addDot(el, 'out', 'next');
 }
+
         if (node.type === 'decision') { 
             this.addDot(el, 'out-yes', 'yes'); 
             this.addDot(el, 'out-no', 'no'); 
