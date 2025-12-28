@@ -137,6 +137,11 @@
             <div id="output-panel">
                 <div class="code-display" id="code-python"></div>
                 <div id="console"></div>
+                <div id="varwatch" style="height:160px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:13px; padding:10px; border-top:1px solid #333; background:#111; color:#0f0">
+                    <strong>Variable Watch</strong>
+                    <div id="varwatch-table"></div>
+                </div>
+                  
             </div>
         </div>
     </div>
@@ -170,7 +175,7 @@
                 <li>Input / Output</li>
                 <li>Variables and processes</li>
                 <li>If / Elif / Else</li>
-                <li>While and For loops (auto-detected, but requires a decision node to create a loop)</li>
+                <li>While and For loops (auto-detected)</li>
             </ul>
     
             <h6 class="fw-bold mt-3">Tips</h6>
@@ -1025,6 +1030,42 @@
     maxScale: 2.5,
     cancelExecution: false,
     skulptTask: null,
+    skModule: null,
+
+    updateVarWatch(varsObj) {
+    const div = document.getElementById("varwatch-table");
+    if (!div) return;
+
+    let html = "<table style='width:100%; border-collapse: collapse;'>";
+    let hasVars = false;
+
+    for (const key in varsObj) {
+        // Filter out internal Skulpt attributes and the highlight function itself
+        if (key.startsWith("__") || key === "highlight" || key === "input" || key === "print") continue;
+
+        let val = varsObj[key];
+        let displayVal = val;
+
+        // Safely unwrap Skulpt types
+        if (val !== null && typeof val === 'object') {
+            if (val.v !== undefined) {
+                displayVal = val.v; // Standard primitives
+            } else if (val.tp$name !== undefined) {
+                displayVal = `[${val.tp$name}]`; // Objects/Lists
+            }
+        }
+
+        html += `
+            <tr style="border-bottom: 1px solid #333;">
+                <td style="color: #888; padding: 4px; font-weight: bold;">${key}</td>
+                <td style="color: #0f0; padding: 4px; text-align: right;">${displayVal}</td>
+            </tr>`;
+        hasVars = true;
+    }
+
+    html += "</table>";
+    div.innerHTML = hasVars ? html : "<em>No variables set</em>";
+},
 
     stopSim() {
         if (!this.isRunning) return;
@@ -1379,60 +1420,56 @@
         },
 
         async runSim() {
-        if (this.isRunning) return;
+    if (this.isRunning) return;
 
-        this.isRunning = true;
-        this.cancelExecution = false;
+    this.isRunning = true;
+    this.cancelExecution = false;
 
-        document.getElementById('run-btn').style.display = "none";
-        document.getElementById('stop-btn').style.display = "inline-block";
+    document.getElementById('run-btn').style.display = "none";
+    document.getElementById('stop-btn').style.display = "inline-block";
+    document.getElementById('console').innerHTML = ">>> Running...\n";
+    
+    // Reset watch
+    this.updateVarWatch({});
 
-        document.getElementById('console').innerHTML = ">>> Running...\n";
+    // Define the highlight bridge
+    Sk.builtins.highlight = new Sk.builtin.func((id) => {
+        if (this.cancelExecution) throw new Error("Execution stopped.");
 
-        Sk.builtins.highlight = new Sk.builtin.func((id) => {
-            if (this.cancelExecution) {
-                throw new Error("Execution stopped.");
-            }
+        const nid = (typeof id === "string") ? id : id.v;
 
-            const nid = (typeof id === "string") ? id : id.v;
-
-            document.querySelectorAll('.node')
-                .forEach(n => n.classList.remove('running'));
-
-            document.getElementById(nid)?.classList.add('running');
-
-            const delay = 2100 - document.getElementById('speed-slider').value;
-
-            return new Sk.misceval.promiseToSuspension(
-                new Promise(resolve => setTimeout(resolve, delay))
-            );
-        });
-
-        try {
-            this.skulptTask = Sk.misceval.asyncToPromise(() =>
-                Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
-            );
-
-            await this.skulptTask;
-        }
-        catch (e) {
-            if (!this.cancelExecution) {
-                this.log(String(e));
-            }
-        }
-
-        this.isRunning = false;
-
+        // UI Update: Highlight Node
         document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+        const activeNode = document.getElementById(nid);
+        if (activeNode) activeNode.classList.add('running');
 
-        document.getElementById('run-btn').style.display = "inline-block";
-        document.getElementById('stop-btn').style.display = "none";
-
-        if (!this.cancelExecution) {
-            this.log("\n>>> Finished.");
+        // VARIABLE TRACKER LOGIC:
+        // Use Sk.globals to get the current state of user variables
+        if (Sk.globals) {
+            this.updateVarWatch(Sk.globals);
         }
+
+        const delay = 2100 - document.getElementById('speed-slider').value;
+        return new Sk.misceval.promiseToSuspension(
+            new Promise(resolve => setTimeout(resolve, delay))
+        );
+    });
+
+    try {
+        this.skulptTask = Sk.misceval.asyncToPromise(() =>
+            Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
+        );
+        await this.skulptTask;
+    } catch (e) {
+        if (!this.cancelExecution) this.log(String(e));
     }
-    ,
+
+    this.isRunning = false;
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    document.getElementById('run-btn').style.display = "inline-block";
+    document.getElementById('stop-btn').style.display = "none";
+    if (!this.cancelExecution) this.log("\n>>> Finished.");
+} ,
         setupGlobalEvents() {
 
             this.canvas.addEventListener("wheel", (e) => {
