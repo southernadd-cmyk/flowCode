@@ -1245,22 +1245,31 @@ if (node.type === 'end') {
     },
 
     getPortPos(id, type) {
-        const el = document.getElementById(id); 
-        if (!el) return {x:0, y:0};
-        
-        let dotClass = 'out';
-        if (type === 'yes') dotClass = 'out-yes';
-        else if (type === 'no') dotClass = 'out-no';
-        else if (type === 'in') dotClass = 'in';
-        
-        const dot = el.querySelector(`.dot.${dotClass}`);
-        if (!dot) return {x: el.offsetLeft + el.offsetWidth/2, y: el.offsetTop + el.offsetHeight/2};
-        
-        const r = dot.getBoundingClientRect();
-        const c = this.canvas.getBoundingClientRect();
-        return { x: r.left - c.left + 5, y: r.top - c.top + 5 };
-    },
+    const el = document.getElementById(id);
+    if (!el) return { x: 0, y: 0 };
 
+    let dotClass = 'out';
+    if (type === 'yes') dotClass = 'out-yes';
+    else if (type === 'no') dotClass = 'out-no';
+    else if (type === 'in') dotClass = 'in';
+
+    const dot = el.querySelector(`.dot.${dotClass}`);
+
+    const canvasRect = this.canvas.getBoundingClientRect();
+
+    // screen coords of the dot
+    const rect = (dot || el).getBoundingClientRect();
+
+    // raw pixel coords inside canvas
+    const rawX = rect.left - canvasRect.left + 5;
+    const rawY = rect.top  - canvasRect.top  + 5;
+
+    // ⬅️ CONVERT THROUGH INVERSE VIEWPORT TRANSFORM
+    const x = (rawX - this.viewportX) / this.viewportScale;
+    const y = (rawY - this.viewportY) / this.viewportScale;
+
+    return { x, y };
+},
     drawConns() {
 
 // Remove old labels
