@@ -505,97 +505,38 @@ compileDecision(node, visitedInPath, contextStack, indentLevel) {
 /**
  * Check if a decision node is a loop header by following all paths
  */
-isLoopHeader(nodeId, yesId, depth = 0, maxDepth = 50) {
-    if (!yesId) return false; // No YES branch means no loop
-    if (depth > maxDepth) return false; // Prevent infinite recursion
-    
-    // Check cache first to avoid repeated expensive checks
-    const cacheKey = `${nodeId}_${yesId}`;
-    if (this.loopHeaderCache.has(cacheKey)) {
-        return this.loopHeaderCache.get(cacheKey);
-    }
-    
-    // Check for direct loop: YES branch goes directly back to decision
-    if (yesId === nodeId) {
-        this.loopHeaderCache.set(cacheKey, true);
-        return true;
-    }
-    
-    // Also check raw connections array - sometimes maps might be stale
-    // Check if YES branch or any node reachable from YES connects back to decision
-    for (const conn of this.connections) {
-        const fromId = conn.from;
-        const toId = conn.to;
-        
-        // If YES branch directly connects back to decision
-        if (fromId === yesId && toId === nodeId) {
-            this.loopHeaderCache.set(cacheKey, true);
+ isLoopHeader(nodeId, branchId) {
+
+if (!branchId) return false;
+
+const MAX_DEPTH = 200;
+const visited = new Set();
+
+const dfs = (id, depth = 0) => {
+
+    if (!id) return false;
+    if (depth > MAX_DEPTH) return false;
+
+    // Real loop only if it comes back to THIS decision
+    if (id === nodeId) return true;
+
+    if (visited.has(id)) return false;
+    visited.add(id);
+
+    const outgoing = this.outgoingMap.get(id) || [];
+
+    for (const edge of outgoing) {
+        if (dfs(edge.targetId, depth + 1)) {
             return true;
         }
     }
-    
-    // Use BFS to follow all paths from the YES branch
-    // Limit depth to prevent infinite recursion in complex graphs
-    const queue = [{ nodeId: yesId, depth: 0 }];
-    const visited = new Set([nodeId]); // Start with decision node marked as visited
-    const maxSearchDepth = 100; // Limit search depth
-    
-    while (queue.length > 0) {
-        const current = queue.shift();
-        const currentId = current.nodeId;
-        const currentDepth = current.depth || 0;
-        
-        // Limit search depth to prevent infinite loops
-        if (currentDepth > maxSearchDepth) {
-            continue;
-        }
-        
-        // If we've already visited this node, skip it
-        if (visited.has(currentId)) {
-            continue;
-        }
-        visited.add(currentId);
-        
-        // Get all outgoing connections from current node
-        const outgoing = this.outgoingMap.get(currentId) || [];
-        
-        // Also check raw connections as a fallback
-        const rawConnections = this.connections.filter(c => c.from === currentId);
-        
-        // Combine both sources
-        const allConnections = outgoing.length > 0 ? outgoing : rawConnections;
-        
-        for (const conn of allConnections) {
-            // Get target ID - check both possible property names
-            const targetId = conn.targetId || conn.to;
-            if (!targetId) continue;
-            
-            // CRITICAL CHECK: If this connection goes back to the decision node, it's a loop!
-            // Check this FIRST, regardless of port type
-            if (targetId === nodeId) {
-                this.loopHeaderCache.set(cacheKey, true);
-                return true;
-            }
-            
-            // Skip if we've already visited this target
-            if (visited.has(targetId)) {
-                continue;
-            }
-            
-            // Follow forward connections (next, yes) but not 'no' branches
-            // 'no' branches typically exit the loop
-            // BUT: if it's not a 'no' port, we should follow it to find the loop
-            if (conn.port !== 'no') {
-                queue.push({ nodeId: targetId, depth: currentDepth + 1 });
-            }
-        }
-    }
-    
-    // Cache the result
-    this.loopHeaderCache.set(cacheKey, false);
+
     return false;
+};
+
+return dfs(branchId, 0);
 }
-    /**
+/**
      * Compile loop structure (while or for)
      */
     compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
