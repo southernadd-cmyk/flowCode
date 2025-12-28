@@ -36,20 +36,86 @@
         .node.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25); }
         .node.running { background-color: #dcfce7 !important; border-color: #16a34a !important; transform: scale(1.05); transition: 0.2s; box-shadow: 0 0 15px rgba(22, 163, 74, 0.4); }
         
-        .shape-start { width: 90px; height: 35px; border-radius: 20px; }
+        .shape-start, .shape-end { 
+    width: 90px; 
+    height: 35px; 
+    border-radius: 20px; 
+}   
         .shape-process, .shape-var { width: 110px; height: 45px; border-radius: 4px; }
-        .shape-decision { width: 80px; height: 80px; transform: rotate(45deg); }
-        .shape-decision .inner-text { transform: rotate(-45deg); width: 130%; font-size: 10px; }
+
         .shape-output, .shape-input { width: 120px; height: 45px; transform: skew(-15deg); border-radius: 2px; }
         .shape-output .inner-text, .shape-input .inner-text { transform: skew(15deg); width: 100%; }
 
         .dot { width: 10px; height: 10px; background: #fff; border: 2px solid #495057; border-radius: 50%; position: absolute; z-index: 5; cursor: crosshair; }
         .dot.in { top: -6px; left: 50%; transform: translateX(-50%); }
         .dot.out { bottom: -6px; left: 50%; transform: translateX(-50%); }
-        .shape-decision .dot.in { top: -6px; left: -6px; } 
-        .shape-decision .dot.out-yes { bottom: -6px; right: -6px; background: #16a34a; } 
-        .shape-decision .dot.out-no { top: -6px; right: -6px; background: #dc2626; }
+
         .conn-label { position: absolute; font-size: 10px; font-weight: 800; background: white; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 3; pointer-events: none; }
+
+        /* New Diamond Shape Styling */
+.shape-decision { 
+    width: 120px; 
+    height: 100px; 
+    background: transparent !important; 
+    border: none !important; 
+    box-shadow: none !important; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.decision-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    fill: #ffffff;
+    stroke: #212529;
+    stroke-width: 2px;
+    z-index: -1;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
+}
+
+/* Highlighting the SVG path during execution */
+.node.running .decision-svg {
+    fill: #dcfce7 !important;
+    stroke: #16a34a !important;
+    stroke-width: 3px;
+}
+
+.node.selected .decision-svg {
+    stroke: var(--accent);
+    stroke-width: 3px;
+}
+
+.shape-decision .inner-text { 
+    transform: none; 
+    width: 70%; /* Keep text inside the diamond area */
+    font-size: 11px;
+    font-weight: 700;
+    z-index: 2;
+}
+
+/* Specific Dot Placements for Diamond Points */
+.shape-decision .dot.in { 
+    top: -5px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+} 
+/* NO is usually the right side, YES usually the bottom */
+.shape-decision .dot.out-yes { 
+    bottom: -5px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background: #16a34a; 
+} 
+.shape-decision .dot.out-no { 
+    top: 50%; 
+    right: -5px; 
+    transform: translateY(-50%);
+    background: #dc2626; 
+}
         
         #nodes-layer, #connections-layer {
             transform-origin: 0 0;
@@ -1239,56 +1305,60 @@ this.svgLayer.appendChild(this.dragLine);
     },
 
     renderNode(node) {
-        const el = document.createElement('div');
-        el.className = `node shape-${node.type}`; 
-        el.id = node.id;
-        el.style.left = node.x + 'px'; 
-        el.style.top = node.y + 'px';
-        
-        let label = node.text;
-        if (node.type === 'output') label = `print(${node.text})`;
-        if (node.type === 'input') label = `${node.varName} = input()`;
-        
+    const el = document.createElement('div');
+    el.className = `node shape-${node.type}`; 
+    el.id = node.id;
+    el.style.left = node.x + 'px'; 
+    el.style.top = node.y + 'px';
+    
+    let label = node.text;
+    if (node.type === 'output') label = `print(${node.text})`;
+    if (node.type === 'input') label = `${node.varName} = input()`;
+    
+    // Logic for the Diamond SVG
+    if (node.type === 'decision') {
+        el.innerHTML = `
+            <svg class="decision-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polygon points="50,0 100,50 50,100 0,50" />
+            </svg>
+            <div class="inner-text">${label}</div>
+        `;
+    } else {
         el.innerHTML = `<div class="inner-text">${label}</div>`;
-        
-        if (node.type !== 'start') this.addDot(el, 'in', 'in');
-        if (node.type === 'end') {
-    el.classList.add('shape-start'); // same pill shape
-}
-// END node has only an input port — no outgoing
-if (node.type === 'end' || node.type === 'decision' ) {
-    // do NOT add outgoing dot
-} else {
-    this.addDot(el, 'out', 'next');
-}
-
-        if (node.type === 'decision') { 
-            this.addDot(el, 'out-yes', 'yes'); 
-            this.addDot(el, 'out-no', 'no'); 
-        } 
-        
-        el.onpointerdown = (e) => {
-            if (e.target.classList.contains('dot')) return;
-            this.selectNode(node.id);
-            const sX = e.clientX, sY = e.clientY, iX = node.x, iY = node.y;
-            const move = (me) => {
-                node.x = iX + (me.clientX - sX); 
-                node.y = iY + (me.clientY - sY);
-                el.style.left = node.x + 'px'; 
-                el.style.top = node.y + 'px';
-                this.drawConns();
-            };
-            window.addEventListener('pointermove', move);
-            window.addEventListener('pointerup', () => { 
-                window.removeEventListener('pointermove', move); 
-                this.updateCode(); 
-            }, {once: true});
+    }
+    
+    // Ports
+    if (node.type !== 'start') this.addDot(el, 'in', 'in');
+    
+    if (node.type === 'decision') { 
+        this.addDot(el, 'out-yes', 'yes'); 
+        this.addDot(el, 'out-no', 'no'); 
+    } else if (node.type !== 'end') {
+        this.addDot(el, 'out', 'next');
+    }
+    
+    // Dragging Logic (unchanged)
+    el.onpointerdown = (e) => {
+        if (e.target.classList.contains('dot')) return;
+        this.selectNode(node.id);
+        const sX = e.clientX, sY = e.clientY, iX = node.x, iY = node.y;
+        const move = (me) => {
+            node.x = iX + (me.clientX - sX); 
+            node.y = iY + (me.clientY - sY);
+            el.style.left = node.x + 'px'; 
+            el.style.top = node.y + 'px';
+            this.drawConns();
         };
-        
-        el.ondblclick = () => this.openEditor(node);
-        this.nodesLayer.appendChild(el);
-    },
-
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', () => { 
+            window.removeEventListener('pointermove', move); 
+            this.updateCode(); 
+        }, {once: true});
+    };
+    
+    el.ondblclick = () => this.openEditor(node);
+    this.nodesLayer.appendChild(el);
+},
     selectNode(id) {
         this.selectedNodeId = id;
         document.querySelectorAll('.node').forEach(n => 
@@ -1590,7 +1660,7 @@ window.addEventListener("pointerup", () => {
     },
 
     openEditor(node) {
-    if (node.type === 'start') return;
+        if (node.type === 'start' || node.type === 'end') return;
 
     this.editingNode = node;
     const body = document.getElementById('edit-modal-body');
