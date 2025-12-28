@@ -64,7 +64,21 @@
     <div class="container-fluid">
         <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode Pro <small class="text-muted">v3.0</small></span>
         <div class="d-flex gap-2">
-            <button class="btn btn-success btn-sm px-4 fw-bold" onclick="App.runSim()"><i class="fa-solid fa-play me-1"></i> RUN</button>
+            <!-- RUN button (shown when idle) -->
+<button id="run-btn"
+class="btn btn-success btn-sm px-4 fw-bold"
+onclick="App.runSim()">
+<i class="fa-solid fa-play me-1"></i> RUN
+</button>
+
+<!-- STOP button (hidden until running) -->
+<button id="stop-btn"
+class="btn btn-danger btn-sm px-4 fw-bold"
+style="display:none"
+onclick="App.stopSim()">
+<i class="fa-solid fa-stop me-1"></i> STOP
+</button>
+
             <button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.saveDiagram()"><i class="fa-solid fa-download me-1"></i> Save</button>
             <button class="btn btn-info btn-sm px-3 fw-bold" onclick="App.loadDiagram()"><i class="fa-solid fa-upload me-1"></i> Load</button>
             <div class="btn-group">
@@ -1005,7 +1019,29 @@ viewportX: 0,
 viewportY: 0,
 minScale: 0.3,
 maxScale: 2.5,
+cancelExecution: false,
+skulptTask: null,
 
+stopSim() {
+    if (!this.isRunning) return;
+
+    this.cancelExecution = true;
+
+    // abort Skulpt task if exists
+    if (this.skulptTask && this.skulptTask.cancel) {
+        try { this.skulptTask.cancel(); } catch (_) {}
+    }
+
+    this.isRunning = false;
+
+    // UI reset
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    document.getElementById('run-btn').style.display = "inline-block";
+    document.getElementById('stop-btn').style.display = "none";
+
+    this.log("\n>>> Stopped.");
+}
+,
 async loadExampleFromFile(filename) {
     try {
         const res = await fetch(`flows/${filename}`);
@@ -1320,39 +1356,60 @@ this.connections.forEach(c => {
     },
 
     async runSim() {
-        if (this.isRunning) return; 
-        this.isRunning = true;
-        
-        document.getElementById('console').innerHTML = ">>> Running...\n";
-        
-        // Define highlight function for Skulpt
-        Sk.builtins.highlight = new Sk.builtin.func(function (id) {
-    const nid = (typeof id === "string") ? id : id.v;
+    if (this.isRunning) return;
+
+    this.isRunning = true;
+    this.cancelExecution = false;
+
+    document.getElementById('run-btn').style.display = "none";
+    document.getElementById('stop-btn').style.display = "inline-block";
+
+    document.getElementById('console').innerHTML = ">>> Running...\n";
+
+    Sk.builtins.highlight = new Sk.builtin.func((id) => {
+        if (this.cancelExecution) {
+            throw new Error("Execution stopped.");
+        }
+
+        const nid = (typeof id === "string") ? id : id.v;
+
+        document.querySelectorAll('.node')
+            .forEach(n => n.classList.remove('running'));
+
+        document.getElementById(nid)?.classList.add('running');
+
+        const delay = 2100 - document.getElementById('speed-slider').value;
+
+        return new Sk.misceval.promiseToSuspension(
+            new Promise(resolve => setTimeout(resolve, delay))
+        );
+    });
+
+    try {
+        this.skulptTask = Sk.misceval.asyncToPromise(() =>
+            Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
+        );
+
+        await this.skulptTask;
+    }
+    catch (e) {
+        if (!this.cancelExecution) {
+            this.log(String(e));
+        }
+    }
+
+    this.isRunning = false;
 
     document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-    document.getElementById(nid)?.classList.add('running');
 
-    const delay = 2100 - document.getElementById('speed-slider').value;
+    document.getElementById('run-btn').style.display = "inline-block";
+    document.getElementById('stop-btn').style.display = "none";
 
-    return new Sk.misceval.promiseToSuspension(
-        new Promise(resolve => setTimeout(resolve, delay))
-    );
-});
-
-        
-        try { 
-            await Sk.misceval.asyncToPromise(() => 
-                Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
-            ); 
-        } catch(e) { 
-            this.log(e.toString()); 
-        }
-        
-        this.isRunning = false; 
-        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+    if (!this.cancelExecution) {
         this.log("\n>>> Finished.");
-    },
-
+    }
+}
+,
     setupGlobalEvents() {
 
         this.canvas.addEventListener("wheel", (e) => {
