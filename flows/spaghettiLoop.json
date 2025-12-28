@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "start",
+      "x": 50,
+      "y": 50,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n2",
+      "type": "input",
+      "x": 24.600006103515625,
+      "y": 186.99998474121094,
+      "text": "",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n3",
+      "type": "decision",
+      "x": 126.60000610351562,
+      "y": 340.79998779296875,
+      "text": "x < 10",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n4",
+      "type": "decision",
+      "x": 262,
+      "y": 322,
+      "text": "x < 20",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n5",
+      "type": "output",
+      "x": 423.66668701171875,
+      "y": 239.7332763671875,
+      "text": "x",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n6",
+      "type": "end",
+      "x": 432.20001220703125,
+      "y": 358,
+      "text": "End",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n1",
+      "port": "next",
+      "to": "n2"
+    },
+    {
+      "from": "n2",
+      "port": "next",
+      "to": "n3"
+    },
+    {
+      "from": "n3",
+      "port": "yes",
+      "to": "n2"
+    },
+    {
+      "from": "n3",
+      "port": "no",
+      "to": "n4"
+    },
+    {
+      "from": "n4",
+      "port": "yes",
+      "to": "n2"
+    },
+    {
+      "from": "n4",
+      "port": "no",
+      "to": "n5"
+    },
+    {
+      "from": "n5",
+      "port": "next",
+      "to": "n6"
+    }
+  ],
+  "version": "3.0"
+}
