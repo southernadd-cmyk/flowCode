@@ -1167,6 +1167,8 @@
     },
 
         init() {
+
+            
             Sk.configure({ 
                 output: (t) => this.log(t), 
                 read: (x) => Sk.builtinFiles["files"][x], 
@@ -1182,6 +1184,12 @@
             this.createNode('start', 50, 50);
             document.getElementById('save-node-btn').onclick = () => this.saveNodeEdit();
             this.applyViewportTransform();
+            this.dragLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+this.dragLine.setAttribute("stroke", "#666");
+this.dragLine.setAttribute("stroke-width", "3");
+this.dragLine.setAttribute("fill", "none");
+this.dragLine.style.display = "none";
+this.connectionsLayer.appendChild(this.dragLine);
 
         },
 
