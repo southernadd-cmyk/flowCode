@@ -105,6 +105,8 @@ onclick="App.stopSim()">
         <div id="palette">
             <div class="palette-header">Flow</div>
             <div class="palette-item" draggable="true" data-type="start">Start</div>
+            <div class="palette-item" draggable="true" data-type="end">End</div>
+
             <div class="palette-item" draggable="true" data-type="decision">Decision</div>
             
             <div class="palette-header">Logic</div>
@@ -320,7 +322,9 @@ class FlowchartCompiler {
             case 'start':
                 // Just continue to next node
                 break;
-                
+                case 'end':
+        code += `${indent}raise SystemExit\n`;
+        break;    
             case 'output':
                 code += `${indent}print(${node.text})\n`;
                 break;
@@ -1168,13 +1172,15 @@ applyViewportTransform() {
         let dtype = "int";
         
         switch(type) {
-            case 'start': text = 'Start'; break;
-            case 'decision': text = 'x < 10'; break;
-            case 'var': text = 'x = 0'; break;
-            case 'output': text = 'x'; break;
-            case 'process': text = 'x = x + 1'; break;
-            case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
-        }
+    case 'start': text = 'Start'; break;
+    case 'end':   text = 'End'; break;
+    case 'decision': text = 'x < 10'; break;
+    case 'var': text = 'x = 0'; break;
+    case 'output': text = 'x'; break;
+    case 'process': text = 'x = x + 1'; break;
+    case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
+}
+
         
         const config = { id, type, x, y, text, varName, prompt, dtype };
         this.nodes.push(config); 
@@ -1196,6 +1202,13 @@ applyViewportTransform() {
         el.innerHTML = `<div class="inner-text">${label}</div>`;
         
         if (node.type !== 'start') this.addDot(el, 'in', 'in');
+        if (node.type === 'end') {
+    el.classList.add('shape-start'); // same pill shape
+}
+if (node.type === 'end') {
+    this.nodesLayer.appendChild(el);
+    return;
+}
         if (node.type === 'decision') { 
             this.addDot(el, 'out-yes', 'yes'); 
             this.addDot(el, 'out-no', 'no'); 
