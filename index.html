@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>FlowCode Pro | Stable v3.0</title>
+        <title>FlowCode v3.1</title>
 
         <!-- LIBS -->
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -62,7 +62,7 @@
 
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
-            <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode Pro <small class="text-muted">v3.0</small></span>
+            <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.1</small></span>
             <div class="d-flex gap-2">
                 <!-- RUN button (shown when idle) -->
     <button id="run-btn"
@@ -1590,48 +1590,103 @@ this.connectionsLayer.appendChild(this.dragLine);
 
         openEditor(node) {
             if (node.type === 'start') return;
-            this.editingNode = node;
-            const body = document.getElementById('edit-modal-body');
-            
-            if (node.type === 'input') {
-                body.innerHTML = `
-                    <label class="small fw-bold">Var Name</label>
-                    <input id="edit-input-var" class="form-control mb-2" value="${node.varName}">
-                    <label class="small fw-bold">Prompt</label>
-                    <input id="edit-input-prompt" class="form-control mb-2" value="${node.prompt}">
-                    <label class="small fw-bold">Type</label>
-                    <select id="edit-input-dtype" class="form-select">
-                        <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
-                        <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>String</option>
-                    </select>`;
-                } else {
-        body.innerHTML = `
-            <label class="small fw-bold">Code Text</label>
-            <input id="edit-generic-text" class="form-control">
-        `;
 
-        // set value safely AFTER inserting the element
-        document.getElementById("edit-generic-text").value = node.text ?? "";
-    }
-            
-            new bootstrap.Modal(document.getElementById('editModal')).show();
-        },
+this.editingNode = node;
+const body = document.getElementById('edit-modal-body');
+
+if (node.type === 'output') {
+    body.innerHTML = `
+        <label class="small fw-bold mb-1">Output value (inside print)</label>
+        <div class="input-group">
+            <span class="input-group-text">print(</span>
+            <input id="edit-output-text" class="form-control" value="${node.text}">
+            <span class="input-group-text">)</span>
+        </div>
+    `;
+}
+else if (node.type === 'decision') {
+    body.innerHTML = `
+        <label class="small fw-bold mb-1">Decision condition</label>
+        <div class="input-group">
+            <span class="input-group-text">if</span>
+            <input id="edit-decision-text" class="form-control" value="${node.text}">
+            <span class="input-group-text">:</span>
+        </div>
+        <div class="form-text">Examples: x &lt; 10, total == 0, name != ""</div>
+    `;
+}
+else if (node.type === 'input') {
+    body.innerHTML = `
+        <label class="small fw-bold">Variable name</label>
+        <input id="edit-input-var" class="form-control mb-2" value="${node.varName}">
+
+        <label class="small fw-bold">Prompt text</label>
+        <input id="edit-input-prompt" class="form-control mb-2" value="${node.prompt}">
+
+        <label class="small fw-bold">Input type</label>
+        <select id="edit-input-dtype" class="form-select">
+            <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
+            <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>Text</option>
+        </select>
+
+        <div class="mt-2 small text-muted">
+            Preview:
+            <code id="input-preview"></code>
+        </div>
+    `;
+
+    setTimeout(() => {
+        const updatePreview = () => {
+            const v = document.getElementById("edit-input-var").value || "x";
+            const p = document.getElementById("edit-input-prompt").value || "";
+            const t = document.getElementById("edit-input-dtype").value;
+
+            document.getElementById("input-preview").innerText =
+                t === "int"
+                    ? `${v} = int(input("${p}"))`
+                    : `${v} = input("${p}")`;
+        };
+
+        document.getElementById("edit-input-var").oninput = updatePreview;
+        document.getElementById("edit-input-prompt").oninput = updatePreview;
+        document.getElementById("edit-input-dtype").onchange = updatePreview;
+
+        updatePreview();
+    }, 0);
+}
+else {
+    body.innerHTML = `
+        <label class="small fw-bold">Code Text</label>
+        <input id="edit-generic-text" class="form-control" value="${node.text ?? ""}">
+    `;
+}
+
+new bootstrap.Modal(document.getElementById('editModal')).show();},
 
         saveNodeEdit() {
             const n = this.editingNode;
-            if (n.type === 'input') { 
-                n.varName = document.getElementById('edit-input-var').value; 
-                n.prompt = document.getElementById('edit-input-prompt').value; 
-                n.dtype = document.getElementById('edit-input-dtype').value; 
-            } else { 
-                n.text = document.getElementById('edit-generic-text').value; 
-            }
-            
-            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-            document.getElementById(n.id).remove(); 
-            this.renderNode(n); 
-            this.drawConns(); 
-            this.updateCode();
+
+if (n.type === 'output') {
+    n.text = document.getElementById('edit-output-text').value;
+}
+else if (n.type === 'decision') {
+    n.text = document.getElementById('edit-decision-text').value;
+}
+else if (n.type === 'input') {
+    n.varName = document.getElementById('edit-input-var').value;
+    n.prompt  = document.getElementById('edit-input-prompt').value;
+    n.dtype   = document.getElementById('edit-input-dtype').value;
+}
+else {
+    n.text = document.getElementById('edit-generic-text').value;
+}
+
+bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+
+document.getElementById(n.id).remove();
+this.renderNode(n);
+this.drawConns();
+this.updateCode();
         },
 
         addDot(parent, cls, portType) {
