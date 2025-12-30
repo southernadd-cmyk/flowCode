@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    {
+      "id": "n13",
+      "type": "start",
+      "x": 80.60000610351562,
+      "y": 21.199996948242188,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n14",
+      "type": "var",
+      "x": 209,
+      "y": 109,
+      "text": "x = True",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n15",
+      "type": "process",
+      "x": 341.5999755859375,
+      "y": 228.80001831054688,
+      "text": "x = not(x)",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n16",
+      "type": "output",
+      "x": 220,
+      "y": 380.1999816894531,
+      "text": "x",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n13",
+      "port": "next",
+      "to": "n14"
+    },
+    {
+      "from": "n14",
+      "port": "next",
+      "to": "n15"
+    },
+    {
+      "from": "n15",
+      "port": "next",
+      "to": "n16"
+    },
+    {
+      "from": "n16",
+      "port": "next",
+      "to": "n15"
+    }
+  ],
+  "version": "3.0"
+}
