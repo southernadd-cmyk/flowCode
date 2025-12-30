@@ -14,8 +14,8 @@
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
 
-    <style>
-        :root { --bg-canvas: #f8f9fa; --node-bg: #ffffff; --node-border: #212529; --accent: #0d6efd; --console-bg: #1e1e1e; }
+      <style>
+        :root { --bg-canvas: #f8f9fa; --node-bg: #ffffff; --node-border: #212529; --accent: #0d6efd; --console-bg: #1e1e1e;--fc-console-muted: #9ca3af; }
         body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; background-color: #fff; margin: 0; }
         .wrapper { height: calc(100vh - 56px); display: flex; flex-direction: column; }
         .main-area { flex: 1; display: flex; overflow: hidden; }
@@ -153,8 +153,14 @@
     font-weight: 700;
     font-size: 11px;
 }
+.text-muted {
+    color: #9ca3af !important;
+    font-weight: 400;
+}
+#console .text-muted {
+    color: var(--fc-console-muted) !important;
+}
 
-/* Running state inherits from .node.running automatically */
 
     
     </style>
