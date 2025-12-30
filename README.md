@@ -11,12 +11,7 @@ FlowCode is designed for teaching programming and algorithmic thinking at KS3/KS
 Major update highlights:
 
 - ✅ **Challenges system added** (30 scaffolded programming problems)
-- ✅ **Challenge info panel + Attempt button**
-- ✅ **Draggable “Active Challenge” banner** with pseudocode view
-- ✅ Banner is now clamped and **cannot be lost behind canvas**
-- ✅ **Multiline challenge details & pseudocode viewer**
-- ✅ **Welcome / instructions modal on first load**
-- ✅ **Ellipsis text truncation on nodes** (prevents overflow)
+- ✅ **Ellipsis text truncation on nodes** (view full text on tooltip)
 - ✅ **Full tooltip on nodes when text is truncated**
 - ✅ Improved zoom & pan controls
 - ✅ Massive compiler upgrades:
