@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.32</title>
+    <title>FlowCode v3.325</title>
 
     <!-- LIBS -->
 
@@ -534,7 +534,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.32</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.325</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -602,6 +602,18 @@ onclick="App.stopSim()">
         </div>
 
         <div id="canvas">
+            <div style="position:absolute; top:12px; right:12px; z-index:10;">
+                <button class="btn btn-sm btn-light" onclick="App.zoomIn()">
+                  +
+                </button>
+                <button class="btn btn-sm btn-light" onclick="App.zoomOut()">
+                  −
+                </button>
+                <button class="btn btn-sm btn-light" onclick="App.resetView()">
+                  reset
+                </button>
+              </div>
+              
             <svg id="connections-layer">
                 <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker></defs>
                 <path id="drag-line" stroke="#0d6efd" stroke-width="2" stroke-dasharray="4,4" fill="none" style="display:none;"></path>
