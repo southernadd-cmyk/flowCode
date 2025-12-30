@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.30</title>
+    <title>FlowCode v3.31</title>
 
     <!-- LIBS -->
 
@@ -66,6 +66,18 @@
             display: flex; 
             overflow: hidden; 
         }
+        .node .inner-text {
+    display: block;
+
+    /* ellipsis behaviour */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    /* keeps text inside padding limits */
+    max-width: 95%;
+    line-height: 1.2;
+}
 
         /* ========== PALETTE ========== */
         #palette { 
@@ -192,19 +204,7 @@
             box-shadow: 0 4px 12px var(--node-shadow);
             transition: all 0.2s ease;
         }
-        .node .inner-text {
-    display: block;
-
-    /* ellipsis behaviour */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    /* keeps text inside padding limits */
-    max-width: 95%;
-    line-height: 1.2;
-}
-
+        
         .node:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
@@ -518,6 +518,10 @@
     pointer-events: auto;      /* keep button clickable */
     cursor: pointer;
 }
+#active-challenge-banner {
+    z-index: 9999;          /* always on top */
+    position: absolute;     /* already set inline, but safe */
+}
 
 
     </style>
@@ -527,7 +531,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.30</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.31</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2653,7 +2657,7 @@ this.svgLayer.appendChild(this.dragLine);
     } else {
         el.innerHTML = `<div class="inner-text">${label}</div>`;
     }
-    
+    el.title = label || "";
     // Ports
     if (node.type !== 'start') this.addDot(el, 'in', 'in');
     
@@ -3344,17 +3348,17 @@ n.text = `${name} = [${formatted.join(", ")}]`;
 // === Draggable challenge banner ===
 (function () {
     const banner = document.getElementById("active-challenge-banner");
-    if (!banner) return;
+    const canvas = document.getElementById("canvas");
+
+    if (!banner || !canvas) return;
 
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
 
     banner.addEventListener("mousedown", (e) => {
-        // Don't start drag if the click is on the Hide button
-        if (e.target.id === "dismiss-challenge" || e.target.closest("button")) {
-            return;
-        }
+        // don't drag when clicking the button
+        if (e.target.id === "dismiss-challenge" || e.target.closest("button")) return;
 
         isDragging = true;
 
@@ -3362,24 +3366,37 @@ n.text = `${name} = [${formatted.join(", ")}]`;
         offsetX = e.clientX - rect.left;
         offsetY = e.clientY - rect.top;
 
-        // Stop text selection while dragging
+        banner.style.transform = "none"; // stop centering once moved
         document.body.style.userSelect = "none";
-        // Remove centering transform once we start dragging
-        banner.style.transform = "none";
     });
 
     document.addEventListener("mousemove", (e) => {
         if (!isDragging) return;
 
-        const x = e.clientX - offsetX;
-        const y = e.clientY - offsetY;
+        const canvasRect = canvas.getBoundingClientRect();
+        const bannerRect = banner.getBoundingClientRect();
+
+        // proposed new position
+        let x = e.clientX - offsetX;
+        let y = e.clientY - offsetY;
+
+        // clamp horizontally
+        x = Math.max(
+            canvasRect.left,
+            Math.min(x, canvasRect.right - bannerRect.width)
+        );
+
+        // clamp vertically
+        y = Math.max(
+            canvasRect.top,
+            Math.min(y, canvasRect.bottom - bannerRect.height)
+        );
 
         banner.style.left = x + "px";
         banner.style.top = y + "px";
     });
 
     document.addEventListener("mouseup", () => {
-        if (!isDragging) return;
         isDragging = false;
         document.body.style.userSelect = "";
     });
