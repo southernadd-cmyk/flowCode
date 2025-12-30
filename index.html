@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.31</title>
+    <title>FlowCode v3.32</title>
 
     <!-- LIBS -->
 
@@ -140,12 +140,15 @@
             background-image: 
                 radial-gradient(circle, #cbd5e1 1px, transparent 1px);
             background-size: 24px 24px;
+            width:10000vw;
+            height:10000vh;
         }
         
         svg#connections-layer { 
             position: absolute; 
             inset: 0; 
             pointer-events: none; 
+            overflow:visible;
             z-index: 1; 
             width: 100%; 
             height: 100%; 
@@ -531,7 +534,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.31</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.32</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -599,33 +602,6 @@ onclick="App.stopSim()">
         </div>
 
         <div id="canvas">
-            <div id="active-challenge-banner"
-     style="
-        display:none;
-        position:absolute;
-        top:10px;
-        left:50%;
-        transform:translateX(-50%);
-        z-index:50;
-        padding:6px 12px;
-        background:rgba(255, 243, 205, 0.92);
-        border:2px solid #eed202;
-        border-radius:10px;
-        font-weight:800;
-        box-shadow:0 4px 10px rgba(0,0,0,0.15);
-     ">
-  Challenge Active:
-  <span id="active-challenge-text"></span>
-  <hr/>
-  <p>Pseudocode:</p>
-  <pre id="active-challenge-code"></pre>
-  <button id="dismiss-challenge"
-          style="float:right"
-          class="btn btn-sm btn-outline-dark">
-    Hide
-  </button>
-</div>
-
             <svg id="connections-layer">
                 <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker></defs>
                 <path id="drag-line" stroke="#0d6efd" stroke-width="2" stroke-dasharray="4,4" fill="none" style="display:none;"></path>
@@ -794,7 +770,35 @@ onclick="App.stopSim()">
       </div>
     </div>
   </div>
-  
+<!-- Move this to the bottom of your file, right above </body> -->
+<div id="active-challenge-banner"
+     style="
+        display:none;
+        position:fixed; /* Changed from absolute to fixed */
+        top:70px;       /* Puts it just below the navbar */
+        left:50%;
+        transform:translateX(-50%);
+        z-index:10000;  /* High number ensures it's above EVERYTHING */
+        padding:6px 12px;
+        background:rgba(255, 243, 205, 0.98); /* Less transparent */
+        border:2px solid #eed202;
+        border-radius:10px;
+        font-weight:800;
+        box-shadow:0 10px 25px rgba(0,0,0,0.2); /* Stronger shadow */
+        min-width: 300px;
+     ">
+  <div id="banner-handle" style="cursor: move; border-bottom: 1px solid #ddd; margin-bottom: 5px; padding-bottom: 2px;">
+     <i class="fa-solid fa-grip-lines me-2"></i> Challenge Active
+  </div>
+  <span id="active-challenge-text"></span>
+  <hr style="margin: 8px 0;"/>
+  <p style="margin-bottom: 4px;">Pseudocode:</p>
+  <pre id="active-challenge-code" style="max-height: 200px; overflow: auto; background: #fff; padding: 5px;"></pre>
+  <button id="dismiss-challenge"
+          class="btn btn-sm btn-outline-dark w-100 mt-2">
+    Hide Banner
+  </button>
+</div>
 <script>
 
 const FLOWCODE_CHALLENGES = [
@@ -2529,10 +2533,11 @@ loadDiagramObject(diagram) {
     // restore connections
     this.connections = diagram.connections;
 
-    this.drawConns();
-    this.updateCode();
-
-    if (this.resetView) this.resetView();
+    requestAnimationFrame(() => {
+        this.drawConns();
+        this.updateCode();
+        if (this.resetView) this.resetView();
+    });
 },
 
 zoomIn() {
@@ -2696,33 +2701,47 @@ this.svgLayer.appendChild(this.dragLine);
             n.classList.toggle('selected', n.id === id));
     },
 
-    getPortPos(id, type) {
-    const el = document.getElementById(id);
-    if (!el) return { x: 0, y: 0 };
+    getPortPos(id, portType) {
+    const node = this.nodes.find(n => n.id === id);
+    if (!node) return { x: 0, y: 0 };
 
-    let dotClass = 'out';
-    if (type === 'yes') dotClass = 'out-yes';
-    else if (type === 'no') dotClass = 'out-no';
-    else if (type === 'in') dotClass = 'in';
+    // These dimensions should match your CSS widths/heights
+    const dims = {
+        start:    { w: 95,  h: 40 },
+        end:      { w: 95,  h: 40 },
+        process:  { w: 120, h: 50 },
+        var:      { w: 120, h: 50 },
+        list:     { w: 140, h: 50 },
+        input:    { w: 130, h: 50 },
+        output:   { w: 130, h: 50 },
+        decision: { w: 130, h: 110 }
+    };
 
-    const dot = el.querySelector(`.dot.${dotClass}`);
+    const d = dims[node.type] || { w: 120, h: 50 };
+    let x = node.x;
+    let y = node.y;
 
-    const canvasRect = this.canvas.getBoundingClientRect();
-
-    // screen coords of the dot
-    const rect = (dot || el).getBoundingClientRect();
-
-    // raw pixel coords inside canvas
-    const rawX = rect.left - canvasRect.left + 5;
-    const rawY = rect.top  - canvasRect.top  + 5;
-
-    // ⬅️ CONVERT THROUGH INVERSE VIEWPORT TRANSFORM
-    const x = (rawX - this.viewportX) / this.viewportScale;
-    const y = (rawY - this.viewportY) / this.viewportScale;
+    // Calculate relative offset based on port type
+    switch (portType) {
+        case 'in':
+            x += d.w / 2;
+            y += 0;
+            break;
+        case 'next':
+        case 'yes':
+            x += d.w / 2;
+            y += d.h;
+            break;
+        case 'no':
+            x += d.w;
+            y += d.h / 2;
+            break;
+    }
 
     return { x, y };
 },
-    drawConns() {
+
+drawConns() {
 
 // Remove old labels
 document.querySelectorAll('.conn-label').forEach(l => l.remove());
@@ -3346,51 +3365,51 @@ n.text = `${name} = [${formatted.join(", ")}]`;
     }
 };
 // === Draggable challenge banner ===
+// === Global Draggable Challenge Banner ===
 (function () {
     const banner = document.getElementById("active-challenge-banner");
-    const canvas = document.getElementById("canvas");
-
-    if (!banner || !canvas) return;
+    if (!banner) return;
 
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
 
     banner.addEventListener("mousedown", (e) => {
-        // don't drag when clicking the button
-        if (e.target.id === "dismiss-challenge" || e.target.closest("button")) return;
+        // Prevent dragging when clicking the hide button or the code block
+        if (e.target.id === "dismiss-challenge" || e.target.id === "active-challenge-code") return;
 
         isDragging = true;
-
+        
+        // Get current position
         const rect = banner.getBoundingClientRect();
+        
+        // Calculate where the mouse is relative to the top-left of the banner
         offsetX = e.clientX - rect.left;
         offsetY = e.clientY - rect.top;
 
-        banner.style.transform = "none"; // stop centering once moved
+        // When starting a drag, remove the CSS "left: 50% + transform" centering
+        // and replace it with fixed pixel coordinates
+        banner.style.left = rect.left + "px";
+        banner.style.top = rect.top + "px";
+        banner.style.transform = "none"; 
+        banner.style.margin = "0";
+
         document.body.style.userSelect = "none";
     });
 
     document.addEventListener("mousemove", (e) => {
         if (!isDragging) return;
 
-        const canvasRect = canvas.getBoundingClientRect();
-        const bannerRect = banner.getBoundingClientRect();
-
-        // proposed new position
+        // Calculate new X and Y
         let x = e.clientX - offsetX;
         let y = e.clientY - offsetY;
 
-        // clamp horizontally
-        x = Math.max(
-            canvasRect.left,
-            Math.min(x, canvasRect.right - bannerRect.width)
-        );
+        // Keep the banner inside the browser window edges
+        const maxX = window.innerWidth - banner.offsetWidth - 10;
+        const maxY = window.innerHeight - banner.offsetHeight - 10;
 
-        // clamp vertically
-        y = Math.max(
-            canvasRect.top,
-            Math.min(y, canvasRect.bottom - bannerRect.height)
-        );
+        x = Math.max(10, Math.min(x, maxX));
+        y = Math.max(10, Math.min(y, maxY));
 
         banner.style.left = x + "px";
         banner.style.top = y + "px";
@@ -3401,7 +3420,6 @@ n.text = `${name} = [${formatted.join(", ")}]`;
         document.body.style.userSelect = "";
     });
 })();
-
 // Initialize the application
 App.init();
 </script>
