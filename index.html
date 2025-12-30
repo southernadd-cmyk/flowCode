@@ -192,7 +192,19 @@
             box-shadow: 0 4px 12px var(--node-shadow);
             transition: all 0.2s ease;
         }
-        
+        .node .inner-text {
+    display: block;
+
+    /* ellipsis behaviour */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    /* keeps text inside padding limits */
+    max-width: 95%;
+    line-height: 1.2;
+}
+
         .node:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
