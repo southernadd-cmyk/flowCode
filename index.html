@@ -127,7 +127,7 @@
             background-image: 
                 radial-gradient(circle, #cbd5e1 1px, transparent 1px);
             background-size: 48px 48px;
-   
+
         }
         
         svg#connections-layer { 
@@ -730,11 +730,7 @@ onclick="App.stopSim()">
                 <path id="drag-line" stroke="#0d6efd" stroke-width="2" stroke-dasharray="4,4" fill="none" style="display:none;"></path>
             </svg>
             <div id="nodes-layer"></div>
-            <div id="zoom-controls" style="position:absolute; right:10px; bottom:10px; z-index:20;">
-                <button onclick="App.zoomIn()" class="btn btn-sm btn-light">+</button>
-                <button onclick="App.zoomOut()" class="btn btn-sm btn-light">−</button>
-                <button onclick="App.resetView()" class="btn btn-sm btn-light">Reset</button>
-            </div>
+
         </div>
         
         <div id="output-panel">
@@ -1466,7 +1462,9 @@ document.getElementById("btn-challenges").addEventListener("click", () => {
     modal.show();
     renderChallengeList();
 });
-
+function nextFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
 function renderChallengeList() {
     const ul = document.getElementById("challenge-list");
     ul.innerHTML = "";
@@ -2445,7 +2443,13 @@ cancelExecution: false,
 skulptTask: null,
 skModule: null,
 
-
+screenFromWorld(x, y) {
+    return {
+        x: x * this.viewportScale + this.viewportX,
+        y: y * this.viewportScale + this.viewportY
+    };
+}
+,
 exportPython() {
     const code = document.getElementById("code-python").innerText || "";
 
@@ -2482,65 +2486,72 @@ exportJSON() {
 }
 ,   
 
-exportImage() {
+async exportImage() {
 
 if (this.nodes.length === 0) {
     alert("Nothing to export.");
     return;
 }
 
-const nodeLayer = document.getElementById("nodes-layer");
-const svgLayer  = document.getElementById("connections-layer");
+const canvasEl = document.getElementById("canvas");
 
-// Save current transform
+// 1️⃣ Save user viewport
 const oldScale = this.viewportScale;
 const oldX = this.viewportX;
 const oldY = this.viewportY;
 
-// 1) Reset transforms so coords are real
+// 2️⃣ Compute bounding box of all nodes
+let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+this.nodes.forEach(n => {
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + 180);  // rough width
+    maxY = Math.max(maxY, n.y + 120);  // rough height
+});
+
+// 3️⃣ Reset viewport (no CSS transform)
 this.viewportScale = 1;
-this.viewportX = 0;
-this.viewportY = 0;
+this.viewportX = -minX + 30;
+this.viewportY = -minY + 30;
 this.applyViewportTransform();
 
-// 2) Force redraw before capture
+// 4️⃣ Redraw connectors at real coordinates
 this.drawConns();
 
-// 3) Measure real bounding box
-const rect = nodeLayer.getBoundingClientRect();
-const width = Math.max(1, Math.round(rect.width));
-const height = Math.max(1, Math.round(rect.height));
+// 5️⃣ wait for layout/paint
+await new Promise(r => requestAnimationFrame(r));
 
-// 4) Render everything at 2× resolution for quality
-html2canvas(document.getElementById("canvas"), {
+// 6️⃣ Capture
+const canvas = await html2canvas(canvasEl, {
     backgroundColor: "#ffffff",
     scale: 2
-}).then(canvas => {
+});
 
-    // Restore transform immediately
-    this.viewportScale = oldScale;
-    this.viewportX = oldX;
-    this.viewportY = oldY;
-    this.applyViewportTransform();
-    this.drawConns();
+// 7️⃣ Restore user view
+this.viewportScale = oldScale;
+this.viewportX = oldX;
+this.viewportY = oldY;
+this.applyViewportTransform();
+this.drawConns();
 
-    const link = document.createElement("a");
-    link.download = "flowchart.png";
-    canvas.toBlob(blob => {
-        link.href = URL.createObjectURL(blob);
-        link.click();
-    }, "image/png");
+// 8️⃣ Download
+canvas.toBlob(blob => {
+    if (!blob) {
+        const url = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "flowchart.png";
+        a.click();
+        return;
+    }
 
-}).catch(err => {
-    alert("Failed to export image");
-    console.error(err);
-
-    // restore even if error
-    this.viewportScale = oldScale;
-    this.viewportX = oldX;
-    this.viewportY = oldY;
-    this.applyViewportTransform();
-    this.drawConns();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flowchart.png";
+    a.click();
+    URL.revokeObjectURL(url);
 });
 }
 ,
@@ -2683,8 +2694,12 @@ resetView() {
 applyViewportTransform() {
     const t = `translate(${this.viewportX}px, ${this.viewportY}px) scale(${this.viewportScale})`;
     this.nodesLayer.style.transform = t;
-    this.svgLayer.style.transform   = t;
-},
+    //this.svgLayer.style.transform = t;
+
+    // force connectors to match new zoom/pan
+    this.drawConns();
+}
+,
 
     init() {
 
@@ -2917,8 +2932,14 @@ function orthogonal(p1, p2) {
 // Draw each connection
 this.connections.forEach(c => {
 
-    const p1 = this.getPortPos(c.from, c.port);
-    const p2 = this.getPortPos(c.to, 'in');
+    // world coords from node geometry
+const p1w = this.getPortPos(c.from, c.port);
+const p2w = this.getPortPos(c.to,   'in');
+
+// ✔ convert to screen coords because SVG NOT transformed
+const p1 = this.screenFromWorld(p1w.x, p1w.y);
+const p2 = this.screenFromWorld(p2w.x, p2w.y);
+
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 
