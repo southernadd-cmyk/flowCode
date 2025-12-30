@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.325</title>
+    <title>FlowCode v3.33</title>
 
     <!-- LIBS -->
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Major+Mono+Display&display=swap" rel="stylesheet">
@@ -18,30 +19,27 @@
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
     <style>
-        :root { 
-            /* Canvas & UI Colors */
-            --bg-canvas: #f1f5f9; 
-            --node-shadow: rgba(0, 0, 0, 0.12);
-            --accent: #3b82f6; 
-            --console-bg: #1a1d23;
-            --fc-console-muted: #9ca3af;
-            
-            /* Traditional Flowchart Colors */
-            --color-start-end: #22c55e;      /* Green for Start/End */
-            --color-process: #3b82f6;        /* Blue for Process */
-            --color-decision: #fbbf24;       /* Yellow for Decision */
-            --color-input-output: #f97316;   /* Orange for I/O */
-            --color-variable: #8b5cf6;       /* Purple for Variables */
-            --color-list: #06b6d4;           /* Cyan for Lists */
-            
-            /* Borders (darker shades) */
-            --border-start-end: #16a34a;
-            --border-process: #2563eb;
-            --border-decision: #f59e0b;
-            --border-input-output: #ea580c;
-            --border-variable: #7c3aed;
-            --border-list: #0891b2;
-        }
+:root {
+    /* Backgrounds */
+    --bg-canvas: #f8fafc;
+    --bg-sidebar: #ffffff;
+    --bg-panel: #f1f5f9;
+    
+    /* Professional Flowchart Colors (Softer, modern) */
+    --color-start-end: #10b981;    /* Emerald 500 */
+    --color-process: #6366f1;      /* Indigo 500 */
+    --color-decision: #f59e0b;     /* Amber 500 */
+    --color-input-output: #0ea5e9; /* Sky 500 */
+    --color-variable: #8b5cf6;     /* Violet 500 */
+    --color-list: #ec4899;         /* Pink 500 */
+    
+    /* UI Accents */
+    --accent: #2563eb;
+    --border-subtle: #e2e8f0;
+    --text-main: #1e293b;
+    --node-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --node-selected: 0 0 0 3px rgba(37, 99, 235, 0.4);
+}
         
         body { 
             font-family: 'Anonymous Pro', 'Courier New', monospace; 
@@ -80,53 +78,40 @@
 }
 
         /* ========== PALETTE ========== */
-        #palette { 
-            width: 250px; 
-            background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
-            border-right: 1px solid #e2e8f0; 
-            padding: 20px 16px; 
-            overflow-y: auto; 
-            z-index: 10; 
-            box-shadow: 3px 0 12px rgba(0, 0, 0, 0.04);
-        }
-        
-        .palette-header { 
-            
-            font-size: 0.65rem; 
-            text-transform: uppercase; 
-            letter-spacing: 2px; 
-            color: #171819; 
-            font-weight: 400; 
-            margin-top: 20px; 
-            margin-bottom: 10px;
-            padding-bottom: 6px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        
-        .palette-item { 
-            cursor: grab; 
-            user-select: none; 
-            margin-bottom: 10px; 
-            padding: 12px 14px; 
-            border: 2px solid #e2e8f0; 
-            border-radius: 10px; 
-            background: white; 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            font-size: 0.875rem; 
-            font-weight: 600; 
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        }
-        
-        .palette-item:hover { 
-            border-color: var(--accent); 
-            color: var(--accent); 
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-        }
-        
+        #palette {
+    width: 260px;
+    background: var(--bg-sidebar);
+    padding: 24px 16px;
+    border-right: 1px solid var(--border-subtle);
+    overflow-y:auto;
+}
+
+.palette-header {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #94a3b8;
+    margin: 20px 0 12px 4px;
+}
+
+.palette-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-main);
+    transition: all 0.15s ease-in-out;
+}
+
+.palette-item:hover {
+    background: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
         .palette-item:active {
             transform: translateY(0);
         }
@@ -139,7 +124,7 @@
             overflow: hidden; 
             background-image: 
                 radial-gradient(circle, #cbd5e1 1px, transparent 1px);
-            background-size: 24px 24px;
+            background-size: 48px 48px;
             width:10000vw;
             height:10000vh;
         }
@@ -154,40 +139,8 @@
             height: 100%; 
         }
 
-        /* ========== OUTPUT PANEL ========== */
-        #output-panel { 
-            width: 480px; 
-            display: flex; 
-            flex-direction: column; 
-            border-left: 1px solid #e2e8f0; 
-            background: #ffffff;
-            box-shadow: -2px 0 12px rgba(0, 0, 0, 0.03);
-        }
-        
-        .code-display { 
-            flex: 1; 
-            padding: 24px; 
-            font-family: 'Anonymous Pro', 'Courier New', monospace; 
-            font-size: 14px; 
-            color: #1e293b; 
-            overflow-y: auto; 
-            line-height: 1.7; 
-            white-space: pre; 
-            background: #f8fafc; 
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        #console { 
-            height: 220px; 
-            background: var(--console-bg); 
-            color: #e2e8f0; 
-            padding: 16px; 
-            font-family: 'Anonymous Pro', 'Courier New', monospace; 
-            font-size: 13px; 
-            overflow-y: auto; 
-            border-top: 3px solid #0ea5e9;
-            line-height: 1.6;
-        }
+
+
 
         /* ========== FLOWCHART NODES ========== */
         .node { 
@@ -282,21 +235,21 @@
         }
 
         /* ========== INPUT/OUTPUT (Orange Parallelogram) ========== */
-        .shape-output, .shape-input { 
-            width: 130px; 
-            height: 50px; 
-            transform: skew(-15deg); 
-            border-radius: 4px;
-            background: linear-gradient(135deg, var(--color-input-output) 0%, #ea580c 100%);
-            border-color: var(--border-input-output);
-            color: white;
-            font-weight: 700;
-        }
-        
-        .shape-output .inner-text, .shape-input .inner-text { 
-            transform: skew(15deg); 
-            width: 100%; 
-        }
+        .shape-output, .shape-input {
+    width: 140px;
+    height: 50px;
+    background: var(--color-input-output) !important;
+    border: none !important;
+    clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%); /* Clean Parallelogram */
+    color: white;
+}
+
+/* Remove the skew from the inner text since we used clip-path */
+.shape-output .inner-text, .shape-input .inner-text {
+    transform: none !important;
+    padding: 0 10px;
+}
+
         
         .shape-output.running, .shape-input.running {
             background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
@@ -525,7 +478,164 @@
     z-index: 9999;          /* always on top */
     position: absolute;     /* already set inline, but safe */
 }
+/* 1. MAIN OUTPUT CONTAINER */
+#output-panel { 
+    width: 480px; 
+    display: flex; 
+    flex-direction: column; 
+    background: #0f172a; /* Deep Slate 900 */
+    border-left: 1px solid #1e293b;
+    box-shadow: -10px 0 20px rgba(0,0,0,0.2);
+}
 
+/* 2. PYTHON CODE AREA (Top Section) */
+.code-display { 
+    flex: 1; 
+    padding: 40px 24px 24px 24px; /* Extra top padding for the pseudo-label */
+    font-family: 'JetBrains Mono', 'Fira Code', monospace; 
+    font-size: 13px; 
+    color: #cbd5e1; 
+    background: #0f172a; 
+    white-space: pre; 
+    overflow-y: auto; 
+    line-height: 1.6;
+    border-bottom: 2px solid #1e293b;
+    position: relative;
+}
+
+/* CSS-ONLY Label for Code Area */
+.code-display::before {
+    content: "\f3e2  PYTHON PREVIEW";
+    position: absolute;
+    top: 12px;
+    left: 24px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #a8ecba;
+    font-family: "Font Awesome 6 Brands";
+    font-weight: 400;
+}
+
+/* 3. TERMINAL CONSOLE (Middle Section) */
+#console { 
+    height: 250px; 
+    background: #020617; /* Rich Black */
+    color: #e2e8f0; 
+    padding: 45px 16px 16px 16px; /* Top padding makes room for the pseudo-header */
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 13px; 
+    overflow-y: auto; 
+    border-top: 1px solid #334155;
+    line-height: 1.5;
+    position: relative;
+    border-bottom: 2px solid #1e293b;
+}
+
+/* CSS-ONLY Terminal Header Bar */
+#console::before {
+    content: "TERMINAL";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: #1e293b;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    padding-left: 36px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* CSS-ONLY Terminal Icon (FontAwesome-like dot) */
+#console::after {
+    content: "";
+    position: absolute;
+    top: 11px;
+    left: 16px;
+    width: 10px;
+    height: 10px;
+    background: #10b981; /* Green dot */
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+/* 4. VARIABLE WATCH (Bottom Section) */
+#varwatch {
+    height: 180px !important; 
+    background: #0f172a !important; 
+    padding: 40px 16px 16px 16px !important;
+    position: relative;
+    border-top: 1px solid #1e293b !important;
+}
+
+/* CSS-ONLY Header for VarWatch */
+#varwatch::before {
+    content: "DEBUGGER / VARIABLES";
+    position: absolute;
+    top: 15px;
+    left: 16px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #38bdf8; /* Sky Blue */
+    letter-spacing: 1px;
+}
+
+/* Target the table created by JS inside VarWatch */
+#varwatch-table table {
+    width: 100%;
+    border-spacing: 0;
+    margin-top: 5px;
+}
+
+#varwatch-table tr {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+#varwatch-table td {
+    padding: 6px 0 !important;
+    font-size: 12px;
+}
+
+/* Left column (Var name) */
+#varwatch-table td:first-child {
+    color: #94a3b8 !important;
+    font-weight: 600;
+}
+
+/* Right column (Value) */
+#varwatch-table td:last-child {
+    color: #22d3ee !important; /* Cyan */
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* 5. SCROLLBARS (Universal Dark Polish) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Text Selection Color */
+::selection {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+}
 
     </style>
 
@@ -534,7 +644,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.325</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.33</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -630,7 +740,6 @@ onclick="App.stopSim()">
             <div class="code-display" id="code-python"></div>
             <div id="console"></div>
             <div id="varwatch" style="height:160px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:13px; padding:10px; border-top:1px solid #333; background:#111; color:#0f0">
-                <strong>Variable Watch</strong>
                 <div id="varwatch-table"></div>
             </div>
               
