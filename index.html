@@ -3112,18 +3112,26 @@ window.addEventListener("pointerup", () => {
 
     const rect = this.canvas.getBoundingClientRect();
 
-    // convert screen → world coordinates
+    // --- mouse to WORLD coordinates ---
     const worldX = (e.clientX - rect.left - this.viewportX) / this.viewportScale;
     const worldY = (e.clientY - rect.top  - this.viewportY) / this.viewportScale;
 
-    const start = this.getPortPos(
+    // --- port position already in WORLD coordinates ---
+    const startWorld = this.getPortPos(
         this.connStart.nodeId,
         this.connStart.portType
     );
 
+    // --- convert BOTH into SCREEN/SVG coordinates ---
+    const startScreenX = startWorld.x * this.viewportScale + this.viewportX;
+    const startScreenY = startWorld.y * this.viewportScale + this.viewportY;
+
+    const endScreenX = worldX * this.viewportScale + this.viewportX;
+    const endScreenY = worldY * this.viewportScale + this.viewportY;
+
     this.dragLine.setAttribute(
         "d",
-        `M ${start.x} ${start.y} L ${worldX} ${worldY}`
+        `M ${startScreenX} ${startScreenY} L ${endScreenX} ${endScreenY}`
     );
 };
 
