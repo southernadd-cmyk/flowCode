@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.1</title>
+    <title>FlowCode v3.2</title>
 
     <!-- LIBS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -37,10 +37,10 @@
         .node.running { background-color: #dcfce7 !important; border-color: #16a34a !important; transform: scale(1.05); transition: 0.2s; box-shadow: 0 0 15px rgba(22, 163, 74, 0.4); }
         
         .shape-start, .shape-end { 
-    width: 90px; 
-    height: 35px; 
-    border-radius: 20px; 
-}   
+            width: 90px; 
+            height: 35px; 
+            border-radius: 20px; 
+        }   
         .shape-process, .shape-var { width: 110px; height: 45px; border-radius: 4px; }
 
         .shape-output, .shape-input { width: 120px; height: 45px; transform: skew(-15deg); border-radius: 2px; }
@@ -53,146 +53,145 @@
         .conn-label { position: absolute; font-size: 10px; font-weight: 800; background: white; padding: 1px 5px; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 3; pointer-events: none; }
 
         /* New Diamond Shape Styling */
-.shape-decision { 
-    width: 120px; 
-    height: 100px; 
-    background: transparent !important; 
-    border: none !important; 
-    box-shadow: none !important; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+        .shape-decision { 
+            width: 120px; 
+            height: 100px; 
+            background: transparent !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-.decision-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    fill: #ffffff;
-    stroke: #212529;
-    stroke-width: 2px;
-    z-index: -1;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
-}
+        .decision-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            fill: #ffffff;
+            stroke: #212529;
+            stroke-width: 2px;
+            z-index: -1;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
+        }
 
-/* Highlighting the SVG path during execution */
-.node.running .decision-svg {
-    fill: #dcfce7 !important;
-    stroke: #16a34a !important;
-    stroke-width: 3px;
-}
+        /* Highlighting the SVG path during execution */
+        .node.running .decision-svg {
+            fill: #dcfce7 !important;
+            stroke: #16a34a !important;
+            stroke-width: 3px;
+        }
 
-.node.selected .decision-svg {
-    stroke: var(--accent);
-    stroke-width: 3px;
-}
+        .node.selected .decision-svg {
+            stroke: var(--accent);
+            stroke-width: 3px;
+        }
 
-.shape-decision .inner-text { 
-    transform: none; 
-    width: 70%; /* Keep text inside the diamond area */
-    font-size: 11px;
-    font-weight: 700;
-    z-index: 2;
-}
+        .shape-decision .inner-text { 
+            transform: none; 
+            width: 70%; /* Keep text inside the diamond area */
+            font-size: 11px;
+            font-weight: 700;
+            z-index: 2;
+        }
 
-/* Specific Dot Placements for Diamond Points */
-.shape-decision .dot.in { 
-    top: -5px; 
-    left: 50%; 
-    transform: translateX(-50%); 
-} 
-/* NO is usually the right side, YES usually the bottom */
-.shape-decision .dot.out-yes { 
-    bottom: -5px; 
-    left: 50%; 
-    transform: translateX(-50%);
-    background: #16a34a; 
-} 
-.shape-decision .dot.out-no { 
-    top: 50%; 
-    right: -5px; 
-    transform: translateY(-50%);
-    background: #dc2626; 
-}
+        /* Specific Dot Placements for Diamond Points */
+        .shape-decision .dot.in { 
+            top: -5px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+        } 
+        /* NO is usually the right side, YES usually the bottom */
+        .shape-decision .dot.out-yes { 
+            bottom: -5px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            background: #16a34a; 
+        } 
+        .shape-decision .dot.out-no { 
+            top: 50%; 
+            right: -5px; 
+            transform: translateY(-50%);
+            background: #dc2626; 
+        }
         
         #nodes-layer, #connections-layer {
             transform-origin: 0 0;
         }
-/* LIST BLOCK STYLE */
-.shape-list {
-    width: 130px;
-    height: 45px;
-    border-radius: 6px;
-    background: var(--node-bg);
-    border: 2px solid var(--node-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 4px;
-}
 
-/* Optional visual identity (subtle blue accent stripe) */
-.shape-list::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 6px;
-    background: rgba(13, 110, 253, 0.35);
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
-}
+        /* LIST BLOCK STYLE */
+        .shape-list {
+            width: 130px;
+            height: 45px;
+            border-radius: 6px;
+            background: var(--node-bg);
+            border: 2px solid var(--node-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+        }
 
-/* highlight and selection reuse your existing behaviour */
-.shape-list .inner-text {
-    width: 100%;
-    transform: none;
-    font-weight: 700;
-    font-size: 11px;
-}
+        /* Optional visual identity (subtle blue accent stripe) */
+        .shape-list::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: rgba(13, 110, 253, 0.35);
+            border-top-left-radius: 4px;
+            border-bottom-left-radius: 4px;
+        }
 
-/* Running state inherits from .node.running automatically */
+        /* highlight and selection reuse your existing behaviour */
+        .shape-list .inner-text {
+            width: 100%;
+            transform: none;
+            font-weight: 700;
+            font-size: 11px;
+        }
 
-    
+        /* Running state inherits from .node.running automatically */
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.1</small></span>
+        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.2</small></span>
         <div class="d-flex gap-2">
             <!-- RUN button (shown when idle) -->
-<button id="run-btn"
-class="btn btn-success btn-sm px-4 fw-bold"
-onclick="App.runSim()">
-<i class="fa-solid fa-play me-1"></i> RUN
-</button>
+            <button id="run-btn"
+                class="btn btn-success btn-sm px-4 fw-bold"
+                onclick="App.runSim()">
+                <i class="fa-solid fa-play me-1"></i> RUN
+            </button>
 
-<!-- STOP button (hidden until running) -->
-<button id="stop-btn"
-class="btn btn-danger btn-sm px-4 fw-bold"
-style="display:none"
-onclick="App.stopSim()">
-<i class="fa-solid fa-stop me-1"></i> STOP
-</button>
+            <!-- STOP button (hidden until running) -->
+            <button id="stop-btn"
+                class="btn btn-danger btn-sm px-4 fw-bold"
+                style="display:none"
+                onclick="App.stopSim()">
+                <i class="fa-solid fa-stop me-1"></i> STOP
+            </button>
 
             <button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.saveDiagram()"><i class="fa-solid fa-download me-1"></i> Save</button>
             <button class="btn btn-info btn-sm px-3 fw-bold" onclick="App.loadDiagram()"><i class="fa-solid fa-upload me-1"></i> Load</button>
             <div class="btn-group">
                 <button class="btn btn-secondary btn-sm dropdown-toggle fw-bold" data-bs-toggle="dropdown">
-                Examples
+                    Examples
                 </button>
             
                 <ul class="dropdown-menu">
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Max of Three</a></li>
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Two Loops</a></li>
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('whileloop.json')">While Loop</a></li>
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('spaghettiLoop.json')">Spaghetti Loop</a></li>
+                    <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Max of Three</a></li>
+                    <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Two Loops</a></li>
+                    <li><a class="dropdown-item" onclick="App.loadExampleFromFile('whileloop.json')">While Loop</a></li>
+                    <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
+                    <li><a class="dropdown-item" onclick="App.loadExampleFromFile('spaghettiLoop.json')">Spaghetti Loop</a></li>
                 </ul>
             </div>
             
@@ -219,6 +218,11 @@ onclick="App.stopSim()">
             <div class="palette-item" draggable="true" data-type="input">Input</div>
             <div class="palette-item" draggable="true" data-type="output">Print</div>
 
+            <div class="palette-header">Functions</div>
+            <div class="palette-item" draggable="true" data-type="function_def">Function Def</div>
+            <div class="palette-item" draggable="true" data-type="function_call">Function Call</div>
+            <div class="palette-item" draggable="true" data-type="return">Return</div>
+
             <div class="palette-header">Speed</div>
             <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="1600">
         </div>
@@ -243,14 +247,15 @@ onclick="App.stopSim()">
                 <strong>Variable Watch</strong>
                 <div id="varwatch-table"></div>
             </div>
-              
         </div>
     </div>
 </div>
 
 <!-- INPUT MODAL -->
 <div class="modal fade" id="inputModal" tabindex="-1" data-bs-backdrop="static"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body p-4"><h6 id="modal-prompt" class="fw-bold mb-3">Input:</h6><input type="text" id="modal-field" class="form-control mb-3"><button class="btn btn-primary w-100 fw-bold" id="modal-submit">Continue</button></div></div></div></div>
+
 <div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header py-2 bg-light"><h6 class="modal-title fw-bold">Edit Node</h6></div><div class="modal-body" id="edit-modal-body"></div><div class="modal-footer py-2 bg-light"><button class="btn btn-primary btn-sm px-4 fw-bold" id="save-node-btn">Save Changes</button></div></div></div></div>
+
 <!-- WELCOME / INSTRUCTIONS MODAL -->
 <div class="modal fade" id="welcomeModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -278,6 +283,7 @@ onclick="App.stopSim()">
             <li>Variables and processes</li>
             <li>If / Elif / Else</li>
             <li>While and For loops (auto-detected)</li>
+            <li>Functions (def / call / return)</li>
         </ul>
 
         <h6 class="fw-bold mt-3">Tips</h6>
@@ -305,30 +311,23 @@ onclick="App.stopSim()">
 </div>
 
 <script>
-
     // Show welcome modal on first visit
-document.addEventListener("DOMContentLoaded", function () {
-
-// if user previously disabled it, don't show
-if (localStorage.getItem("hideWelcomeModal") === "true") return;
-
-const welcomeModal = new bootstrap.Modal(
-    document.getElementById('welcomeModal')
-);
-
-welcomeModal.show();
-
-document.getElementById("welcomeCloseBtn").onclick = function () {
-    if (document.getElementById("dontShowAgainCheck").checked) {
-        localStorage.setItem("hideWelcomeModal", "true");
-    }
-    welcomeModal.hide();
-};
-});
+    document.addEventListener("DOMContentLoaded", function () {
+        if (localStorage.getItem("hideWelcomeModal") === "true") return;
+        const welcomeModal = new bootstrap.Modal(document.getElementById('welcomeModal'));
+        welcomeModal.show();
+        document.getElementById("welcomeCloseBtn").onclick = function () {
+            if (document.getElementById("dontShowAgainCheck").checked) {
+                localStorage.setItem("hideWelcomeModal", "true");
+            }
+            welcomeModal.hide();
+        };
+    });
 
 /**
  * ENHANCED FLOWCHART COMPILER
- * Handles nested loops, if/else, for/while loops, and complex structures
+ * Handles nested loops, if/else, for/while loops, complex structures
+ * NOW WITH FUNCTION SUPPORT
  */
 class FlowchartCompiler {
     constructor(nodes, connections, useHighlighting = false) {
@@ -336,40 +335,122 @@ class FlowchartCompiler {
         this.connections = connections;
         this.useHighlighting = useHighlighting;
         
-        // Build adjacency maps for faster lookups
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
-        this.loopHeaderCache = new Map(); // Cache for loop header detection
+        this.loopHeaderCache = new Map();
+        this.loweredImplicitLoops = new Set();
         this.buildMaps();
     }
+    
+    getImplicitLoopBodyNodes(headerId) {
+
+const bodyNodes = new Set();
+const visited = new Set();
+
+const headerNext = this.getSuccessor(headerId, 'next');
+
+const dfs = (nodeId) => {
+    if (!nodeId) return;
+    if (visited.has(nodeId)) return;
+
+    visited.add(nodeId);
+    bodyNodes.add(nodeId);
+
+    const succs = this.getAllSuccessors(nodeId);
+
+    for (const {nodeId: nextId} of succs) {
+
+        // stop if we reach header again (back-edge)
+        if (nextId === headerId) continue;
+
+        dfs(nextId);
+    }
+};
+
+dfs(headerNext);
+return bodyNodes;
+}
+getImplicitLoopExitEdges(headerId) {
+
+const body = this.getImplicitLoopBodyNodes(headerId);
+const exits = [];
+
+for (const nid of body) {
+
+    const succs = this.getAllSuccessors(nid);
+
+    for (const {nodeId: nextId} of succs) {
+        if (!nextId) continue;
+
+        // ignore back edge
+        if (nextId === headerId) continue;
+
+        // edge leaves loop body
+        if (!body.has(nextId)) {
+            exits.push({
+                from: nid,
+                to: nextId
+            });
+        }
+    }
+}
+return exits;
+}
+
 
     buildMaps() {
-        // Clear maps and cache
         this.outgoingMap.clear();
         this.incomingMap.clear();
-        if (this.loopHeaderCache) {
-            this.loopHeaderCache.clear();
-        }
+        if (this.loopHeaderCache) this.loopHeaderCache.clear();
         
-        // Initialize maps for all nodes
         this.nodes.forEach(node => {
             this.outgoingMap.set(node.id, []);
             this.incomingMap.set(node.id, []);
         });
         
-        // Fill maps
         this.connections.forEach(conn => {
-            // Outgoing connections
             const outgoing = this.outgoingMap.get(conn.from) || [];
             outgoing.push({...conn, targetId: conn.to});
             this.outgoingMap.set(conn.from, outgoing);
             
-            // Incoming connections
             const incoming = this.incomingMap.get(conn.to) || [];
             incoming.push({...conn, sourceId: conn.from});
             this.incomingMap.set(conn.to, incoming);
         });
     }
+    findBackEdges() {
+    const backEdges = [];
+    const visited = new Set();
+    const stack = new Set();
+
+    const dfs = (nodeId) => {
+        if (!nodeId) return;
+        if (visited.has(nodeId)) return;
+
+        visited.add(nodeId);
+        stack.add(nodeId);
+
+        const succs = this.getAllSuccessors(nodeId);
+
+        for (const {nodeId: nextId} of succs) {
+            if (!nextId) continue;
+
+            // back-edge found
+            if (stack.has(nextId)) {
+                backEdges.push({ from: nodeId, to: nextId });
+            } else {
+                dfs(nextId);
+            }
+        }
+
+        stack.delete(nodeId);
+    };
+
+    const start = this.nodes.find(n => n.type === "start");
+    if (start) dfs(start.id);
+
+    return backEdges;
+}
 
     getSuccessor(nodeId, port = 'next') {
         const outgoing = this.outgoingMap.get(nodeId) || [];
@@ -382,209 +463,268 @@ class FlowchartCompiler {
         return outgoing.map(c => ({port: c.port, nodeId: c.targetId}));
     }
 
-    /**
-     * Main compilation entry point
-     */
     compile() {
         const startNode = this.nodes.find(n => n.type === 'start');
         if (!startNode) return "# Add a Start node.";
-        
-        this.buildMaps(); // Ensure maps are up to date
-        
-        // Use iterative compilation with manual stack management
+        this.buildMaps();
+         // ---------- detect implicit loop headers ----------
+    this.implicitLoopHeaders = new Set();
+
+const backEdges = this.findBackEdges();
+backEdges.forEach(edge => {
+    const target = this.nodes.find(n => n.id === edge.to);
+
+    // ignore decision-controlled loops (you already handle them)
+    if (target && target.type !== 'decision') {
+        this.implicitLoopHeaders.add(edge.to);
+    }
+});
+
+// ---------------------------------------------------
         return this.compileNode(startNode.id, new Set(), [], 0);
     }
 
-    /**
-     * Compile a node with context tracking
-     */
+    compileImplicitForeverLoop(nodeId, visitedInPath, contextStack, indentLevel) {
+
+const indent = "    ".repeat(indentLevel);
+let code = "";
+
+// emit loop header
+code += `${indent}while True:\n`;
+
+// highlighting
+if (this.useHighlighting) {
+    code += `${indent}    highlight('${nodeId}')\n`;
+}
+
+// --------------------------------------------
+// IMPORTANT: compile header node INSIDE loop
+// --------------------------------------------
+
+// prevent re-enter lowering for this header
+const saved = new Set(this.implicitLoopHeaders);
+this.implicitLoopHeaders.delete(nodeId);
+
+// fresh visited for loop body so it emits once
+const bodyVisited = new Set();
+
+// 1) compile the header node’s own statement
+const headerCode =
+    this.compileNode(
+        nodeId,
+        bodyVisited,
+        [...contextStack, `implicit_${nodeId}`],
+        indentLevel + 1
+    );
+
+// 2) compile from its successor onward
+const nextId = this.getSuccessor(nodeId, "next");
+
+const restCode =
+    this.compileNode(
+        nextId,
+        bodyVisited,
+        [...contextStack, `implicit_${nodeId}`],
+        indentLevel + 1
+    );
+
+// restore set
+this.implicitLoopHeaders = saved;
+
+const body = (headerCode + restCode).trim()
+    ? headerCode + restCode
+    : `${indent}    pass\n`;
+
+code += body;
+
+return code;
+}
+
     compileNode(nodeId, visitedInPath, contextStack, indentLevel, inLoopHeader = false) {
+        // stop on implicit-loop back edges
+// prevent infinite recursion on back-edges inside implicit loops
+// only suppress SECOND visit to the implicit loop header
+if (inLoopHeader && visitedInPath.has(nodeId)) {
+    return "";
+}
+
+
+
         if (!nodeId || nodeId === 'end') return "";
         
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return "";
         
-        // Create unique context identifier
-        const contextId = `${nodeId}_${contextStack.join('_')}_${indentLevel}`;
+
+
+// IMPLICIT LOOP COMPILATION (with lowering guard)
+if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
+
+// if we already lowered this loop -> do NOT lower again
+if (this.loweredImplicitLoops.has(nodeId)) {
+    // just continue normally from successor to avoid recursion
+    const nextNodeId = this.getSuccessor(nodeId, 'next');
+    return this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel);
+}
+
+// mark loop as lowered now
+this.loweredImplicitLoops.add(nodeId);
+
+return this.compileImplicitForeverLoop(
+    nodeId,
+    visitedInPath,
+    contextStack,
+    indentLevel
+);
+}
+
+
         
-        // Prevent infinite recursion in the same context
-        if (visitedInPath.has(contextId)) {
-            return "";
-        }
+        const contextId = `${nodeId}_${contextStack.join('_')}_${indentLevel}`;
+        if (visitedInPath.has(contextId)) return "";
         visitedInPath.add(contextId);
         
         const indent = "    ".repeat(indentLevel);
         let code = "";
         
-        // Add highlight if enabled
         if (this.useHighlighting) {
             code += `${indent}highlight('${node.id}')\n`;
         }
         
-        // Handle different node types
         switch (node.type) {
+            case 'function_def':
+                return this.compileFunction(node, visitedInPath, contextStack, indentLevel);
+
+            case 'function_call':
+                if (node.text) code += `${indent}${node.text}\n`;
+                break;
+
+            case 'return':
+                if (node.text) code += `${indent}${node.text}\n`;
+                break;
+
             case 'decision':
                 return this.compileDecision(node, visitedInPath, contextStack, indentLevel);
                 
             case 'start':
-                // Just continue to next node
                 break;
-                case 'end':
-        code += `${indent}raise SystemExit\n`;
-        break;    
+
+            case 'end':
+                code += `${indent}raise SystemExit\n`;
+                break;    
+
             case 'output':
                 code += `${indent}print(${node.text})\n`;
                 break;
                 
             case 'input':
-                const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
-                code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
-                if (node.dtype === 'int') code = code.trimEnd() + ")\n";
+                {
+                    const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
+                    code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
+                    if (node.dtype === 'int') code = code.trimEnd() + ")\n";
+                }
                 break;
                 
             default:
-                // Process, var, etc.
                 if (node.text) code += `${indent}${node.text}\n`;
                 break;
         }
-        
-        // Get next node (default 'next' port)
+        // after compiling the header once,
+// mark so that a second visit (back-edge) stops
+if (inLoopHeader) {
+    visitedInPath.add(nodeId);
+}
+
         const nextNodeId = this.getSuccessor(nodeId, 'next');
         
-        // If we're in a loop context, check if next node is any loop header in the stack
-        // If so, don't follow it (it's a back edge)
         if (contextStack.length > 0) {
             for (const ctx of contextStack) {
                 if (ctx.startsWith('loop_')) {
                     const loopHeaderId = ctx.replace('loop_', '');
                     if (nextNodeId === loopHeaderId) {
-                        // This is a back edge to a loop header, stop here
                         return code;
                     }
                 }
             }
         }
         
-        // Also check if next node is a decision that's already in the context stack
-        // This prevents infinite recursion when multiple loops share nodes
         if (nextNodeId) {
             const nextNode = this.nodes.find(n => n.id === nextNodeId);
             if (nextNode && nextNode.type === 'decision') {
                 const isAlreadyInStack = contextStack.some(ctx => ctx === `loop_${nextNodeId}`);
-                if (isAlreadyInStack) {
-                    // This decision is already being compiled as a loop, don't follow it
-                    return code;
-                }
+                if (isAlreadyInStack) return code;
             }
-            
-            // Check if next node is already visited in current context to prevent cycles
-            // This is especially important for if/else branches that might loop back
             const nextContextId = `${nextNodeId}_${contextStack.join('_')}_${indentLevel}`;
-            if (visitedInPath.has(nextContextId)) {
-                // This node is already being compiled in this context, stop to prevent cycle
-                return code;
-            }
+            if (visitedInPath.has(nextContextId)) return code;
         }
         
-        // Continue compilation
         code += this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel);
-        
         return code;
     }
 
-    /**
-     * Compile decision node (could be if, while, or for)
-     */
-    /**
- * Compile decision node (could be if, while, or for)
- */
-compileDecision(node, visitedInPath, contextStack, indentLevel) {
-    const yesId = this.getSuccessor(node.id, 'yes');
-    const noId  = this.getSuccessor(node.id, 'no');
+    /* ---- decision / loop logic (unchanged from your version) ---- */
 
-    // If this decision node is *already* in a loop context,
-    // just treat it as a normal if/else to avoid re-creating the loop.
-    const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
-    if (isAlreadyLoop) {
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
-    }
+    compileDecision(node, visitedInPath, contextStack, indentLevel) {
+        const yesId = this.getSuccessor(node.id, 'yes');
+        const noId  = this.getSuccessor(node.id, 'no');
 
-    // Simple loop detection: does this branch eventually lead back to me?
-    const isLoopYes = this.isLoopHeader(node.id, yesId);
-    const isLoopNo  = noId ? this.isLoopHeader(node.id, noId) : false;
-    const isLoop    = isLoopYes || isLoopNo;
+        const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+        if (isAlreadyLoop) {
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+        }
 
-    if (isLoop) {
-        // YES or NO branch is the loop body
-        const loopBodyId  = isLoopYes ? yesId : noId;
-        const exitId      = isLoopYes ? noId  : yesId;
-        const useNoBranch = !isLoopYes && isLoopNo;  // loop on "no" branch => negate condition
+        const isLoopYes = this.isLoopHeader(node.id, yesId);
+        const isLoopNo  = noId ? this.isLoopHeader(node.id, noId) : false;
+        const isLoop    = isLoopYes || isLoopNo;
 
-        return this.compileLoop(
-            node,
-            loopBodyId,
-            exitId,
-            visitedInPath,
-            contextStack,
-            indentLevel,
-            useNoBranch
-        );
-    } else {
-        // Plain if/else
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
-    }
-}
+        if (isLoop) {
+            const loopBodyId  = isLoopYes ? yesId : noId;
+            const exitId      = isLoopYes ? noId  : yesId;
+            const useNoBranch = !isLoopYes && isLoopNo;
 
-    /**
-     * Check if a decision node is a loop header
-     */
-/**
- * Check if a decision node is a loop header by following all paths
- */
- isLoopHeader(nodeId, branchId) {
-
-if (!branchId) return false;
-
-const MAX_DEPTH = 200;
-const visited = new Set();
-
-const dfs = (id, depth = 0) => {
-
-    if (!id) return false;
-    if (depth > MAX_DEPTH) return false;
-
-    // Real loop only if it comes back to THIS decision
-    if (id === nodeId) return true;
-
-    if (visited.has(id)) return false;
-    visited.add(id);
-
-    const outgoing = this.outgoingMap.get(id) || [];
-
-    for (const edge of outgoing) {
-        if (dfs(edge.targetId, depth + 1)) {
-            return true;
+            return this.compileLoop(
+                node,
+                loopBodyId,
+                exitId,
+                visitedInPath,
+                contextStack,
+                indentLevel,
+                useNoBranch
+            );
+        } else {
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
         }
     }
 
-    return false;
-};
+    isLoopHeader(nodeId, branchId) {
+        if (!branchId) return false;
+        const MAX_DEPTH = 200;
+        const visited = new Set();
 
-return dfs(branchId, 0);
-}
-/**
-     * Compile loop structure (while or for)
-     */
+        const dfs = (id, depth = 0) => {
+            if (!id) return false;
+            if (depth > MAX_DEPTH) return false;
+            if (id === nodeId) return true;
+            if (visited.has(id)) return false;
+            visited.add(id);
+
+            const outgoing = this.outgoingMap.get(id) || [];
+            for (const edge of outgoing) {
+                if (dfs(edge.targetId, depth + 1)) return true;
+            }
+            return false;
+        };
+
+        return dfs(branchId, 0);
+    }
+
     compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
         const indent = "    ".repeat(indentLevel);
         let code = "";
 
-        // Try to detect if it's a for loop pattern (only for YES branch loops)
         const forLoopInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
         
         if (forLoopInfo) {
-            // Compile as for loop
-            // Build range() with optional step parameter
             let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}`;
             if (forLoopInfo.step && Math.abs(forLoopInfo.step) !== 1) {
                 rangeStr += `, ${forLoopInfo.step}`;
@@ -593,396 +733,216 @@ return dfs(branchId, 0);
             
             code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
             if (this.useHighlighting) {
-    code += `${indent}    highlight('${node.id}')\n`;
-}
+                code += `${indent}    highlight('${node.id}')\n`;
+            }
             
-            // Compile loop body (exclude the increment statement)
-// compile loop body normally so highlight runs every iteration
-const forBodyContext = [...contextStack, `loop_${node.id}`];
-const forVisited = new Set();  // fresh per-loop context
+            const forBodyContext = [...contextStack, `loop_${node.id}`];
+            const forVisited = new Set();
+            code += this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
+                 || `${indent}    pass\n`;
 
-code +=
-    this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
-    || `${indent}    pass\n`;
-
-            
-            // Handle loop exit
             if (exitId) {
                 code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
-            
             return code;
         } else {
-            // Compile as while loop
-            // If NO branch loops, negate the condition
             let condition = node.text;
             if (useNoBranch) {
-                // Negate the condition: wrap in not() or invert operators
-                // Simple approach: wrap in not()
                 condition = `not (${node.text})`;
             }
             
             code += `${indent}while ${condition}:\n`;
             if (this.useHighlighting) {
-    code += `${indent}    highlight('${node.id}')\n`;
-}
-            // Push loop context
-            const newContextStack = [...contextStack, `loop_${node.id}`];
-            const newVisited = new Set([...visitedInPath]);
-            
-            // Compile loop body
-// compile loop body with normal compiler — highlight works per-iteration
-const whileBodyContext = [...contextStack, `loop_${node.id}`];
-const whileVisited = new Set();  // do NOT reuse visitedInPath here
+                code += `${indent}    highlight('${node.id}')\n`;
+            }
+            const whileBodyContext = [...contextStack, `loop_${node.id}`];
+            const whileVisited = new Set();
+            code += this.compileNode(loopBodyId, whileVisited, whileBodyContext, indentLevel + 1)
+                 || `${indent}    pass\n`;
 
-code +=
-    this.compileNode(loopBodyId, whileVisited, whileBodyContext, indentLevel + 1)
-    || `${indent}    pass\n`;
-
-            
-            // Handle loop exit
-            // Use original visited set (not the loop body's visited set) for the exit path
-            // This allows proper compilation of nodes after the loop
             if (exitId) {
                 code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
-            
             return code;
         }
     }
 
-    /**
-     * Detect for loop pattern:
-     * Looks for: var = 0 → decision → ... → var = var + 1 → back to decision
-     */
-/**
- * Improved for loop detection with path analysis
- */
-detectForLoopPattern(decisionId) {
-    // Look for variable initialization before the decision
-    const incoming = this.incomingMap.get(decisionId) || [];
-    let initNode = null;
-    let varName = null;
-    let startValue = null;
-    
-    for (const conn of incoming) {
-        const node = this.nodes.find(n => n.id === conn.sourceId);
-        if (node && (node.type === 'var' || node.type === 'process')) {
-            // Check if it looks like initialization: "i = 0"
-            const match = node.text.match(/^\s*(\w+)\s*=\s*(\d+)\s*$/);
+    detectForLoopPattern(decisionId) {
+        const incoming = this.incomingMap.get(decisionId) || [];
+        let initNode = null;
+        let varName = null;
+        let startValue = null;
+        
+        for (const conn of incoming) {
+            const node = this.nodes.find(n => n.id === conn.sourceId);
+            if (node && (node.type === 'var' || node.type === 'process')) {
+                const match = node.text.match(/^\s*(\w+)\s*=\s*(\d+)\s*$/);
+                if (match) {
+                    initNode = node;
+                    varName = match[1];
+                    startValue = match[2];
+                    break;
+                }
+            }
+        }
+        
+        if (!varName) return null;
+        
+        const decisionNode = this.nodes.find(n => n.id === decisionId);
+        const condition = decisionNode.text;
+        
+        let endValue = null;
+        let comparisonOp = null;
+        const patterns = [
+            { regex: new RegExp(`${varName}\\s*<\\s*(\\d+)`), op: '<' },
+            { regex: new RegExp(`${varName}\\s*<=\\s*(\\d+)`), op: '<=' },
+            { regex: new RegExp(`${varName}\\s*>\\s*(\\d+)`), op: '>' },
+            { regex: new RegExp(`${varName}\\s*>=\\s*(\\d+)`), op: '>=' }
+        ];
+        
+        for (const pattern of patterns) {
+            const match = condition.match(pattern.regex);
             if (match) {
-                initNode = node;
-                varName = match[1];
-                startValue = match[2];
+                endValue = match[1];
+                comparisonOp = pattern.op;
                 break;
             }
         }
-    }
-    
-    if (!varName) return null;
-    
-    // Parse condition to get end value
-    const decisionNode = this.nodes.find(n => n.id === decisionId);
-    const condition = decisionNode.text;
-    
-    // Try to extract end value from condition
-    let endValue = null;
-    let comparisonOp = null;
-    const patterns = [
-        { regex: new RegExp(`${varName}\\s*<\\s*(\\d+)`), op: '<' },
-        { regex: new RegExp(`${varName}\\s*<=\\s*(\\d+)`), op: '<=' },
-        { regex: new RegExp(`${varName}\\s*>\\s*(\\d+)`), op: '>' },
-        { regex: new RegExp(`${varName}\\s*>=\\s*(\\d+)`), op: '>=' }
-    ];
-    
-    for (const pattern of patterns) {
-        const match = condition.match(pattern.regex);
-        if (match) {
-            endValue = match[1];
-            comparisonOp = pattern.op;
-            break;
-        }
-    }
-    
-    if (!endValue) return null;
-    
-    // Look for increment statement in the loop body using BFS
-    const yesId = this.getSuccessor(decisionId, 'yes');
-    const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
-    
-    if (incrementInfo) {
-        // Determine step size and direction
-        let step = incrementInfo.step || 1;
-        const isDecrement = incrementInfo.isDecrement || false;
         
-        // Handle range conversion based on comparison operator
-        let finalStart = startValue;
-        let finalEnd = endValue;
-        let finalStep = step;
+        if (!endValue) return null;
         
-        if (comparisonOp === '>' || comparisonOp === '>=') {
-            // Decrementing loop: i = 10, i > 0, i = i - 1
-            // For i > 0: range(10, 0, -1) gives [10,9,8,...,1] ✓
-            // For i >= 0: range(10, -1, -1) gives [10,9,8,...,0] ✓
-            finalStart = startValue;
-            if (comparisonOp === '>=') {
-                // i >= endValue means we want to include endValue, so stop at endValue - 1
-                finalEnd = `${parseInt(endValue) - 1}`;
+        const yesId = this.getSuccessor(decisionId, 'yes');
+        const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
+        
+        if (incrementInfo) {
+            let step = incrementInfo.step || 1;
+            const isDecrement = incrementInfo.isDecrement || false;
+            
+            let finalStart = startValue;
+            let finalEnd = endValue;
+            let finalStep = step;
+            
+            if (comparisonOp === '>' || comparisonOp === '>=') {
+                finalStart = startValue;
+                if (comparisonOp === '>=') {
+                    finalEnd = `${parseInt(endValue) - 1}`;
+                } else {
+                    finalEnd = endValue;
+                }
+                finalStep = -Math.abs(step);
             } else {
-                // i > endValue means we stop when i == endValue, so range stops at endValue
-                finalEnd = endValue;
-            }
-            finalStep = -Math.abs(step);
-        } else {
-            // Incrementing loop: i = 0, i < 10, i = i + 1
-            finalStart = startValue;
-            if (comparisonOp === '<=') {
-                // i <= endValue means we want to include endValue, so range goes to endValue + 1
-                finalEnd = `${parseInt(endValue) + 1}`;
-            } else {
-                // i < endValue means range stops at endValue (exclusive)
-                finalEnd = endValue;
-            }
-            finalStep = Math.abs(step);
-        }
-        
-        return {
-            variable: varName,
-            start: finalStart,
-            end: finalEnd,
-            step: finalStep,
-            incrementNodeId: incrementInfo.node.id
-        };
-    }
-    
-    return null;
-}
-
-/**
- * Find increment node using BFS to handle longer paths
- * Returns object with node, step size, and direction info
- */
-findIncrementNodeBFS(startId, stopId, varName) {
-    const queue = [{ nodeId: startId, visited: new Set() }];
-    
-    while (queue.length > 0) {
-        const current = queue.shift();
-        
-        if (current.nodeId === stopId || current.visited.has(current.nodeId)) {
-            continue;
-        }
-        
-        current.visited.add(current.nodeId);
-        
-        const node = this.nodes.find(n => n.id === current.nodeId);
-        if (node) {
-            // Check for various increment patterns
-            // Pattern 1: i = i + 1, i = i - 1, i = i + 2, etc.
-            let incrementMatch = node.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*([+-])\\s*(\\d+)\\s*$`));
-            if (incrementMatch && (node.type === 'process' || node.type === 'var')) {
-                const op = incrementMatch[1];
-                const step = parseInt(incrementMatch[2]);
-                return {
-                    node: node,
-                    step: step,
-                    isDecrement: op === '-'
-                };
+                finalStart = startValue;
+                if (comparisonOp === '<=') {
+                    finalEnd = `${parseInt(endValue) + 1}`;
+                } else {
+                    finalEnd = endValue;
+                }
+                finalStep = Math.abs(step);
             }
             
-            // Pattern 2: i += 1, i -= 1, i += 2, etc.
-            incrementMatch = node.text.match(new RegExp(`^\\s*${varName}\\s*([+-])=\\s*(\\d+)\\s*$`));
-            if (incrementMatch && (node.type === 'process' || node.type === 'var')) {
-                const op = incrementMatch[1];
-                const step = parseInt(incrementMatch[2]);
-                return {
-                    node: node,
-                    step: step,
-                    isDecrement: op === '-'
-                };
-            }
+            return {
+                variable: varName,
+                start: finalStart,
+                end: finalEnd,
+                step: finalStep,
+                incrementNodeId: incrementInfo.node.id
+            };
         }
         
-        // Add next nodes to queue
-        const nextId = this.getSuccessor(current.nodeId, 'next');
-        if (nextId && !current.visited.has(nextId)) {
-            queue.push({
-                nodeId: nextId,
-                visited: new Set([...current.visited])
-            });
-        }
-        
-        // Also check yes branch if this is a decision
-        if (node && node.type === 'decision') {
-            const yesId = this.getSuccessor(current.nodeId, 'yes');
-            if (yesId && !current.visited.has(yesId)) {
-                queue.push({
-                    nodeId: yesId,
-                    visited: new Set([...current.visited])
-                });
-            }
-        }
+        return null;
     }
-    
-    return null;
-}
 
-    /**
-     * Find increment node in loop body
-     */
-    findIncrementNode(startId, stopId, varName, visited = new Set()) {
-        if (!startId || visited.has(startId) || startId === stopId) return null;
-        visited.add(startId);
+    findIncrementNodeBFS(startId, stopId, varName) {
+        const queue = [{ nodeId: startId, visited: new Set() }];
         
-        const node = this.nodes.find(n => n.id === startId);
-        if (node) {
-            // Check if this is an increment statement
-            const incrementPattern = new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*[+-]\\s*\\d+\\s*$`);
-            if ((node.type === 'process' || node.type === 'var') && 
-                node.text && incrementPattern.test(node.text)) {
-                return node;
-            }
+        while (queue.length > 0) {
+            const current = queue.shift();
             
-            // Check if this node has a back edge to the loop header
-            const outgoing = this.outgoingMap.get(startId) || [];
-            const hasBackEdge = outgoing.some(conn => conn.targetId === stopId);
-            if (hasBackEdge) {
-                // Reached back edge without finding increment
-                return null;
-            }
-        }
-        
-        // Continue searching
-        const nextId = this.getSuccessor(startId, 'next');
-        return this.findIncrementNode(nextId, stopId, varName, visited);
-    }
-
-    /**
-     * Compile loop body, stopping at back edges
-     */
-    compileLoopBody(loopHeaderId, startId, skipNodeId, visitedInPath, contextStack, indentLevel) {
-        let code = "";
-        let currentId = startId;
-        const visitedInLoop = new Set([...visitedInPath]);
-        
-        while (currentId && currentId !== loopHeaderId) {
-            // >>> ALWAYS highlight loop body nodes <<<
-        if (this.useHighlighting) {
-            const indentHL = "    ".repeat(indentLevel);
-            code += `${indentHL}highlight('${currentId}')\n`;
-        }
-
-            // Check if we should skip this node (for increment in for loops)
-            if (currentId === skipNodeId) {
-                currentId = this.getSuccessor(currentId, 'next');
+            if (current.nodeId === stopId || current.visited.has(current.nodeId)) {
                 continue;
             }
             
-            const node = this.nodes.find(n => n.id === currentId);
-            if (!node) break;
+            current.visited.add(current.nodeId);
             
-            // Check if this node has a back edge to the loop header
-            const outgoing = this.outgoingMap.get(currentId) || [];
-            const hasBackEdge = outgoing.some(conn => 
-                conn.targetId === loopHeaderId && (conn.port === 'next' || conn.port === 'yes'));
-            
-            // Also check if next node is any loop header in the context stack
-            const nextId = this.getSuccessor(currentId, 'next');
-            let isBackEdgeToAnyLoop = false;
-            if (nextId && contextStack.length > 0) {
-                for (const ctx of contextStack) {
-                    if (ctx.startsWith('loop_')) {
-                        const ctxLoopHeaderId = ctx.replace('loop_', '');
-                        if (nextId === ctxLoopHeaderId) {
-                            isBackEdgeToAnyLoop = true;
-                            break;
-                        }
-                    }
+            const node = this.nodes.find(n => n.id === current.nodeId);
+            if (node) {
+                let incrementMatch = node.text.match(new RegExp(`^\\s*${varName}\\s*=\\s*${varName}\\s*([+-])\\s*(\\d+)\\s*$`));
+                if (incrementMatch && (node.type === 'process' || node.type === 'var')) {
+                    const op = incrementMatch[1];
+                    const step = parseInt(incrementMatch[2]);
+                    return {
+                        node: node,
+                        step: step,
+                        isDecrement: op === '-'
+                    };
+                }
+                
+                incrementMatch = node.text.match(new RegExp(`^\\s*${varName}\\s*([+-])=\\s*(\\d+)\\s*$`));
+                if (incrementMatch && (node.type === 'process' || node.type === 'var')) {
+                    const op = incrementMatch[1];
+                    const step = parseInt(incrementMatch[2]);
+                    return {
+                        node: node,
+                        step: step,
+                        isDecrement: op === '-'
+                    };
                 }
             }
             
-            if (hasBackEdge || isBackEdgeToAnyLoop) {
-                // Compile this node but don't follow the back edge
-                // We need to compile just this node's code without following its 'next' connection
-            // Compile this node but don't follow the back edge
-            const indent = "    ".repeat(indentLevel);
-
-
-            if (this.useHighlighting) {
-                code += `${indent}highlight('${node.id}')\n`;
+            const nextId = this.getSuccessor(current.nodeId, 'next');
+            if (nextId && !current.visited.has(nextId)) {
+                queue.push({
+                    nodeId: nextId,
+                    visited: new Set([...current.visited])
+                });
             }
-
-            switch (node.type) {
-                case 'output':
-                    code += `${indent}print(${node.text})\n`;
-                    break;
-
-                    case 'input':
-                        const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
-                        code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
-                        if (node.dtype === 'int') code = code.trimEnd() + ")\n";
-                        break;
-                    default:
-                        if (node.text) code += `${indent}${node.text}\n`;
-                        break;
+            
+            if (node && node.type === 'decision') {
+                const yesId = this.getSuccessor(current.nodeId, 'yes');
+                if (yesId && !current.visited.has(yesId)) {
+                    queue.push({
+                        nodeId: yesId,
+                        visited: new Set([...current.visited])
+                    });
                 }
-                break;
             }
-            
-            // Compile the node
-// Always highlight body nodes
-            if (this.useHighlighting) {
-                code += `${"    ".repeat(indentLevel)}highlight('${currentId}')\n`;
-            }
-
-            // Compile the node normally
-            const nodeCode = this.compileNode(currentId, visitedInLoop, contextStack, indentLevel, true);
-            code += nodeCode;
-
-            
-            // Move to next node, but check if it's the loop header first
-            if (nextId === loopHeaderId) {
-                // Next node is the loop header, stop here
-                break;
-            }
-            currentId = nextId;
         }
         
-        return code;
+        return null;
     }
 
-    /**
-     * Compile if/else statement with support for elif
-     */
-/**
- * Compile if/else statement with support for elif
- */
-compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
-    const indent = "    ".repeat(indentLevel);
-    let code = `${indent}if ${node.text}:\n`;
+    compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
+        const indent = "    ".repeat(indentLevel);
+        let code = `${indent}if ${node.text}:\n`;
 
-    // ----- IF BRANCH -----
-    const ifContext = [...contextStack, `if_${node.id}`];
-    const ifVisited = new Set(visitedInPath);
-    const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
-    ifVisited.add(ifDecisionContextId);
+        const ifContext = [...contextStack, `if_${node.id}`];
+        const ifVisited = new Set(visitedInPath);
+        const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
+        ifVisited.add(ifDecisionContextId);
 
-    const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
-    code += ifCode || `${indent}    pass\n`;
+        const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
+        code += ifCode || `${indent}    pass\n`;
 
-    // ----- ELSE / ELIF -----
-    if (noId) {
-        const noNode = this.nodes.find(n => n.id === noId);
+        if (noId) {
+            const noNode = this.nodes.find(n => n.id === noId);
 
-        if (noNode && noNode.type === 'decision') {
-            // Check if this "else" decision is itself a loop header.
-            // If it is, we MUST NOT turn it into an elif chain, or we get
-            // exactly the infinite recursion you’re seeing.
-            const yesOfNo        = this.getSuccessor(noNode.id, 'yes');
-            const noBranchIsLoop = this.isLoopHeader(noNode.id, yesOfNo);
+            if (noNode && noNode.type === 'decision') {
+                const yesOfNo        = this.getSuccessor(noNode.id, 'yes');
+                const noBranchIsLoop = this.isLoopHeader(noNode.id, yesOfNo);
 
-            if (noBranchIsLoop) {
-                // Treat it as a plain else: block, whose contents happen
-                // to start with another while-loop decision.
+                if (noBranchIsLoop) {
+                    const elseContext = [...contextStack, `else_${node.id}`];
+                    const elseVisited = new Set(visitedInPath);
+                    const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
+                    elseVisited.add(elseDecisionContextId);
+
+                    code += `${indent}else:\n`;
+                    const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
+                    code += elseCode || `${indent}    pass\n`;
+                } else {
+                    code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
+                }
+            } else {
                 const elseContext = [...contextStack, `else_${node.id}`];
                 const elseVisited = new Set(visitedInPath);
                 const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
@@ -991,227 +951,242 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
                 code += `${indent}else:\n`;
                 const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
                 code += elseCode || `${indent}    pass\n`;
-            } else {
-                // Safe to treat as an elif chain
-                code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
             }
-        } else {
-            // Simple else branch (no decision node at the top)
-            const elseContext = [...contextStack, `else_${node.id}`];
-            const elseVisited = new Set(visitedInPath);
-            const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
-            elseVisited.add(elseDecisionContextId);
+        }
+
+        return code;
+    }
+
+    compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
+        let code = "";
+        const indent = "    ".repeat(indentLevel);
+
+        let currentElif = elifNode;
+        const seen = new Set();
+
+        while (currentElif && currentElif.type === 'decision') {
+            if (seen.has(currentElif.id)) break;
+            seen.add(currentElif.id);
+
+            const elifYesId = this.getSuccessor(currentElif.id, 'yes');
+            const elifNoId  = this.getSuccessor(currentElif.id, 'no');
+
+            code += `${indent}elif ${currentElif.text}:\n`;
+
+            const elifContext = [...contextStack, `elif_${currentElif.id}`];
+            const elifVisited = new Set(visitedInPath);
+
+            const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1);
+            code += elifCode || `${indent}    pass\n`;
+
+            if (!elifNoId) break;
+
+            const nextNode = this.nodes.find(n => n.id === elifNoId);
+
+            if (nextNode && nextNode.type === 'decision') {
+                currentElif = nextNode;
+                continue;
+            }
 
             code += `${indent}else:\n`;
-            const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
+            const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1);
             code += elseCode || `${indent}    pass\n`;
-        }
-    }
 
-    return code;
-}
-
-    /**
-     * Handle elif chains
-     */
-/**
- * Handle elif chains safely (no infinite A ↔ B bouncing)
- */
-compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
-    let code = "";
-    const indent = "    ".repeat(indentLevel);
-
-    let currentElif = elifNode;
-    const seen = new Set();   // prevent the same decision reappearing in the chain
-
-    while (currentElif && currentElif.type === 'decision') {
-        // Stop if we’ve already emitted this decision in the chain
-        if (seen.has(currentElif.id)) break;
-        seen.add(currentElif.id);
-
-        const elifYesId = this.getSuccessor(currentElif.id, 'yes');
-        const elifNoId  = this.getSuccessor(currentElif.id, 'no');
-
-        code += `${indent}elif ${currentElif.text}:\n`;
-
-        const elifContext = [...contextStack, `elif_${currentElif.id}`];
-        const elifVisited = new Set(visitedInPath);
-
-        const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1);
-        code += elifCode || `${indent}    pass\n`;
-
-        if (!elifNoId) break;
-
-        const nextNode = this.nodes.find(n => n.id === elifNoId);
-
-        // Another elif in the chain?
-        if (nextNode && nextNode.type === 'decision') {
-            currentElif = nextNode;
-            continue;
+            break;
         }
 
-        // Final else clause
-        code += `${indent}else:\n`;
-        const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1);
-        code += elseCode || `${indent}    pass\n`;
-
-        break;
+        return code;
     }
 
-    return code;
+    /* ================== FUNCTION SUPPORT ================== */
+    compileFunction(node, visitedInPath, contextStack, indentLevel) {
+        const indent = "    ".repeat(indentLevel);
+        const headerRaw = (node.text || "my_func()").trim();
+        let funcName = "my_func";
+        let params = "";
+
+        const m = headerRaw.match(/^(\w+)\s*\((.*)\)$/);
+        if (m) {
+            funcName = m[1];
+            params = m[2].trim();
+        }
+
+        let code = `${indent}def ${funcName}(${params}):\n`;
+        if (this.useHighlighting) {
+            code += `${indent}    highlight('${node.id}')\n`;
+        }
+
+        const bodyStart = this.getSuccessor(node.id, 'next') || this.getSuccessor(node.id, 'yes');
+
+        const bodyVisited = new Set();
+        const bodyCtx = [...contextStack, `func_${funcName}`];
+        let body = this.compileNode(bodyStart, bodyVisited, bodyCtx, indentLevel + 1);
+
+        if (!body.trim()) {
+            body = `${indent}    pass\n`;
+        } else if (!/\breturn\b/.test(body)) {
+            body += `${indent}    # WARNING: function '${funcName}' has no return statement\n`;
+        }
+
+        code += body + "\n";
+
+        const afterId = this.getSuccessor(node.id, 'next');
+        code += this.compileNode(afterId, visitedInPath, contextStack, indentLevel);
+        return code;
+    }
 }
 
-}
-
+/* ============================================================
+   APP OBJECT
+============================================================ */
 const App = {
-    nodes: [], connections: [], nextId: 1, isRunning: false,
-    isConnecting: false, connStart: null, fullExecCode: "",
-    editingNode: null, selectedNodeId: null,viewportScale: 1,
-viewportX: 0,
-viewportY: 0,
-minScale: 0.3,
-maxScale: 2.5,
-cancelExecution: false,
-skulptTask: null,
-skModule: null,
+    nodes: [],
+    connections: [],
+    nextId: 1,
+    isRunning: false,
+    isConnecting: false,
+    connStart: null,
+    fullExecCode: "",
+    editingNode: null,
+    selectedNodeId: null,
+    viewportScale: 1,
+    viewportX: 0,
+    viewportY: 0,
+    minScale: 0.3,
+    maxScale: 2.5,
+    cancelExecution: false,
+    skulptTask: null,
+    skModule: null,
 
-updateVarWatch(varsObj) {
-const div = document.getElementById("varwatch-table");
-if (!div) return;
+    updateVarWatch(varsObj) {
+        const div = document.getElementById("varwatch-table");
+        if (!div) return;
 
-let html = "<table style='width:100%; border-collapse: collapse;'>";
-let hasVars = false;
+        let html = "<table style='width:100%; border-collapse: collapse;'>";
+        let hasVars = false;
 
-for (const key in varsObj) {
-    // Filter out internal Skulpt attributes and the highlight function itself
-    if (key.startsWith("__") || key === "highlight" || key === "input" || key === "print") continue;
+        for (const key in varsObj) {
+            if (key.startsWith("__") || key === "highlight" || key === "input" || key === "print") continue;
 
-    let val = varsObj[key];
-    let displayVal = val;
+            let val = varsObj[key];
+            let displayVal = val;
 
-    // Safely unwrap Skulpt types
-    if (val !== null && typeof val === 'object') {
-        if (val.v !== undefined) {
-            displayVal = val.v; // Standard primitives
-        } else if (val.tp$name !== undefined) {
-            displayVal = `[${val.tp$name}]`; // Objects/Lists
+            if (val !== null && typeof val === 'object') {
+                if (val.v !== undefined) {
+                    displayVal = val.v;
+                } else if (val.tp$name !== undefined) {
+                    displayVal = `[${val.tp$name}]`;
+                }
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="color: #888; padding: 4px; font-weight: bold;">${key}</td>
+                    <td style="color: #0f0; padding: 4px; text-align: right;">${displayVal}</td>
+                </tr>`;
+            hasVars = true;
         }
-    }
 
-    html += `
-        <tr style="border-bottom: 1px solid #333;">
-            <td style="color: #888; padding: 4px; font-weight: bold;">${key}</td>
-            <td style="color: #0f0; padding: 4px; text-align: right;">${displayVal}</td>
-        </tr>`;
-    hasVars = true;
-}
+        html += "</table>";
+        div.innerHTML = hasVars ? html : "<em>No variables set</em>";
+    },
 
-html += "</table>";
-div.innerHTML = hasVars ? html : "<em>No variables set</em>";
-},
+    stopSim() {
+        if (!this.isRunning) return;
 
-stopSim() {
-    if (!this.isRunning) return;
+        this.cancelExecution = true;
 
-    this.cancelExecution = true;
+        if (this.skulptTask && this.skulptTask.cancel) {
+            try { this.skulptTask.cancel(); } catch (_) {}
+        }
 
-    // abort Skulpt task if exists
-    if (this.skulptTask && this.skulptTask.cancel) {
-        try { this.skulptTask.cancel(); } catch (_) {}
-    }
+        this.isRunning = false;
 
-    this.isRunning = false;
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+        document.getElementById('run-btn').style.display = "inline-block";
+        document.getElementById('stop-btn').style.display = "none";
 
-    // UI reset
-    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-    document.getElementById('run-btn').style.display = "inline-block";
-    document.getElementById('stop-btn').style.display = "none";
+        this.log("\n>>> Stopped.");
+    },
 
-    this.log("\n>>> Stopped.");
-}
-,
-async loadExampleFromFile(filename) {
-    try {
-        const res = await fetch(`flows/${filename}`);
-        if (!res.ok) {
-            alert(`Could not load ${filename}`);
+    async loadExampleFromFile(filename) {
+        try {
+            const res = await fetch(`flows/${filename}`);
+            if (!res.ok) {
+                alert(`Could not load ${filename}`);
+                return;
+            }
+
+            const diagram = await res.json();
+            this.loadDiagramObject(diagram);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error loading example file");
+        }
+    },
+
+    loadDiagramObject(diagram) {
+        if (!diagram.nodes || !Array.isArray(diagram.nodes)) {
+            alert("Invalid diagram file (missing nodes)");
             return;
         }
 
-        const diagram = await res.json();
-        this.loadDiagramObject(diagram);
+        if (!diagram.connections || !Array.isArray(diagram.connections)) {
+            alert("Invalid diagram file (missing connections)");
+            return;
+        }
 
-    } catch (err) {
-        console.error(err);
-        alert("Error loading example file");
-    }
-},
-loadDiagramObject(diagram) {
-    if (!diagram.nodes || !Array.isArray(diagram.nodes)) {
-        alert("Invalid diagram file (missing nodes)");
-        return;
-    }
+        this.nodes = [];
+        this.connections = [];
+        this.selectedNodeId = null;
 
-    if (!diagram.connections || !Array.isArray(diagram.connections)) {
-        alert("Invalid diagram file (missing connections)");
-        return;
-    }
+        document.getElementById('nodes-layer').innerHTML = "";
+        document.getElementById('console').innerHTML = "";
+        document.getElementById('code-python').innerText = "";
 
-    // reset
-    this.nodes = [];
-    this.connections = [];
-    this.selectedNodeId = null;
+        this.nextId = 1;
 
-    document.getElementById('nodes-layer').innerHTML = "";
-    document.getElementById('console').innerHTML = "";
-    document.getElementById('code-python').innerText = "";
+        diagram.nodes.forEach(node => {
+            const num = parseInt(node.id.replace("n", "")) || 0;
+            if (num >= this.nextId) this.nextId = num + 1;
 
-    this.nextId = 1;
+            this.nodes.push(node);
+            this.renderNode(node);
+        });
 
-    // restore nodes
-    diagram.nodes.forEach(node => {
-        const num = parseInt(node.id.replace("n", "")) || 0;
-        if (num >= this.nextId) this.nextId = num + 1;
+        this.connections = diagram.connections;
 
-        this.nodes.push(node);
-        this.renderNode(node);
-    });
+        this.drawConns();
+        this.updateCode();
 
-    // restore connections
-    this.connections = diagram.connections;
+        if (this.resetView) this.resetView();
+    },
 
-    this.drawConns();
-    this.updateCode();
+    zoomIn() {
+        this.viewportScale = Math.min(this.maxScale, this.viewportScale * 1.2);
+        this.applyViewportTransform();
+    },
 
-    if (this.resetView) this.resetView();
-},
+    zoomOut() {
+        this.viewportScale = Math.max(this.minScale, this.viewportScale / 1.2);
+        this.applyViewportTransform();
+    },
 
-zoomIn() {
-    this.viewportScale = Math.min(this.maxScale, this.viewportScale * 1.2);
-    this.applyViewportTransform();
-},
+    resetView() {
+        this.viewportScale = 1;
+        this.viewportX = 0;
+        this.viewportY = 0;
+        this.applyViewportTransform();
+    },
 
-zoomOut() {
-    this.viewportScale = Math.max(this.minScale, this.viewportScale / 1.2);
-    this.applyViewportTransform();
-},
-
-resetView() {
-    this.viewportScale = 1;
-    this.viewportX = 0;
-    this.viewportY = 0;
-    this.applyViewportTransform();
-},
-
-applyViewportTransform() {
-    const t = `translate(${this.viewportX}px, ${this.viewportY}px) scale(${this.viewportScale})`;
-    this.nodesLayer.style.transform = t;
-    this.svgLayer.style.transform   = t;
-},
+    applyViewportTransform() {
+        const t = `translate(${this.viewportX}px, ${this.viewportY}px) scale(${this.viewportScale})`;
+        this.nodesLayer.style.transform = t;
+        this.svgLayer.style.transform   = t;
+    },
 
     init() {
-
-        
         Sk.configure({ 
             output: (t) => this.log(t), 
             read: (x) => Sk.builtinFiles["files"][x], 
@@ -1228,13 +1203,11 @@ applyViewportTransform() {
         document.getElementById('save-node-btn').onclick = () => this.saveNodeEdit();
         this.applyViewportTransform();
         this.dragLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
-this.dragLine.setAttribute("stroke", "#666");
-this.dragLine.setAttribute("stroke-width", "3");
-this.dragLine.setAttribute("fill", "none");
-this.dragLine.style.display = "none";
-this.svgLayer.appendChild(this.dragLine);
-
-
+        this.dragLine.setAttribute("stroke", "#666");
+        this.dragLine.setAttribute("stroke-width", "3");
+        this.dragLine.setAttribute("fill", "none");
+        this.dragLine.style.display = "none";
+        this.svgLayer.appendChild(this.dragLine);
     },
 
     log(t) { 
@@ -1250,7 +1223,8 @@ this.svgLayer.appendChild(this.dragLine);
             const modal = new bootstrap.Modal(document.getElementById('inputModal'));
             document.getElementById('modal-prompt').innerText = prompt || "Enter value:";
             const field = document.getElementById('modal-field');
-            field.value = ""; modal.show();
+            field.value = "";
+            modal.show();
             const finish = () => { modal.hide(); resolve(field.value); };
             document.getElementById('modal-submit').onclick = finish;
             field.onkeydown = (e) => { if(e.key === 'Enter') finish(); };
@@ -1265,21 +1239,19 @@ this.svgLayer.appendChild(this.dragLine);
         let dtype = "int";
         
         switch(type) {
-            
-    case 'start': text = 'Start'; break;
-    case 'end':   text = 'End'; break;
-    case 'decision': text = 'x < 10'; break;
-    case 'var': text = 'x = 0'; break;
-    case 'list':
-    text = 'myList = []';
-    break;
+            case 'start': text = 'Start'; break;
+            case 'end':   text = 'End'; break;
+            case 'decision': text = 'x < 10'; break;
+            case 'var': text = 'x = 0'; break;
+            case 'list': text = 'myList = []'; break;
+            case 'output': text = 'x'; break;
+            case 'process': text = 'x = x + 1'; break;
+            case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
+            case 'function_def': text = 'my_func(a, b)'; break;
+            case 'function_call': text = 'result = my_func(1, 2)'; break;
+            case 'return': text = 'return x'; break;
+        }
 
-    case 'output': text = 'x'; break;
-    case 'process': text = 'x = x + 1'; break;
-    case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
-}
-
-        
         const config = { id, type, x, y, text, varName, prompt, dtype };
         this.nodes.push(config); 
         this.renderNode(config); 
@@ -1287,60 +1259,65 @@ this.svgLayer.appendChild(this.dragLine);
     },
 
     renderNode(node) {
-    const el = document.createElement('div');
-    el.className = `node shape-${node.type}`; 
-    el.id = node.id;
-    el.style.left = node.x + 'px'; 
-    el.style.top = node.y + 'px';
-    
-    let label = node.text;
-    if (node.type === 'output') label = `print(${node.text})`;
-    if (node.type === 'input') label = `${node.varName} = input()`;
-    
-    // Logic for the Diamond SVG
-    if (node.type === 'decision') {
-        el.innerHTML = `
-            <svg class="decision-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <polygon points="50,0 100,50 50,100 0,50" />
-            </svg>
-            <div class="inner-text">${label}</div>
-        `;
-    } else {
-        el.innerHTML = `<div class="inner-text">${label}</div>`;
-    }
-    
-    // Ports
-    if (node.type !== 'start') this.addDot(el, 'in', 'in');
-    
-    if (node.type === 'decision') { 
-        this.addDot(el, 'out-yes', 'yes'); 
-        this.addDot(el, 'out-no', 'no'); 
-    } else if (node.type !== 'end') {
-        this.addDot(el, 'out', 'next');
-    }
-    
-    // Dragging Logic (unchanged)
-    el.onpointerdown = (e) => {
-        if (e.target.classList.contains('dot')) return;
-        this.selectNode(node.id);
-        const sX = e.clientX, sY = e.clientY, iX = node.x, iY = node.y;
-        const move = (me) => {
-            node.x = iX + (me.clientX - sX); 
-            node.y = iY + (me.clientY - sY);
-            el.style.left = node.x + 'px'; 
-            el.style.top = node.y + 'px';
-            this.drawConns();
+        const el = document.createElement('div');
+        el.className = `node shape-${node.type}`; 
+        el.id = node.id;
+        el.style.left = node.x + 'px'; 
+        el.style.top = node.y + 'px';
+        
+        let label = node.text;
+        if (node.type === 'output') label = `print(${node.text})`;
+        if (node.type === 'input') label = `${node.varName} = input()`;
+        if (node.type === 'function_def') label = `def ${node.text}:`;
+        if (node.type === 'return') {
+            if (!label || !label.trim().startsWith('return')) {
+                label = `return ${label}`;
+            }
+        }
+        
+        if (node.type === 'decision') {
+            el.className = `node shape-decision`;
+            el.innerHTML = `
+                <svg class="decision-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <polygon points="50,0 100,50 50,100 0,50" />
+                </svg>
+                <div class="inner-text">${label}</div>
+            `;
+        } else {
+            el.innerHTML = `<div class="inner-text">${label}</div>`;
+        }
+        
+        if (node.type !== 'start') this.addDot(el, 'in', 'in');
+        
+        if (node.type === 'decision') { 
+            this.addDot(el, 'out-yes', 'yes'); 
+            this.addDot(el, 'out-no', 'no'); 
+        } else if (node.type !== 'end') {
+            this.addDot(el, 'out', 'next');
+        }
+        
+        el.onpointerdown = (e) => {
+            if (e.target.classList.contains('dot')) return;
+            this.selectNode(node.id);
+            const sX = e.clientX, sY = e.clientY, iX = node.x, iY = node.y;
+            const move = (me) => {
+                node.x = iX + (me.clientX - sX); 
+                node.y = iY + (me.clientY - sY);
+                el.style.left = node.x + 'px'; 
+                el.style.top = node.y + 'px';
+                this.drawConns();
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', () => { 
+                window.removeEventListener('pointermove', move); 
+                this.updateCode(); 
+            }, {once: true});
         };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', () => { 
-            window.removeEventListener('pointermove', move); 
-            this.updateCode(); 
-        }, {once: true});
-    };
-    
-    el.ondblclick = () => this.openEditor(node);
-    this.nodesLayer.appendChild(el);
-},
+        
+        el.ondblclick = () => this.openEditor(node);
+        this.nodesLayer.appendChild(el);
+    },
+
     selectNode(id) {
         this.selectedNodeId = id;
         document.querySelectorAll('.node').forEach(n => 
@@ -1348,234 +1325,232 @@ this.svgLayer.appendChild(this.dragLine);
     },
 
     getPortPos(id, type) {
-    const el = document.getElementById(id);
-    if (!el) return { x: 0, y: 0 };
+        const el = document.getElementById(id);
+        if (!el) return { x: 0, y: 0 };
 
-    let dotClass = 'out';
-    if (type === 'yes') dotClass = 'out-yes';
-    else if (type === 'no') dotClass = 'out-no';
-    else if (type === 'in') dotClass = 'in';
+        let dotClass = 'out';
+        if (type === 'yes') dotClass = 'out-yes';
+        else if (type === 'no') dotClass = 'out-no';
+        else if (type === 'in') dotClass = 'in';
 
-    const dot = el.querySelector(`.dot.${dotClass}`);
+        const dot = el.querySelector(`.dot.${dotClass}`);
 
-    const canvasRect = this.canvas.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const rect = (dot || el).getBoundingClientRect();
 
-    // screen coords of the dot
-    const rect = (dot || el).getBoundingClientRect();
+        const rawX = rect.left - canvasRect.left + 5;
+        const rawY = rect.top  - canvasRect.top  + 5;
 
-    // raw pixel coords inside canvas
-    const rawX = rect.left - canvasRect.left + 5;
-    const rawY = rect.top  - canvasRect.top  + 5;
+        const x = (rawX - this.viewportX) / this.viewportScale;
+        const y = (rawY - this.viewportY) / this.viewportScale;
 
-    // ⬅️ CONVERT THROUGH INVERSE VIEWPORT TRANSFORM
-    const x = (rawX - this.viewportX) / this.viewportScale;
-    const y = (rawY - this.viewportY) / this.viewportScale;
+        return { x, y };
+    },
 
-    return { x, y };
-},
     drawConns() {
+        document.querySelectorAll('.conn-label').forEach(l => l.remove());
 
-// Remove old labels
-document.querySelectorAll('.conn-label').forEach(l => l.remove());
+        const d = this.svgLayer.querySelector('defs');
+        this.svgLayer.innerHTML = "";
+        this.svgLayer.appendChild(d);
+        this.svgLayer.appendChild(this.dragLine);
 
-// Reset SVG paths
-const d = this.svgLayer.querySelector('defs');
-this.svgLayer.innerHTML = "";
-this.svgLayer.appendChild(d);
-this.svgLayer.appendChild(this.dragLine);
+        const orthogonal = (p1, p2) => {
+            const GAP = 25;
+            const SIDE = 90;
 
-// Manhattan router
-function orthogonal(p1, p2) {
+            if (p2.y >= p1.y) {
+                const y1 = p1.y + GAP;
+                const midY = (y1 + p2.y - GAP) / 2;
 
-    const GAP = 25;   // spacing away from shapes
-    const SIDE = 90;  // width for loopbacks
+                return `
+                    M ${p1.x} ${p1.y}
+                    V ${y1}
+                    V ${midY}
+                    H ${p2.x}
+                    V ${p2.y - GAP}
+                    V ${p2.y}
+                `.replace(/\s+/g, ' ');
+            }
 
-    // ---------- NORMAL DOWNWARD FLOW ----------
-    if (p2.y >= p1.y) {
+            const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
 
-        // go straight down a bit to clear node
-        const y1 = p1.y + GAP;
+            return `
+                M ${p1.x} ${p1.y}
+                V ${p1.y + GAP}
+                H ${sideX}
+                V ${p2.y - GAP}
+                H ${p2.x}
+                V ${p2.y}
+            `.replace(/\s+/g, ' ');
+        };
 
-        // midpoint between source and target
-        const midY = (y1 + p2.y - GAP) / 2;
+        this.connections.forEach(c => {
+            const p1 = this.getPortPos(c.from, c.port);
+            const p2 = this.getPortPos(c.to, 'in');
 
-        return `
-            M ${p1.x} ${p1.y}
-            V ${y1}
-            V ${midY}
-            H ${p2.x}
-            V ${p2.y - GAP}
-            V ${p2.y}
-        `.replace(/\s+/g, ' ');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const dStr = orthogonal(p1, p2);
+            path.setAttribute('d', dStr);
+            path.setAttribute(
+                'stroke',
+                c.port === 'yes' ? '#16a34a' :
+                c.port === 'no'  ? '#dc2626' :
+                                   '#444'
+            );
+            path.setAttribute('stroke-width', 2.5);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('stroke-linecap', 'round');
+
+            this.svgLayer.appendChild(path);
+
+            if (c.port === 'yes' || c.port === 'no') {
+                const l = document.createElement('div');
+                l.className = 'conn-label';
+                l.innerText = c.port.toUpperCase();
+                l.style.left = (p1.x + 8) + 'px';
+                l.style.top  = (p1.y + 8) + 'px';
+                this.nodesLayer.appendChild(l);
+            }
+        });
+    },
+
+    updateCode() {
+    try {
+        const comp = new FlowchartCompiler(this.nodes, this.connections, false);
+        const execComp = new FlowchartCompiler(this.nodes, this.connections, true);
+
+        // normal compilation
+        const code = comp.compile();
+        document.getElementById('code-python').innerText = code;
+        this.fullExecCode = execComp.compile();
+
+        // ================================
+        // STATIC LOOP EXIT ANALYSIS HERE
+        // ================================
+        const consoleEl = document.getElementById("console");
+
+        // clear previous suggestions (but not runtime output)
+        consoleEl.innerHTML = ">>> Analysis\n";
+
+        // 1. find *implicit* loop headers
+        if (!comp.implicitLoopHeaders) return;
+
+        comp.implicitLoopHeaders.forEach(headerId => {
+
+            // 2. compute exit edges for this header
+            const exits = comp.getImplicitLoopExitEdges(headerId);
+
+            if (exits.length === 0) {
+                consoleEl.innerHTML +=
+                    `⚠️ Loop at ${headerId} has NO exits. Program will run forever unless 'break' or 'return' is used.<br>`;
+            } else {
+                consoleEl.innerHTML +=
+                    `💡 Loop at ${headerId} has exits leaving the loop body. You may need a 'break' statement.<br>`;
+            }
+        });
+
+    } catch (error) {
+        console.error('Compilation error:', error);
+        document.getElementById('code-python').innerText =
+            `# Compilation Error: ${error.message}\n# Check console for details.`;
+        this.fullExecCode = "";
     }
-
-    // ---------- LOOPBACK / TARGET ABOVE ----------
-    // route sideways, then up, then across
-    const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
-
-    return `
-        M ${p1.x} ${p1.y}
-        V ${p1.y + GAP}
-        H ${sideX}
-        V ${p2.y - GAP}
-        H ${p2.x}
-        V ${p2.y}
-    `.replace(/\s+/g, ' ');
-}
-
-// Draw each connection
-this.connections.forEach(c => {
-
-    const p1 = this.getPortPos(c.from, c.port);
-    const p2 = this.getPortPos(c.to, 'in');
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-
-    const dStr = orthogonal(p1, p2);
-
-    path.setAttribute('d', dStr);
-
-    // colors by port
-    path.setAttribute(
-        'stroke',
-        c.port === 'yes' ? '#16a34a' :
-        c.port === 'no'  ? '#dc2626' :
-                        '#444'
-    );
-
-    path.setAttribute('stroke-width', 2.5);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('marker-end', 'url(#arrowhead)');
-
-    // tidy corners
-    path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('stroke-linecap', 'round');
-
-    this.svgLayer.appendChild(path);
-
-    // YES / NO labels
-    if (c.port === 'yes' || c.port === 'no') {
-        const l = document.createElement('div');
-        l.className = 'conn-label';
-        l.innerText = c.port.toUpperCase();
-        l.style.left = (p1.x + 8) + 'px';
-        l.style.top  = (p1.y + 8) + 'px';
-        this.nodesLayer.appendChild(l);
-    }
-});
 }
 ,
 
-    updateCode() {
+    async runSim() {
+        if (this.isRunning) return;
+
+        this.isRunning = true;
+        this.cancelExecution = false;
+
+        document.getElementById('run-btn').style.display = "none";
+        document.getElementById('stop-btn').style.display = "inline-block";
+        document.getElementById('console').innerHTML = ">>> Running...<br/>";
+
+        this.updateVarWatch({});
+
+        Sk.builtins.highlight = new Sk.builtin.func((id) => {
+            if (this.cancelExecution) throw new Error("Execution stopped.");
+
+            const nid = (typeof id === "string") ? id : id.v;
+
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+            const activeNode = document.getElementById(nid);
+            if (activeNode) activeNode.classList.add('running');
+
+            if (Sk.globals) {
+                this.updateVarWatch(Sk.globals);
+            }
+
+            const delay = 2100 - document.getElementById('speed-slider').value;
+            return new Sk.misceval.promiseToSuspension(
+                new Promise(resolve => setTimeout(resolve, delay))
+            );
+        });
+
         try {
-            const comp = new FlowchartCompiler(this.nodes, this.connections, false);
-            const execComp = new FlowchartCompiler(this.nodes, this.connections, true);
-            const code = comp.compile();
-            document.getElementById('code-python').innerText = code;
-            this.fullExecCode = execComp.compile();
-        } catch (error) {
-            console.error('Compilation error:', error);
-            document.getElementById('code-python').innerText = `# Compilation Error: ${error.message}\n# Check console for details.`;
-            this.fullExecCode = "";
+            this.skulptTask = Sk.misceval.asyncToPromise(() =>
+                Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
+            );
+            await this.skulptTask;
+        } catch (e) {
+            if (!this.cancelExecution) this.log(String(e));
         }
+
+        this.isRunning = false;
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
+        document.getElementById('run-btn').style.display = "inline-block";
+        document.getElementById('stop-btn').style.display = "none";
+        if (!this.cancelExecution) this.log("\n>>> Finished.");
     },
 
-    async runSim() {
-if (this.isRunning) return;
-
-this.isRunning = true;
-this.cancelExecution = false;
-
-document.getElementById('run-btn').style.display = "none";
-document.getElementById('stop-btn').style.display = "inline-block";
-document.getElementById('console').innerHTML = ">>> Running...<br/>";
-
-// Reset watch
-this.updateVarWatch({});
-
-// Define the highlight bridge
-Sk.builtins.highlight = new Sk.builtin.func((id) => {
-    if (this.cancelExecution) throw new Error("Execution stopped.");
-
-    const nid = (typeof id === "string") ? id : id.v;
-
-    // UI Update: Highlight Node
-    document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-    const activeNode = document.getElementById(nid);
-    if (activeNode) activeNode.classList.add('running');
-
-    // VARIABLE TRACKER LOGIC:
-    // Use Sk.globals to get the current state of user variables
-    if (Sk.globals) {
-        this.updateVarWatch(Sk.globals);
-    }
-
-    const delay = 2100 - document.getElementById('speed-slider').value;
-    return new Sk.misceval.promiseToSuspension(
-        new Promise(resolve => setTimeout(resolve, delay))
-    );
-});
-
-try {
-    this.skulptTask = Sk.misceval.asyncToPromise(() =>
-        Sk.importMainWithBody("<stdin>", false, this.fullExecCode, true)
-    );
-    await this.skulptTask;
-} catch (e) {
-    if (!this.cancelExecution) this.log(String(e));
-}
-
-this.isRunning = false;
-document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
-document.getElementById('run-btn').style.display = "inline-block";
-document.getElementById('stop-btn').style.display = "none";
-if (!this.cancelExecution) this.log("\n>>> Finished.");
-} ,
     setupGlobalEvents() {
-
         this.canvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
+            e.preventDefault();
 
-    const scaleBefore = this.viewportScale;
+            const scaleBefore = this.viewportScale;
 
-    if (e.deltaY < 0) this.viewportScale *= 1.1;
-    else this.viewportScale /= 1.1;
+            if (e.deltaY < 0) this.viewportScale *= 1.1;
+            else this.viewportScale /= 1.1;
 
-    this.viewportScale = Math.min(this.maxScale, Math.max(this.minScale, this.viewportScale));
+            this.viewportScale = Math.min(this.maxScale, Math.max(this.minScale, this.viewportScale));
 
-    // zoom towards mouse pointer
-    const rect = this.canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+            const rect = this.canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
 
-    this.viewportX = mx - (mx - this.viewportX) * (this.viewportScale / scaleBefore);
-    this.viewportY = my - (my - this.viewportY) * (this.viewportScale / scaleBefore);
+            this.viewportX = mx - (mx - this.viewportX) * (this.viewportScale / scaleBefore);
+            this.viewportY = my - (my - this.viewportY) * (this.viewportScale / scaleBefore);
 
-    this.applyViewportTransform();
-}, { passive: false });
-let isPanning = false;
-let panStartX = 0;
-let panStartY = 0;
+            this.applyViewportTransform();
+        }, { passive: false });
 
-this.canvas.addEventListener("pointerdown", (e) => {
-    // only pan if clicking empty canvas background
-    if (e.target.id === "canvas" || e.target.id === "connections-layer") {
-        isPanning = true;
-        panStartX = e.clientX - this.viewportX;
-        panStartY = e.clientY - this.viewportY;
-    }
-});
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
 
-window.addEventListener("pointermove", (e) => {
-    if (!isPanning) return;
-    this.viewportX = e.clientX - panStartX;
-    this.viewportY = e.clientY - panStartY;
-    this.applyViewportTransform();
-});
+        this.canvas.addEventListener("pointerdown", (e) => {
+            if (e.target.id === "canvas" || e.target.id === "connections-layer") {
+                isPanning = true;
+                panStartX = e.clientX - this.viewportX;
+                panStartY = e.clientY - this.viewportY;
+            }
+        });
 
-window.addEventListener("pointerup", () => {
-    isPanning = false;
-});
+        window.addEventListener("pointermove", (e) => {
+            if (!isPanning) return;
+            this.viewportX = e.clientX - panStartX;
+            this.viewportY = e.clientY - panStartY;
+            this.applyViewportTransform();
+        });
+
+        window.addEventListener("pointerup", () => {
+            isPanning = false;
+        });
 
         window.onkeydown = (e) => {
             if ((e.key === "Delete" || e.key === "Backspace") && this.selectedNodeId) {
@@ -1609,11 +1584,9 @@ window.addEventListener("pointerup", () => {
             
             const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.node');
             if (target && target.id !== this.connStart.nodeId) {
-                // Remove any existing connection from same port
                 this.connections = this.connections.filter(c => 
                     !(c.from === this.connStart.nodeId && c.port === this.connStart.portType));
                 
-                // Add new connection
                 this.connections.push({ 
                     from: this.connStart.nodeId, 
                     port: this.connStart.portType, 
@@ -1644,247 +1617,286 @@ window.addEventListener("pointerup", () => {
     openEditor(node) {
         if (node.type === 'start' || node.type === 'end') return;
 
-    this.editingNode = node;
-    const body = document.getElementById('edit-modal-body');
+        this.editingNode = node;
+        const body = document.getElementById('edit-modal-body');
 
-    if (node.type === 'output') {
-        body.innerHTML = `
-            <label class="small fw-bold mb-1">Output value (inside print)</label>
-            <div class="input-group">
-                <span class="input-group-text">print(</span>
-                <input id="edit-output-text" class="form-control" value="${node.text}">
-                <span class="input-group-text">)</span>
-            </div>
-        `;
-    }
-    else if (node.type === 'decision') {
-        body.innerHTML = `
-            <label class="small fw-bold mb-1">Decision condition</label>
-            <div class="input-group">
-                <span class="input-group-text">if</span>
-                <input id="edit-decision-text" class="form-control" value="${node.text}">
-                <span class="input-group-text">:</span>
-            </div>
-            <div class="form-text">Examples: x &lt; 10, total == 0, name != ""</div>
-        `;
-    }
-    else if (node.type === 'input') {
-        body.innerHTML = `
-            <label class="small fw-bold">Variable name</label>
-            <input id="edit-input-var" class="form-control mb-2" value="${node.varName}">
-
-            <label class="small fw-bold">Prompt text</label>
-            <input id="edit-input-prompt" class="form-control mb-2" value="${node.prompt}">
-
-            <label class="small fw-bold">Input type</label>
-            <select id="edit-input-dtype" class="form-select">
-                <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
-                <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>Text</option>
-            </select>
-
-            <div class="mt-2 small text-muted">
-                Preview:
-                <code id="input-preview"></code>
-            </div>
-        `;
-
-        setTimeout(() => {
-            const updatePreview = () => {
-                const v = document.getElementById("edit-input-var").value || "x";
-                const p = document.getElementById("edit-input-prompt").value || "";
-                const t = document.getElementById("edit-input-dtype").value;
-
-                document.getElementById("input-preview").innerText =
-                    t === "int"
-                        ? `${v} = int(input("${p}"))`
-                        : `${v} = input("${p}")`;
-            };
-
-            document.getElementById("edit-input-var").oninput = updatePreview;
-            document.getElementById("edit-input-prompt").oninput = updatePreview;
-            document.getElementById("edit-input-dtype").onchange = updatePreview;
-
-            updatePreview();
-        }, 0);
-    }
-    else if (node.type === 'var') {
-
-        // Split existing text like:   total = total + 1
-        let varName = "x";
-        let varValue = "";
-
-        if (node.text && node.text.includes("=")) {
-            const parts = node.text.split("=");
-            varName = parts[0].trim();
-            varValue = parts.slice(1).join("=").trim();
-        }
-
-        body.innerHTML = `
-            <label class="small fw-bold">Variable name</label>
-            <input id="edit-var-name" class="form-control mb-2" value="${varName}">
-
-            <label class="small fw-bold">Value or expression</label>
-            <input id="edit-var-value" class="form-control mb-2" value="${varValue}">
-
-            <div class="mt-2 small text-muted">
-                Preview:
-                <code id="var-preview"></code>
-            </div>
-        `;
-
-        setTimeout(() => {
-            const updatePreview = () => {
-                const n = document.getElementById("edit-var-name").value || "x";
-                const v = document.getElementById("edit-var-value").value || "0";
-                document.getElementById("var-preview").innerText = `${n} = ${v}`;
-            };
-
-            document.getElementById("edit-var-name").oninput = updatePreview;
-            document.getElementById("edit-var-value").oninput = updatePreview;
-
-            updatePreview();
-        }, 0);
-    }
-
-    else if (node.type === 'list') {
-
-// defaults
-let listName = "myList";
-let values = [];
-
-if (node.text && node.text.includes("=")) {
-    const parts = node.text.split("=");
-    listName = parts[0].trim();
-
-    // parse array literal
-    try {
-        values = JSON.parse(parts[1].trim().replace(/'/g,'"'));
-    } catch {
-        values = [];
-    }
-}
-
-const length = values.length || 3;
-
-// build initial element inputs
-let elementsHtml = "";
-for (let i = 0; i < length; i++) {
-    elementsHtml += `
-        <input class="form-control mb-1 list-element"
-               value="${values[i] ?? ''}"
-               placeholder="Element ${i}">
-    `;
-}
-
-body.innerHTML = `
-    <label class="small fw-bold">List name</label>
-    <input id="edit-list-name" class="form-control mb-2" value="${listName}">
-
-    <label class="small fw-bold">List length</label>
-    <input id="edit-list-length" type="number"
-           min="0" class="form-control mb-2" value="${length}">
-
-    <label class="small fw-bold">Elements</label>
-    <div id="list-elements-box">${elementsHtml}</div>
-
-    <div class="mt-2 small text-muted">
-        Preview:
-        <code id="list-preview"></code>
-    </div>
-`;
-
-// dynamic behaviour
-setTimeout(() => {
-
-    const listBox = document.getElementById("list-elements-box");
-
-    const rebuild = () => {
-        const len = parseInt(document.getElementById("edit-list-length").value) || 0;
-
-        listBox.innerHTML = "";
-        for (let i = 0; i < len; i++) {
-            listBox.innerHTML += `
-                <input class="form-control mb-1 list-element"
-                       placeholder="Element ${i}">
+        if (node.type === 'output') {
+            body.innerHTML = `
+                <label class="small fw-bold mb-1">Output value (inside print)</label>
+                <div class="input-group">
+                    <span class="input-group-text">print(</span>
+                    <input id="edit-output-text" class="form-control" value="${node.text}">
+                    <span class="input-group-text">)</span>
+                </div>
             `;
         }
-        updatePreview();
-    };
+        else if (node.type === 'decision') {
+            body.innerHTML = `
+                <label class="small fw-bold mb-1">Decision condition</label>
+                <div class="input-group">
+                    <span class="input-group-text">if</span>
+                    <input id="edit-decision-text" class="form-control" value="${node.text}">
+                    <span class="input-group-text">:</span>
+                </div>
+                <div class="form-text">Examples: x &lt; 10, total == 0, name != ""</div>
+            `;
+        }
+        else if (node.type === 'input') {
+            body.innerHTML = `
+                <label class="small fw-bold">Variable name</label>
+                <input id="edit-input-var" class="form-control mb-2" value="${node.varName}">
 
-    const updatePreview = () => {
-        const name = document.getElementById("edit-list-name").value || "myList";
-        const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+                <label class="small fw-bold">Prompt text</label>
+                <input id="edit-input-prompt" class="form-control mb-2" value="${node.prompt}">
 
-        const quoted = elems.map(v =>
-            isNaN(v) || v === "" ? `"${v}"` : v
-        );
+                <label class="small fw-bold">Input type</label>
+                <select id="edit-input-dtype" class="form-select">
+                    <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
+                    <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>Text</option>
+                </select>
 
-        document.getElementById("list-preview").innerText =
-            `${name} = [${quoted.join(", ")}]`;
-    };
+                <div class="mt-2 small text-muted">
+                    Preview:
+                    <code id="input-preview"></code>
+                </div>
+            `;
 
-    document.getElementById("edit-list-length").oninput = rebuild;
-    document.getElementById("edit-list-name").oninput = updatePreview;
-    listBox.oninput = updatePreview;
+            setTimeout(() => {
+                const updatePreview = () => {
+                    const v = document.getElementById("edit-input-var").value || "x";
+                    const p = document.getElementById("edit-input-prompt").value || "";
+                    const t = document.getElementById("edit-input-dtype").value;
 
-    updatePreview();
-}, 0);
-}
+                    document.getElementById("input-preview").innerText =
+                        t === "int"
+                            ? `${v} = int(input("${p}"))`
+                            : `${v} = input("${p}")`;
+                };
 
-    else {
-        body.innerHTML = `
-            <label class="small fw-bold">Code Text</label>
-            <input id="edit-generic-text" class="form-control" value="${node.text ?? ""}">
-        `;
-    }
+                document.getElementById("edit-input-var").oninput = updatePreview;
+                document.getElementById("edit-input-prompt").oninput = updatePreview;
+                document.getElementById("edit-input-dtype").onchange = updatePreview;
 
-    new bootstrap.Modal(document.getElementById('editModal')).show();
-}
-,
-saveNodeEdit() {
-    const n = this.editingNode;
+                updatePreview();
+            }, 0);
+        }
+        else if (node.type === 'var') {
+            let varName = "x";
+            let varValue = "";
 
-    if (n.type === 'output') {
-        n.text = document.getElementById('edit-output-text').value;
-    }
-    else if (n.type === 'decision') {
-        n.text = document.getElementById('edit-decision-text').value;
-    }
-    else if (n.type === 'input') {
-        n.varName = document.getElementById('edit-input-var').value;
-        n.prompt  = document.getElementById('edit-input-prompt').value;
-        n.dtype   = document.getElementById('edit-input-dtype').value;
-    }
-    else if (n.type === 'var') {
-        const name  = document.getElementById('edit-var-name').value || "x";
-        const value = document.getElementById('edit-var-value').value || "0";
-        n.text = `${name} = ${value}`;
-    }
-    else if (n.type === 'list') {
+            if (node.text && node.text.includes("=")) {
+                const parts = node.text.split("=");
+                varName = parts[0].trim();
+                varValue = parts.slice(1).join("=").trim();
+            }
 
-const name = document.getElementById("edit-list-name").value || "myList";
+            body.innerHTML = `
+                <label class="small fw-bold">Variable name</label>
+                <input id="edit-var-name" class="form-control mb-2" value="${varName}">
 
-const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+                <label class="small fw-bold">Value or expression</label>
+                <input id="edit-var-value" class="form-control mb-2" value="${varValue}">
 
-const formatted = elems.map(v =>
-    isNaN(v) || v === "" ? `"${v}"` : v
-);
+                <div class="mt-2 small text-muted">
+                    Preview:
+                    <code id="var-preview"></code>
+                </div>
+            `;
 
-n.text = `${name} = [${formatted.join(", ")}]`;
-}
+            setTimeout(() => {
+                const updatePreview = () => {
+                    const n = document.getElementById("edit-var-name").value || "x";
+                    const v = document.getElementById("edit-var-value").value || "0";
+                    document.getElementById("var-preview").innerText = `${n} = ${v}`;
+                };
 
-    else {
-        n.text = document.getElementById('edit-generic-text').value;
-    }
+                document.getElementById("edit-var-name").oninput = updatePreview;
+                document.getElementById("edit-var-value").oninput = updatePreview;
 
-    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+                updatePreview();
+            }, 0);
+        }
+        else if (node.type === 'list') {
+            let listName = "myList";
+            let values = [];
 
-    document.getElementById(n.id).remove();
-    this.renderNode(n);
-    this.drawConns();
-    this.updateCode();
-}
-,
+            if (node.text && node.text.includes("=")) {
+                const parts = node.text.split("=");
+                listName = parts[0].trim();
+
+                try {
+                    values = JSON.parse(parts[1].trim().replace(/'/g,'"'));
+                } catch {
+                    values = [];
+                }
+            }
+
+            const length = values.length || 3;
+
+            let elementsHtml = "";
+            for (let i = 0; i < length; i++) {
+                elementsHtml += `
+                    <input class="form-control mb-1 list-element"
+                           value="${values[i] ?? ''}"
+                           placeholder="Element ${i}">
+                `;
+            }
+
+            body.innerHTML = `
+                <label class="small fw-bold">List name</label>
+                <input id="edit-list-name" class="form-control mb-2" value="${listName}">
+
+                <label class="small fw-bold">List length</label>
+                <input id="edit-list-length" type="number"
+                       min="0" class="form-control mb-2" value="${length}">
+
+                <label class="small fw-bold">Elements</label>
+                <div id="list-elements-box">${elementsHtml}</div>
+
+                <div class="mt-2 small text-muted">
+                    Preview:
+                    <code id="list-preview"></code>
+                </div>
+            `;
+
+            setTimeout(() => {
+                const listBox = document.getElementById("list-elements-box");
+
+                const rebuild = () => {
+                    const len = parseInt(document.getElementById("edit-list-length").value) || 0;
+
+                    listBox.innerHTML = "";
+                    for (let i = 0; i < len; i++) {
+                        listBox.innerHTML += `
+                            <input class="form-control mb-1 list-element"
+                                   placeholder="Element ${i}">
+                        `;
+                    }
+                    updatePreview();
+                };
+
+                const updatePreview = () => {
+                    const name = document.getElementById("edit-list-name").value || "myList";
+                    const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+
+                    const quoted = elems.map(v =>
+                        isNaN(v) || v === "" ? `"${v}"` : v
+                    );
+
+                    document.getElementById("list-preview").innerText =
+                        `${name} = [${quoted.join(", ")}]`;
+                };
+
+                document.getElementById("edit-list-length").oninput = rebuild;
+                document.getElementById("edit-list-name").oninput = updatePreview;
+                listBox.oninput = updatePreview;
+
+                updatePreview();
+            }, 0);
+        }
+        else if (node.type === 'function_def') {
+            body.innerHTML = `
+                <label class="small fw-bold">Function name and parameters</label>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">def</span>
+                    <input id="edit-func-header" class="form-control" value="${node.text}">
+                    <span class="input-group-text">:</span>
+                </div>
+                <div class="mt-1 small text-muted">
+                    Preview: <code id="func-preview"></code>
+                </div>
+            `;
+            setTimeout(() => {
+                const inp = document.getElementById("edit-func-header");
+                const prev = document.getElementById("func-preview");
+                const update = () => {
+                    const h = (inp.value || "my_func()").trim();
+                    prev.innerText = `def ${h}:`;
+                };
+                inp.oninput = update;
+                update();
+            }, 0);
+        }
+        else if (node.type === 'function_call') {
+            body.innerHTML = `
+                <label class="small fw-bold">Function call</label>
+                <input id="edit-call-text" class="form-control mb-2" value="${node.text}">
+                <div class="small text-muted">
+                    Example: <code>result = my_func(1, 2)</code>
+                </div>
+            `;
+        }
+        else if (node.type === 'return') {
+            const expr = (node.text || "").replace(/^return\s+/, "");
+            body.innerHTML = `
+                <label class="small fw-bold">Return expression</label>
+                <div class="input-group">
+                    <span class="input-group-text">return</span>
+                    <input id="edit-return-expr" class="form-control" value="${expr}">
+                </div>
+            `;
+        }
+        else {
+            body.innerHTML = `
+                <label class="small fw-bold">Code Text</label>
+                <input id="edit-generic-text" class="form-control" value="${node.text ?? ""}">
+            `;
+        }
+
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    },
+
+    saveNodeEdit() {
+        const n = this.editingNode;
+
+        if (n.type === 'output') {
+            n.text = document.getElementById('edit-output-text').value;
+        }
+        else if (n.type === 'decision') {
+            n.text = document.getElementById('edit-decision-text').value;
+        }
+        else if (n.type === 'input') {
+            n.varName = document.getElementById('edit-input-var').value;
+            n.prompt  = document.getElementById('edit-input-prompt').value;
+            n.dtype   = document.getElementById('edit-input-dtype').value;
+        }
+        else if (n.type === 'var') {
+            const name  = document.getElementById('edit-var-name').value || "x";
+            const value = document.getElementById('edit-var-value').value || "0";
+            n.text = `${name} = ${value}`;
+        }
+        else if (n.type === 'list') {
+            const name = document.getElementById("edit-list-name").value || "myList";
+            const elems = [...document.querySelectorAll(".list-element")].map(e => e.value);
+            const formatted = elems.map(v =>
+                isNaN(v) || v === "" ? `"${v}"` : v
+            );
+            n.text = `${name} = [${formatted.join(", ")}]`;
+        }
+        else if (n.type === 'function_def') {
+            const header = document.getElementById('edit-func-header').value.trim() || "my_func()";
+            n.text = header;
+        }
+        else if (n.type === 'function_call') {
+            const callText = document.getElementById('edit-call-text').value.trim() || "my_func()";
+            n.text = callText;
+        }
+        else if (n.type === 'return') {
+            const expr = document.getElementById('edit-return-expr').value.trim() || "None";
+            n.text = `return ${expr}`;
+        }
+        else {
+            n.text = document.getElementById('edit-generic-text').value;
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+
+        document.getElementById(n.id).remove();
+        this.renderNode(n);
+        this.drawConns();
+        this.updateCode();
+    },
+
     addDot(parent, cls, portType) {
         const d = document.createElement('div'); 
         d.className = `dot ${cls}`;
@@ -1929,7 +1941,6 @@ n.text = `${name} = [${formatted.join(", ")}]`;
                 try {
                     const diagram = JSON.parse(event.target.result);
                     
-                    // Validate the diagram structure
                     if (!diagram.nodes || !Array.isArray(diagram.nodes)) {
                         alert('Invalid diagram file: missing nodes array');
                         return;
@@ -1939,7 +1950,6 @@ n.text = `${name} = [${formatted.join(", ")}]`;
                         return;
                     }
                     
-                    // Clear current canvas
                     this.nodes = [];
                     this.connections = [];
                     this.selectedNodeId = null;
@@ -1947,10 +1957,8 @@ n.text = `${name} = [${formatted.join(", ")}]`;
                     document.getElementById('code-python').innerText = "";
                     document.getElementById('console').innerHTML = "";
                     
-                    // Restore nodes
                     this.nextId = 1;
                     diagram.nodes.forEach(node => {
-                        // Update nextId to avoid ID conflicts
                         const nodeNum = parseInt(node.id.replace('n', '')) || 0;
                         if (nodeNum >= this.nextId) {
                             this.nextId = nodeNum + 1;
@@ -1959,13 +1967,9 @@ n.text = `${name} = [${formatted.join(", ")}]`;
                         this.renderNode(node);
                     });
                     
-                    // Restore connections
                     this.connections = diagram.connections;
                     
-                    // Redraw everything
                     this.drawConns();
-                    
-                    // Update code with error handling
                     try {
                         this.updateCode();
                     } catch (compileError) {
@@ -1997,7 +2001,6 @@ n.text = `${name} = [${formatted.join(", ")}]`;
     }
 };
 
-// Initialize the application
 App.init();
 </script>
 </body>
