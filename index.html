@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.33</title>
+    <title>FlowCode v3.34</title>
 
     <!-- LIBS -->
 
@@ -646,7 +646,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.33</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.34</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -3086,12 +3086,22 @@ window.addEventListener("pointerup", () => {
         };
         
         window.onpointermove = (e) => {
-            if (!this.isConnecting) return;
-            const r = this.canvas.getBoundingClientRect();
-            const start = this.getPortPos(this.connStart.nodeId, this.connStart.portType);
-            this.dragLine.setAttribute('d', 
-                `M ${start.x} ${start.y} L ${e.clientX - r.left} ${e.clientY - r.top}`);
-        };
+    if (!this.isConnecting) return;
+
+    const r = this.canvas.getBoundingClientRect();
+
+    // convert mouse → world coordinates
+    const worldX = (e.clientX - r.left - this.viewportX) / this.viewportScale;
+    const worldY = (e.clientY - r.top  - this.viewportY) / this.viewportScale;
+
+    const start = this.getPortPos(this.connStart.nodeId, this.connStart.portType);
+
+    this.dragLine.setAttribute(
+        "d",
+        `M ${start.x} ${start.y} L ${worldX} ${worldY}`
+    );
+};
+
         
         window.onpointerup = (e) => {
             if (!this.isConnecting) return;
