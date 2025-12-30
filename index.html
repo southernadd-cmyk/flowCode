@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.1</title>
+    <title>FlowCode v3.21</title>
 
     <!-- LIBS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
 
-      <style>
+    <style>
         :root { --bg-canvas: #f8f9fa; --node-bg: #ffffff; --node-border: #212529; --accent: #0d6efd; --console-bg: #1e1e1e;--fc-console-muted: #9ca3af; }
         body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; background-color: #fff; margin: 0; }
         .wrapper { height: calc(100vh - 56px); display: flex; flex-direction: column; }
@@ -161,6 +161,7 @@
     color: var(--fc-console-muted) !important;
 }
 
+/* Running state inherits from .node.running automatically */
 
     
     </style>
@@ -169,7 +170,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.1</small></span>
+        <span class="navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.21</small></span>
         <div class="d-flex gap-2">
             <!-- RUN button (shown when idle) -->
 <button id="run-btn"
@@ -341,13 +342,57 @@ class FlowchartCompiler {
         this.nodes = nodes;
         this.connections = connections;
         this.useHighlighting = useHighlighting;
-        
+        this.loweredImplicitLoops = new Set();   // prevents stack overflow on implicit loops
+
         // Build adjacency maps for faster lookups
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
         this.loopHeaderCache = new Map(); // Cache for loop header detection
         this.buildMaps();
     }
+    findImplicitForeverLoopHeaders() {
+
+const headers = new Set();
+
+const visited = new Set();
+const onStack = new Set();
+
+const dfs = (nodeId) => {
+
+    visited.add(nodeId);
+    onStack.add(nodeId);
+
+    const outgoing = this.outgoingMap.get(nodeId) || [];
+
+    for (const edge of outgoing) {
+        const target = edge.targetId;
+
+        if (!visited.has(target)) {
+            dfs(target);
+        } else if (onStack.has(target)) {
+            // BACK EDGE detected: nodeId -> target
+            const fromNode = this.nodes.find(n => n.id === nodeId);
+            const toNode   = this.nodes.find(n => n.id === target);
+
+            if (!fromNode || !toNode) continue;
+
+            // ignore ALL decision-controlled loops
+            if (fromNode.type === "decision") continue;
+            if (toNode.type   === "decision") continue;
+
+            // non-decision → non-decision = implicit forever loop
+            headers.add(target);
+        }
+    }
+
+    onStack.delete(nodeId);
+};
+
+const start = this.nodes.find(n => n.type === "start");
+if (start) dfs(start.id);
+
+return headers;
+}
 
     buildMaps() {
         // Clear maps and cache
@@ -396,7 +441,8 @@ class FlowchartCompiler {
         if (!startNode) return "# Add a Start node.";
         
         this.buildMaps(); // Ensure maps are up to date
-        
+        this.implicitLoopHeaders = this.findImplicitForeverLoopHeaders();
+
         // Use iterative compilation with manual stack management
         return this.compileNode(startNode.id, new Set(), [], 0);
     }
@@ -408,8 +454,33 @@ class FlowchartCompiler {
         if (!nodeId || nodeId === 'end') return "";
         
         const node = this.nodes.find(n => n.id === nodeId);
+
+
         if (!node) return "";
-        
+        // ================= IMPLICIT FOREVER LOOP HANDLING =================
+
+// Do we have implicit loop headers computed?
+if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
+
+    // Already lowered once → do NOT lower again → just continue to successor
+    if (this.loweredImplicitLoops.has(nodeId)) {
+        const next = this.getSuccessor(nodeId, "next");
+        return this.compileNode(next, visitedInPath, contextStack, indentLevel);
+    }
+
+    // Mark lowered so we don’t recurse forever
+    this.loweredImplicitLoops.add(nodeId);
+
+    // Emit while True loop safely
+    return this.compileImplicitForeverLoop(
+        nodeId,
+        visitedInPath,
+        contextStack,
+        indentLevel
+    );
+}
+// ================================================================
+
         // Create unique context identifier
         const contextId = `${nodeId}_${contextStack.join('_')}_${indentLevel}`;
         
@@ -497,6 +568,74 @@ class FlowchartCompiler {
         
         return code;
     }
+    compileImplicitForeverLoop(nodeId, visitedInPath, contextStack, indentLevel) {
+
+const indent = "    ".repeat(indentLevel);
+let code = "";
+
+// while True header
+code += `${indent}while True:\n`;
+
+if (this.useHighlighting) {
+    code += `${indent}    highlight('${nodeId}')\n`;
+}
+
+// ----- compile the header node body once (inside loop) -----
+const nodeCode = this.compileSingleNode(nodeId, indentLevel + 1) || "";
+
+// ----- then compile successor chain -----
+const nextId = this.getSuccessor(nodeId, "next");
+
+const bodyCode =
+    this.compileNode(
+        nextId,
+        new Set(), // fresh visited set to stop recursion chain explosion
+        [...contextStack, `implicit_${nodeId}`],
+        indentLevel + 1
+    ) || "";
+
+const fullBody = (nodeCode + bodyCode).trim()
+    ? nodeCode + bodyCode
+    : `${indent}    pass\n`;
+
+code += fullBody;
+
+return code;
+}
+compileSingleNode(nodeId, indentLevel) {
+
+const node = this.nodes.find(n => n.id === nodeId);
+if (!node) return "";
+
+const indent = "    ".repeat(indentLevel);
+let code = "";
+
+switch (node.type) {
+
+    case "output":
+        code += `${indent}print(${node.text})\n`;
+        break;
+
+    case "input":
+        const wrap = node.dtype === "int" ? "int(input(" : "input(";
+        code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
+        if (node.dtype === "int") code = code.trimEnd() + ")\n";
+        break;
+
+    case "decision":
+        // decision itself is handled elsewhere – treat as no-op here
+        break;
+
+    case "start":
+    case "end":
+        break;
+
+    default:
+        if (node.text) code += `${indent}${node.text}\n`;
+}
+
+return code;
+}
 
     /**
      * Compile decision node (could be if, while, or for)
