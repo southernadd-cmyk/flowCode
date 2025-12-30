@@ -1,123 +1,40 @@
 {
   "nodes": [
-    {
-      "id": "n1",
-      "type": "start",
-      "x": 60,
-      "y": 30,
-      "text": "Start"
-    },
-    {
-      "id": "n2",
-      "type": "var",
-      "x": 184.4000244140625,
-      "y": 140.7999725341797,
-      "text": "i = 0"
-    },
-    {
-      "id": "n3",
-      "type": "decision",
-      "x": 154,
-      "y": 256.3999938964844,
-      "text": "i < 3"
-    },
-    {
-      "id": "n4",
-      "type": "process",
-      "x": 115.60000610351562,
-      "y": 422,
-      "text": "i = i + 1"
-    },
-    {
-      "id": "n5",
-      "type": "var",
-      "x": 350,
-      "y": 80,
-      "text": "j = 0"
-    },
-    {
-      "id": "n6",
-      "type": "decision",
-      "x": 352.4000244140625,
-      "y": 259.6000061035156,
-      "text": "j < 2"
-    },
-    {
-      "id": "n7",
-      "type": "process",
-      "x": 592.3999633789062,
-      "y": 217.20001220703125,
-      "text": "j = j + 1"
-    },
-    {
-      "id": "n8",
-      "type": "output",
-      "x": 486.39996337890625,
-      "y": 456.8000183105469,
-      "text": "j"
-    },
-    {
-      "id": "n9",
-      "type": "end",
-      "x": 275,
-      "y": 554,
-      "text": "End",
-      "varName": "x",
-      "prompt": "Enter value",
-      "dtype": "int"
-    }
+    { "id": "n1", "type": "start", "x": 120, "y": 60, "text": "Start" },
+
+    { "id": "n2", "type": "var", "x": 120, "y": 140, "text": "i = 0" },
+
+    { "id": "n3", "type": "decision", "x": 120, "y": 230, "text": "i < 3" },
+
+    { "id": "n4", "type": "var", "x": 360, "y": 230, "text": "j = 0" },
+
+    { "id": "n5", "type": "decision", "x": 360, "y": 320, "text": "j < 2" },
+
+    { "id": "n6", "type": "output", "x": 360, "y": 410, "text": "i, j" },
+
+    { "id": "n7", "type": "process", "x": 360, "y": 500, "text": "j = j + 1" },
+
+    { "id": "n8", "type": "process", "x": 120, "y": 320, "text": "i = i + 1" },
+
+    { "id": "n9", "type": "end", "x": 120, "y": 430, "text": "End" }
   ],
   "connections": [
-    {
-      "from": "n1",
-      "port": "next",
-      "to": "n2"
-    },
-    {
-      "from": "n2",
-      "port": "next",
-      "to": "n3"
-    },
-    {
-      "from": "n3",
-      "port": "yes",
-      "to": "n4"
-    },
-    {
-      "from": "n4",
-      "port": "next",
-      "to": "n3"
-    },
-    {
-      "from": "n3",
-      "port": "no",
-      "to": "n5"
-    },
-    {
-      "from": "n5",
-      "port": "next",
-      "to": "n6"
-    },
-    {
-      "from": "n6",
-      "port": "yes",
-      "to": "n7"
-    },
-    {
-      "from": "n7",
-      "port": "next",
-      "to": "n6"
-    },
-    {
-      "from": "n6",
-      "port": "no",
-      "to": "n8"
-    },
-    {
-      "from": "n8",
-      "port": "next",
-      "to": "n9"
-    }
-  ],
-  "version": "3.0"
+    { "from": "n1", "to": "n2", "port": "next" },
+
+    { "from": "n2", "to": "n3", "port": "next" },
+
+    { "from": "n3", "to": "n4", "port": "yes" },
+    { "from": "n3", "to": "n9", "port": "no" },
+
+    { "from": "n4", "to": "n5", "port": "next" },
+
+    { "from": "n5", "to": "n6", "port": "yes" },
+    { "from": "n5", "to": "n8", "port": "no" },
+
+    { "from": "n6", "to": "n7", "port": "next" },
+
+    { "from": "n7", "to": "n5", "port": "next" },
+
+    { "from": "n8", "to": "n3", "port": "next" }
+  ]
 }
