@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.35</title>
+    <title>FlowCode v3.36</title>
 
     <!-- LIBS -->
 
@@ -645,7 +645,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.35</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.36</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2972,7 +2972,8 @@ const p2 = this.screenFromWorld(p2w.x, p2w.y);
         l.innerText = c.port.toUpperCase();
         l.style.left = (p1.x + 8) + 'px';
         l.style.top  = (p1.y + 8) + 'px';
-        this.nodesLayer.appendChild(l);
+        this.svgLayer.parentElement.appendChild(l);
+
     }
 });
 }
