@@ -1,10 +1,13 @@
-# FlowCode v3.31
+# FlowCode v3.32
 
 Build **real, executable flowcharts** in the browser — then automatically generate Python code and run it step-by-step.
 
 FlowCode is designed for teaching programming and algorithmic thinking at KS3/KS4/college level. Students drag blocks, connect them, run the program, and instantly see corresponding Python.
 
 ---
+## ✨ What’s new in v3.32
+- ✅ **Fixed connectors clipping issue
+- ✅ **Fixed Active Challenge Modal
 
 ## ✨ What’s new in v3.31
 
