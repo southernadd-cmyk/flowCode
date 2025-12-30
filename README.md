@@ -11,16 +11,12 @@ FlowCode is designed for teaching programming and algorithmic thinking at KS3/KS
 Major update highlights:
 
 - ✅ **Challenges system added** (30 scaffolded programming problems)
-- ✅ **Ellipsis text truncation on nodes** (view full text on tooltip)
-- ✅ **Full tooltip on nodes when text is truncated**
+- ✅ **Ellipsis text truncation on nodes** 
+- ✅ **Full text in tooltip on nodes when text is truncated**
 - ✅ Improved zoom & pan controls
 - ✅ Massive compiler upgrades:
-  - automatic **while loop detection**
-  - automatic **for-loop detection**
   - **implicit forever loop support**
   - safer recursion prevention
-- ✅ **Run / Stop simulation buttons**
-- ✅ **Variable Watch live panel**
 - ✅ **Export options modal**
   - PNG image
   - JSON diagram
