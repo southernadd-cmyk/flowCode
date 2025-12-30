@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.22</title>
+    <title>FlowCode v3.30</title>
 
     <!-- LIBS -->
 
@@ -12,7 +12,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Major+Mono+Display&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
@@ -495,6 +496,18 @@
         #console::-webkit-scrollbar-thumb {
             background: #334155;
         }
+
+        #active-challenge-banner {
+    pointer-events: auto;      /* allow dragging banner */
+    cursor: move;              /* visual hint it's draggable */
+}
+
+#active-challenge-banner button {
+    pointer-events: auto;      /* keep button clickable */
+    cursor: pointer;
+}
+
+
     </style>
 
 </head>
@@ -502,8 +515,13 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.22</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.30</small></span>
         <div class="d-flex gap-2">
+
+            <button id="btn-challenges" class="btn btn-outline-secondary">
+                Challenges
+              </button>
+              
             <!-- RUN button (shown when idle) -->
 <button id="run-btn"
 class="btn btn-success btn-sm px-4 fw-bold"
@@ -519,7 +537,8 @@ onclick="App.stopSim()">
 <i class="fa-solid fa-stop me-1"></i> STOP
 </button>
 
-            <button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.saveDiagram()"><i class="fa-solid fa-download me-1"></i> Save</button>
+<button class="btn btn-primary btn-sm px-3 fw-bold" onclick="App.openSaveOptions()">
+    <i class="fa-solid fa-download me-1"></i> Save</button>
             <button class="btn btn-info btn-sm px-3 fw-bold" onclick="App.loadDiagram()"><i class="fa-solid fa-upload me-1"></i> Load</button>
             <div class="btn-group">
                 <button class="btn btn-secondary btn-sm dropdown-toggle fw-bold" data-bs-toggle="dropdown">
@@ -562,8 +581,35 @@ onclick="App.stopSim()">
             <div class="palette-header">Speed</div>
             <input type="range" class="form-range" id="speed-slider" min="100" max="2000" value="1600">
         </div>
-        
+
         <div id="canvas">
+            <div id="active-challenge-banner"
+     style="
+        display:none;
+        position:absolute;
+        top:10px;
+        left:50%;
+        transform:translateX(-50%);
+        z-index:50;
+        padding:6px 12px;
+        background:rgba(255, 243, 205, 0.92);
+        border:2px solid #eed202;
+        border-radius:10px;
+        font-weight:800;
+        box-shadow:0 4px 10px rgba(0,0,0,0.15);
+     ">
+  Challenge Active:
+  <span id="active-challenge-text"></span>
+  <hr/>
+  <p>Pseudocode:</p>
+  <pre id="active-challenge-code"></pre>
+  <button id="dismiss-challenge"
+          style="float:right"
+          class="btn btn-sm btn-outline-dark">
+    Hide
+  </button>
+</div>
+
             <svg id="connections-layer">
                 <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#555" /></marker></defs>
                 <path id="drag-line" stroke="#0d6efd" stroke-width="2" stroke-dasharray="4,4" fill="none" style="display:none;"></path>
@@ -643,8 +689,711 @@ onclick="App.stopSim()">
     </div>
     </div>
 </div>
-
+<div class="modal fade" id="challengesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">FlowCode Challenges</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+  
+        <div class="modal-body" style="height: 60vh;">
+            <div class="row h-100">
+          
+              <!-- LEFT: scrollable list -->
+              <div class="col-4 border-end h-100">
+                <ul id="challenge-list"
+                    class="list-group"
+                    style="max-height: 100%; overflow-y: auto;">
+                </ul>
+              </div>
+          
+              <!-- RIGHT: fixed info panel, separate scroll -->
+              <div class="col-8 h-100"
+                   style="display:flex; flex-direction:column;">
+          
+                <div style="flex:1; overflow-y:auto;">
+                  <h5 id="challenge-title"></h5>
+                  <span id="challenge-diff" class="badge bg-primary mb-2"></span>
+                  <p id="challenge-task" class="mt-2"></p>
+                  <p id="challenge-detail" class="mt-2"></p>
+                  <p id="challenge-success" class="mt-2"></p>
+                  <pre id="challenge-code" class="mt-2"></pre>
+                  <div id="challenge-skills" class="mt-2"></div>
+                </div>
+          
+                <div class="mt-2">
+                  <button id="btn-attempt-challenge" class="btn btn-success" disabled>
+                    Attempt this challenge
+                  </button>
+                </div>
+          
+              </div>
+            </div>
+          </div>
+          
+  
+      </div>
+    </div>
+  </div>
+  <!-- SAVE OPTIONS MODAL -->
+<div class="modal fade" id="saveOptionsModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+  
+        <div class="modal-header bg-dark text-white py-2">
+          <h6 class="modal-title fw-bold">Export Options</h6>
+        </div>
+  
+        <div class="modal-body">
+  
+          <strong>What do you want to export?</strong>
+  
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="chk-export-code">
+            <label class="form-check-label">Python code (.py)</label>
+          </div>
+  
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="chk-export-json">
+            <label class="form-check-label">Flowchart JSON (.json)</label>
+          </div>
+  
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="chk-export-image">
+            <label class="form-check-label">Flowchart image (.png)</label>
+          </div>
+  
+          <div class="small text-muted mt-3">
+            Tip: you can select multiple export options.
+          </div>
+  
+        </div>
+  
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="btn-save-export">Export</button>
+        </div>
+  
+      </div>
+    </div>
+  </div>
+  
 <script>
+
+const FLOWCODE_CHALLENGES = [
+
+/* ----------------------- Difficulty 1 (Sequence) ----------------------- */
+{
+ id: 1, diff: 1,
+ title: "Name, age, favourite colour",
+ skills: ["input","output","sequence"],
+ task: "Ask the user for their name, age and favourite colour. Output all three on separate lines.",
+ detail: "This challenge practises basic input and output. Each question should be asked one after the other. Each answer must be printed on its own line in the correct order.",
+ pseudocode:
+`OUTPUT "Enter your name"
+INPUT name
+OUTPUT "Enter your age"
+INPUT age
+OUTPUT "Enter your favourite colour"
+INPUT colour
+OUTPUT name
+OUTPUT age
+OUTPUT colour`,
+ success: "Program asks for all three values and prints them each on a new line."
+},
+
+{
+ id: 2, diff: 1,
+ title: "Echo my name",
+ skills: ["input","output","sequence"],
+ task: "Ask for the user's name and output it back to them.",
+ detail: "The program should ask for the user's name and repeat it back. This is often called an 'echo' program.",
+ pseudocode:
+`OUTPUT "What is your name?"
+INPUT name
+OUTPUT name`,
+ success: "Name the user types appears exactly back on the screen."
+},
+
+{
+ id: 3, diff: 1,
+ title: "First name then surname",
+ skills: ["input","output","sequence"],
+ task: "Ask for first name and surname. Output them on separate lines.",
+ detail: "Take two separate inputs. Output the first name and surname one under the other. No joining required.",
+ pseudocode:
+`OUTPUT "Enter first name"
+INPUT firstName
+OUTPUT "Enter surname"
+INPUT surname
+OUTPUT firstName
+OUTPUT surname`,
+ success: "Two different outputs appear, one per line, in the same order asked."
+},
+
+{
+ id: 4, diff: 1,
+ title: "Full name one line",
+ skills: ["input","output","sequence"],
+ task: "Ask for first name and surname, then output the full name on one line.",
+ detail: "This time the two values should be printed on the same line with a space between them.",
+ pseudocode:
+`OUTPUT "Enter first name"
+INPUT firstName
+OUTPUT "Enter surname"
+INPUT surname
+OUTPUT firstName + " " + surname`,
+ success: "The output shows first name and surname together on one line."
+},
+
+{
+ id: 5, diff: 1,
+ title: "Add two numbers",
+ skills: ["input","output","arithmetic"],
+ task: "Ask the user for two numbers. Add them together and output the answer.",
+ detail: "The program should store both numbers, calculate the sum in a variable, then output it.",
+ pseudocode:
+`OUTPUT "Enter first number"
+INPUT num1
+OUTPUT "Enter second number"
+INPUT num2
+total ← num1 + num2
+OUTPUT total`,
+ success: "Correct total displayed for any two numbers entered."
+},
+
+{
+ id: 6, diff: 1,
+ title: "Multiply two numbers",
+ skills: ["input","output","arithmetic"],
+ task: "Ask for two numbers. Output the product.",
+ detail: "Very similar to addition, but multiply instead. Use a variable to store the result.",
+ pseudocode:
+`OUTPUT "Enter first number"
+INPUT a
+OUTPUT "Enter second number"
+INPUT b
+answer ← a * b
+OUTPUT answer`,
+ success: "Product printed correctly."
+},
+
+{
+ id: 7, diff: 1,
+ title: "Add and multiply",
+ skills: ["input","output","arithmetic"],
+ task: "Ask for two numbers. Output both their sum and their product.",
+ detail: "The program must calculate two different values and output both.",
+ pseudocode:
+`OUTPUT "Enter first number"
+INPUT a
+OUTPUT "Enter second number"
+INPUT b
+sum ← a + b
+product ← a * b
+OUTPUT sum
+OUTPUT product`,
+ success: "Both correct values shown — order does not matter."
+},
+
+/* ----------------------- Difficulty 2 (Selection) ----------------------- */
+{
+ id: 8, diff: 2,
+ title: "Correct alphabet guess?",
+ skills: ["input","output","selection"],
+ task: "Ask the user how many letters are in the alphabet. Output 'Correct' if they enter 26, otherwise 'Incorrect'.",
+ detail: "This is your first simple IF statement with an ELSE outcome.",
+ pseudocode:
+`OUTPUT "How many letters are in the alphabet?"
+INPUT guess
+IF guess = 26 THEN
+    OUTPUT "Correct"
+ELSE
+    OUTPUT "Incorrect"
+ENDIF`,
+ success: "Entering 26 prints Correct, any other answer prints Incorrect."
+},
+
+{
+ id: 9, diff: 2,
+ title: "Cool name",
+ skills: ["selection","input","output"],
+ task: "Store your favourite name in a variable. Ask the user for their name. If it matches, output 'You are cool', otherwise output 'Nice to meet you'.",
+ detail: "Choose any favourite name. Must compare strings.",
+ pseudocode:
+`favourite ← "alex"   // or your choice
+OUTPUT "What is your name?"
+INPUT name
+IF name = favourite THEN
+    OUTPUT "You are cool"
+ELSE
+    OUTPUT "Nice to meet you"
+ENDIF`,
+ success: "Correct message shown depending on whether names match."
+},
+
+{
+ id: 10, diff: 2,
+ title: "Largest of two numbers",
+ skills: ["selection","arithmetic","output"],
+ task: "Ask for two numbers. Output the largest.",
+ detail: "Do not assume the first number is bigger. Test using IF / ELSE.",
+ pseudocode:
+`OUTPUT "Enter first number"
+INPUT a
+OUTPUT "Enter second number"
+INPUT b
+IF a > b THEN
+    OUTPUT a
+ELSE
+    OUTPUT b
+ENDIF`,
+ success: "Always outputs the larger of the two values."
+},
+
+{
+ id: 11, diff: 2,
+ title: "Exam pass or fail",
+ skills: ["selection"],
+ task: "Ask for a test score out of 100. Output PASS if 50 or more, otherwise FAIL.",
+ detail: "Single threshold comparison challenge.",
+ pseudocode:
+`OUTPUT "Enter score out of 100"
+INPUT score
+IF score >= 50 THEN
+    OUTPUT "PASS"
+ELSE
+    OUTPUT "FAIL"
+ENDIF`,
+ success: "Outputs PASS at 50 or more, FAIL below 50."
+},
+
+{
+ id: 12, diff: 2,
+ title: "Even or odd",
+ skills: ["selection","arithmetic"],
+ task: "Ask for a whole number. Output whether it is even or odd.",
+ detail: "Hint: use remainder/modulus % 2.",
+ pseudocode:
+`OUTPUT "Enter a whole number"
+INPUT n
+IF n MOD 2 = 0 THEN
+    OUTPUT "Even"
+ELSE
+    OUTPUT "Odd"
+ENDIF`,
+ success: "Identifies even and odd correctly."
+},
+
+/* ----------------------- Difficulty 3 (Iteration basics) ----------------------- */
+{
+ id: 13, diff: 3,
+ title: "Count to ten",
+ skills: ["iteration","output","for"],
+ task: "Output the numbers 1 to 10. Use a loop.",
+ detail: "Introduce counted loops. One output per line.",
+ pseudocode:
+`FOR x ← 1 TO 10
+    OUTPUT x
+NEXT x`,
+ success: "Outputs: 1 2 3 4 5 6 7 8 9 10."
+},
+
+{
+ id: 14, diff: 3,
+ title: "Count down",
+ skills: ["iteration","output","for"],
+ task: "Output the numbers from 10 down to 1.",
+ detail: "Use a loop that decreases each time.",
+ pseudocode:
+`FOR x ← 10 DOWNTO 1
+    OUTPUT x
+NEXT x`,
+ success: "Countdown prints correctly in reverse order."
+},
+
+{
+ id: 15, diff: 3,
+ title: "Multiplication table",
+ skills: ["iteration","arithmetic"],
+ task: "Ask for a number between 1 and 12. Output its times table up to 12.",
+ detail: "This combines multiplication and loops.",
+ pseudocode:
+`OUTPUT "Enter a number 1–12"
+INPUT n
+FOR x ← 1 TO 12
+    OUTPUT n * x
+NEXT x`,
+ success: "Twelve results appear correctly."
+},
+
+{
+ id: 16, diff: 3,
+ title: "Sum of first 10 numbers",
+ skills: ["iteration","accumulator"],
+ task: "Use a loop to add the numbers 1 to 10 and output the total.",
+ detail: "You must use an accumulator variable.",
+ pseudocode:
+`total ← 0
+FOR x ← 1 TO 10
+    total ← total + x
+NEXT x
+OUTPUT total`,
+ success: "Outputs 55."
+},
+
+/* ----------------------- Difficulty 4 (While loops) ----------------------- */
+{
+ id: 17, diff: 4,
+ title: "Repeat until correct answer",
+ skills: ["while","selection"],
+ task: "Keep asking 'What is 7 + 5?' until the user enters the correct answer.",
+ detail: "The program must repeat until condition is met.",
+ pseudocode:
+`answer ← 0
+WHILE answer <> 12
+    OUTPUT "What is 7 + 5?"
+    INPUT answer
+ENDWHILE
+OUTPUT "Correct!"`,
+ success: "Loop only stops when 12 is typed."
+},
+
+{
+ id: 18, diff: 4,
+ title: "Password checker",
+ skills: ["while","selection","input"],
+ task: "Store a password. Keep asking for the password until the user types it correctly.",
+ detail: "No limit on attempts.",
+ pseudocode:
+`password ← "secret"
+guess ← ""
+WHILE guess <> password
+    OUTPUT "Enter password"
+    INPUT guess
+ENDWHILE
+OUTPUT "Access granted"`,
+ success: "Continues to loop until correct password entered."
+},
+
+{
+ id: 19, diff: 4,
+ title: "Number guessing game",
+ skills: ["while","selection"],
+ task: "Choose a number. Keep asking the user to guess until they get it right.",
+ detail: "Fixed number chosen by programmer (no randomness needed).",
+ pseudocode:
+`target ← 7
+guess ← 0
+WHILE guess <> target
+    OUTPUT "Guess the number"
+    INPUT guess
+ENDWHILE
+OUTPUT "Well done"`,
+ success: "Runs repeatedly until correct number guessed."
+},
+
+{
+ id: 20, diff: 4,
+ title: "Menu repeater",
+ skills: ["while","selection"],
+ task: "Display a simple menu repeatedly until the user chooses QUIT.",
+ detail: "Typical loop-menu problem.",
+ pseudocode:
+`choice ← ""
+WHILE choice <> "QUIT"
+    OUTPUT "1) Option A"
+    OUTPUT "2) Option B"
+    OUTPUT "Type QUIT to exit"
+    INPUT choice
+ENDWHILE
+OUTPUT "Goodbye"`,
+ success: "Menu keeps repeating until QUIT typed."
+},
+
+/* ----------------------- Difficulty 5 (Lists) ----------------------- */
+{
+ id: 21, diff: 5,
+ title: "List of 5 names",
+ skills: ["list","output"],
+ task: "Store 5 names in a list. Output all of them.",
+ detail: "Names can be any strings",
+ pseudocode:
+`names ← ["Ali","Ben","Chris","Dana","Eva"]
+FOR i ← 0 TO 4
+    OUTPUT names[i]
+NEXT i`,
+ success: "All names appear once each."
+},
+
+{
+ id: 22, diff: 5,
+ title: "Search for a name",
+ skills: ["list","selection"],
+ task: "Store 5 names. Ask the user for a name and say whether it is in the list.",
+ detail: "Use IF with IN check or loop scan.",
+ pseudocode:
+`names ← ["Ali","Ben","Chris","Dana","Eva"]
+OUTPUT "Enter name to search"
+INPUT target
+found ← FALSE
+FOR i ← 0 TO 4
+    IF names[i] = target THEN
+        found ← TRUE
+    ENDIF
+NEXT i
+IF found = TRUE THEN
+    OUTPUT "Found"
+ELSE
+    OUTPUT "Not found"
+ENDIF`,
+ success: "Correctly identifies present and missing names."
+},
+
+{
+ id: 23, diff: 5,
+ title: "Total shopping bill",
+ skills: ["list","iteration","accumulator"],
+ task: "Store several prices in a list. Use a loop to total them and output the bill.",
+ detail: "Use accumulator and list traversal.",
+ pseudocode:
+`prices ← [1.50, 2.00, 0.99, 3.25]
+total ← 0
+FOR i ← 0 TO 3
+    total ← total + prices[i]
+NEXT i
+OUTPUT total`,
+ success: "Total printed correctly."
+},
+
+{
+ id: 24, diff: 5,
+ title: "Highest value in a list",
+ skills: ["list","iteration","selection"],
+ task: "Store some numbers in a list. Use a loop to find and output the largest.",
+ detail: "Track current maximum.",
+ pseudocode:
+`nums ← [5, 12, 3, 20, 7]
+max ← nums[0]
+FOR i ← 1 TO 4
+    IF nums[i] > max THEN
+        max ← nums[i]
+    ENDIF
+NEXT i
+OUTPUT max`,
+ success: "Largest value displayed."
+},
+
+/* ----------------------- Difficulty 6–8 (Mixed challenges) ----------------------- */
+{
+ id: 25, diff: 6,
+ title: "Times quiz",
+ skills: ["selection","iteration","accumulator"],
+ task: "Ask 5 multiplication questions and keep score of correct answers.",
+ detail: "No random needed — fixed or simple numbers allowed.",
+ pseudocode:
+`score ← 0
+FOR q ← 1 TO 5
+    OUTPUT "What is 3 × 4?"
+    INPUT ans
+    IF ans = 12 THEN
+        score ← score + 1
+    ENDIF
+NEXT q
+OUTPUT score`,
+ success: "Score must increase correctly when correct answers given."
+},
+
+{
+ id: 26, diff: 6,
+ title: "Grade calculator",
+ skills: ["selection"],
+ task: "Ask for a percentage and output grade: A, B, C, D or U.",
+ detail: "Use IF…ELSEIF…ELSE ladder.",
+ pseudocode:
+`OUTPUT "Enter percentage"
+INPUT p
+IF p >= 80 THEN
+    OUTPUT "A"
+ELSE IF p >= 70 THEN
+    OUTPUT "B"
+ELSE IF p >= 60 THEN
+    OUTPUT "C"
+ELSE IF p >= 50 THEN
+    OUTPUT "D"
+ELSE
+    OUTPUT "U"
+ENDIF`,
+ success: "Correct grade for correct range."
+},
+
+{
+ id: 27, diff: 7,
+ title: "ATM simulator",
+ skills: ["selection","while","arithmetic"],
+ task: "Simulate balance, withdraw and deposit options until user quits.",
+ detail: "Simple menu repetition — no overdraft logic required.",
+ pseudocode:
+`balance ← 0
+choice ← ""
+WHILE choice <> "QUIT"
+    OUTPUT "BALANCE / DEPOSIT / WITHDRAW / QUIT"
+    INPUT choice
+    IF choice = "DEPOSIT" THEN
+        INPUT amount
+        balance ← balance + amount
+    ELSE IF choice = "WITHDRAW" THEN
+        INPUT amount
+        balance ← balance - amount
+    ENDIF
+ENDWHILE
+OUTPUT balance`,
+ success: "Balance updates correctly after each operation."
+},
+
+{
+ id: 28, diff: 7,
+ title: "Rock Paper Scissors (text)",
+ skills: ["selection","while"],
+ task: "Player vs computer, text version. Ask choices and output winner.",
+ detail: "Computer choice may be fixed (no randomness required).",
+ pseudocode:
+`computer ← "ROCK"
+player ← ""
+WHILE player <> "QUIT"
+    OUTPUT "Enter ROCK PAPER or SCISSORS"
+    INPUT player
+    IF player = computer THEN
+        OUTPUT "Draw"
+    ELSE IF player = "PAPER" AND computer = "ROCK" THEN
+        OUTPUT "Player wins"
+    ELSE
+        OUTPUT "Computer wins"
+    ENDIF
+ENDWHILE`,
+ success: "Correct result displayed for combinations used."
+},
+
+{
+ id: 29, diff: 8,
+ title: "Times table practice until 10 correct",
+ skills: ["iteration","while","accumulator"],
+ task: "Ask random times questions repeatedly until the user scores 10 correct.",
+ detail: "You may reuse the same question each time if randomness unsupported.",
+ pseudocode:
+`score ← 0
+WHILE score < 10
+    OUTPUT "What is 6 × 7?"
+    INPUT ans
+    IF ans = 42 THEN
+        score ← score + 1
+    ENDIF
+ENDWHILE
+OUTPUT "Finished"`,
+ success: "Stops exactly when score reaches 10."
+},
+
+{
+ id: 30, diff: 8,
+ title: "Average of list",
+ skills: ["list","iteration","arithmetic"],
+ task: "Ask the user to enter 5 numbers. Store in a list. Output average.",
+ detail: "Must use loop to total and divide by length.",
+ pseudocode:
+`numbers ← empty list
+FOR i ← 1 TO 5
+    INPUT n
+    append n to numbers
+NEXT i
+total ← 0
+FOR i ← 1 TO 5
+    total ← total + numbers[i]
+NEXT i
+average ← total / 5
+OUTPUT average`,
+ success: "Correct mean value shown."
+}
+
+];
+
+// open modal
+document.getElementById("btn-challenges").addEventListener("click", () => {
+    const modal = new bootstrap.Modal(document.getElementById("challengesModal"));
+    modal.show();
+    renderChallengeList();
+});
+
+function renderChallengeList() {
+    const ul = document.getElementById("challenge-list");
+    ul.innerHTML = "";
+
+    FLOWCODE_CHALLENGES.forEach(ch => {
+        const li = document.createElement("li");
+        li.className = "list-group-item list-group-item-action";
+        li.textContent = `#${ch.id} ${ch.title}`;
+        li.onclick = () => loadChallenge(ch);
+        ul.appendChild(li);
+    });
+}
+
+
+let ACTIVE_CHALLENGE = null;
+let CHALLENGE_COMPLETED = new Set();
+
+function loadChallenge(ch) {
+    document.getElementById("challenge-title").textContent = ch.title;
+    document.getElementById("challenge-diff").textContent = "Difficulty " + ch.diff;
+    document.getElementById("challenge-task").textContent = ch.task;
+    document.getElementById("challenge-detail").textContent = ch.detail;
+    document.getElementById("challenge-success").textContent = ch.success;
+    document.getElementById("challenge-code").textContent = ch.pseudocode; // ✅ Fixed
+    document.getElementById("challenge-skills").textContent = "Skills: " + ch.skills.join(", ");
+    
+    // Enable the attempt button and store the challenge
+    document.getElementById("btn-attempt-challenge").disabled = false;
+    ACTIVE_CHALLENGE = ch;
+}
+document.getElementById("btn-save-export").addEventListener("click", () => {
+    const code = document.getElementById("chk-export-code").checked;
+    const json = document.getElementById("chk-export-json").checked;
+    const img  = document.getElementById("chk-export-image").checked;
+
+    const modalEl = document.getElementById("saveOptionsModal");
+    bootstrap.Modal.getInstance(modalEl).hide();
+
+    if (!code && !json && !img) {
+        alert("Please select at least one export option.");
+        return;
+    }
+
+    if (code) App.exportPython();
+    if (json) App.exportJSON();
+    if (img)  App.exportImage();
+});
+
+document.getElementById("btn-attempt-challenge").addEventListener("click", () => {
+
+if (!ACTIVE_CHALLENGE) return;
+
+// show banner overlay
+const banner = document.getElementById("active-challenge-banner");
+banner.style.display = "block";
+document.getElementById("active-challenge-text").textContent =
+    `#${ACTIVE_CHALLENGE.id} — ${ACTIVE_CHALLENGE.title}`;
+    document.getElementById("active-challenge-code").textContent =
+    `${ACTIVE_CHALLENGE.pseudocode}`;
+// ★ CLOSE THE MODAL ★
+const modalEl = document.getElementById("challengesModal");
+const modal = bootstrap.Modal.getInstance(modalEl) 
+            || new bootstrap.Modal(modalEl);
+modal.hide();
+});
+
+document.getElementById("dismiss-challenge").addEventListener("click", () => {
+    document.getElementById("active-challenge-banner").style.display = "none";
+});
+
 
     // Show welcome modal on first visit
 document.addEventListener("DOMContentLoaded", function () {
@@ -1553,6 +2302,112 @@ cancelExecution: false,
 skulptTask: null,
 skModule: null,
 
+
+exportPython() {
+    const code = document.getElementById("code-python").innerText || "";
+
+    const blob = new Blob([code], { type: "text/x-python" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flowcode_program.py";
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+,
+exportJSON() {
+    const diagram = {
+        nodes: this.nodes,
+        connections: this.connections,
+        version: "3.0"
+    };
+
+    const blob = new Blob(
+        [JSON.stringify(diagram, null, 2)],
+        { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flowchart.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+,   
+
+exportImage() {
+
+if (this.nodes.length === 0) {
+    alert("Nothing to export.");
+    return;
+}
+
+const nodeLayer = document.getElementById("nodes-layer");
+const svgLayer  = document.getElementById("connections-layer");
+
+// Save current transform
+const oldScale = this.viewportScale;
+const oldX = this.viewportX;
+const oldY = this.viewportY;
+
+// 1) Reset transforms so coords are real
+this.viewportScale = 1;
+this.viewportX = 0;
+this.viewportY = 0;
+this.applyViewportTransform();
+
+// 2) Force redraw before capture
+this.drawConns();
+
+// 3) Measure real bounding box
+const rect = nodeLayer.getBoundingClientRect();
+const width = Math.max(1, Math.round(rect.width));
+const height = Math.max(1, Math.round(rect.height));
+
+// 4) Render everything at 2× resolution for quality
+html2canvas(document.getElementById("canvas"), {
+    backgroundColor: "#ffffff",
+    scale: 2
+}).then(canvas => {
+
+    // Restore transform immediately
+    this.viewportScale = oldScale;
+    this.viewportX = oldX;
+    this.viewportY = oldY;
+    this.applyViewportTransform();
+    this.drawConns();
+
+    const link = document.createElement("a");
+    link.download = "flowchart.png";
+    canvas.toBlob(blob => {
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }, "image/png");
+
+}).catch(err => {
+    alert("Failed to export image");
+    console.error(err);
+
+    // restore even if error
+    this.viewportScale = oldScale;
+    this.viewportX = oldX;
+    this.viewportY = oldY;
+    this.applyViewportTransform();
+    this.drawConns();
+});
+}
+,
+openSaveOptions() {
+    const modal = new bootstrap.Modal(
+        document.getElementById('saveOptionsModal')
+    );
+    modal.show();
+}
+,
 updateVarWatch(varsObj) {
 const div = document.getElementById("varwatch-table");
 if (!div) return;
@@ -2474,6 +3329,49 @@ n.text = `${name} = [${formatted.join(", ")}]`;
         } 
     }
 };
+// === Draggable challenge banner ===
+(function () {
+    const banner = document.getElementById("active-challenge-banner");
+    if (!banner) return;
+
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    banner.addEventListener("mousedown", (e) => {
+        // Don't start drag if the click is on the Hide button
+        if (e.target.id === "dismiss-challenge" || e.target.closest("button")) {
+            return;
+        }
+
+        isDragging = true;
+
+        const rect = banner.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        // Stop text selection while dragging
+        document.body.style.userSelect = "none";
+        // Remove centering transform once we start dragging
+        banner.style.transform = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+
+        banner.style.left = x + "px";
+        banner.style.top = y + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        document.body.style.userSelect = "";
+    });
+})();
 
 // Initialize the application
 App.init();
