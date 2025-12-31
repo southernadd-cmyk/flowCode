@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.44</title>
+    <title>FlowCode v3.45</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.44</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.45</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -683,6 +683,7 @@ onclick="App.stopSim()">
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Maximum Number of 3 Inputs</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('sumOfN.json')">Sum of first N Numbers</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
+                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('countdown.json')">Descending For Loop</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Nested For Loops</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('whileloop.json')">While Loop</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('WhileTrue.json')">While True Loop</a></li>
@@ -1748,13 +1749,15 @@ if (this.isInitOfForLoop(nodeId)) {
 
 
 
-
 // 2) any nodes explicitly skipped for this loop body (typically increments)
+//    make them *control-flow transparent*: don't emit, but continue to successor
 if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
     if (node && (node.type === 'var' || node.type === 'process')) {
-        return "";
+        const nextNodeId = this.getSuccessor(nodeId, 'next');
+        return this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel);
     }
 }
+
 
 
 
@@ -1870,6 +1873,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
         
         return code;
     }
+    
+    
+    
     compileImplicitForeverLoop(nodeId, visitedInPath, contextStack, indentLevel) {
 
 const indent = "    ".repeat(indentLevel);
@@ -2115,8 +2121,37 @@ const forVisited = new Set();  // fresh per-loop context
 const oldGlobalSkips = this.nodesToSkip;
 this.nodesToSkip = localSkips;
 
-code += this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
-      || `${indent}    pass\n`;
+// compile loop body
+let body = "";
+
+// do NOT compile the loop header again
+if (loopBodyId && loopBodyId !== node.id) {
+    body = this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1);
+}
+
+
+// ------------------------------------------------------
+// NEW: detect when body is logically empty
+// (only whitespace, comments, highlights etc.)
+// ------------------------------------------------------
+const bodyTrimmed = (body || "")
+    // remove whitespace
+    .replace(/\s+/g, "")
+    // remove highlights
+    .replace(/highlight\(.*?\)/g, "")
+    // remove comments
+    .replace(/^#.*$/gm, "")
+    // remove accidental re-emitted decision
+    .replace(/if.*?:passelse:.*/g, "");
+
+if (!bodyTrimmed) {
+    body = `${indent}    pass\n`;
+}
+
+
+// emit final body
+code += body;
+
 
 this.nodesToSkip = oldGlobalSkips;  // restore after body
 
