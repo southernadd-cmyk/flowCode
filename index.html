@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.41</title>
+    <title>FlowCode v3.42</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.41</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.42</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1582,12 +1582,40 @@ class FlowchartCompiler {
         this.loweredImplicitLoops = new Set();   // prevents stack overflow on implicit loops
         this.nodesToSkip = new Set();
 
+
         // Build adjacency maps for faster lookups
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
         this.loopHeaderCache = new Map(); // Cache for loop header detection
         this.buildMaps();
     }
+
+// Returns true if this node is the init assignment of a detected for-loop
+isInitOfForLoop(nodeId) {
+
+const node = this.nodes.find(n => n.id === nodeId);
+if (!node || (node.type !== "var" && node.type !== "process")) return false;
+
+// look at every decision node (possible loop header)
+for (const dec of this.nodes.filter(n => n.type === "decision")) {
+
+    const info = this.detectForLoopPattern(dec.id);
+    if (!info || !info.initNodeId) continue;
+
+    // must match the detected init node
+    if (info.initNodeId !== nodeId) continue;
+
+    // must be unmittel predecessor in straight-line code
+    const incoming = this.incomingMap.get(dec.id) || [];
+    const directlyBefore = incoming.some(c => c.sourceId === nodeId);
+
+    if (directlyBefore) return true;
+}
+
+return false;
+}
+
+
     findImplicitForeverLoopHeaders() {
 
 const headers = new Set();
@@ -1674,16 +1702,28 @@ return headers;
     /**
      * Main compilation entry point
      */
-    compile() {
-        const startNode = this.nodes.find(n => n.type === 'start');
-        if (!startNode) return "# Add a Start node.";
-        
-        this.buildMaps(); // Ensure maps are up to date
-        this.implicitLoopHeaders = this.findImplicitForeverLoopHeaders();
+     compile() {
+    const startNode = this.nodes.find(n => n.type === 'start');
+    if (!startNode) return "# Add a Start node.";
+    
+    this.buildMaps(); // Ensure maps are up to date
+    this.implicitLoopHeaders = this.findImplicitForeverLoopHeaders();
 
-        // Use iterative compilation with manual stack management
-        return this.compileNode(startNode.id, new Set(), [], 0);
-    }
+
+
+    this.nodes
+        .filter(n => n.type === "decision")
+        .forEach(dec => {
+            const info = this.detectForLoopPattern(dec.id);
+            if (info && info.initNodeId) {
+                
+            }
+        });
+
+    // Use iterative compilation with manual stack management
+    return this.compileNode(startNode.id, new Set(), [], 0);
+}
+
 
     /**
      * Compile a node with context tracking
@@ -1692,10 +1732,30 @@ return headers;
         if (!nodeId || nodeId === 'end') return "";
         
         const node = this.nodes.find(n => n.id === nodeId);
-// --- skip nodes suppressed by loop transforms (e.g., for-loop increment) ---
-if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
-    return "";
+
+// --- suppress for-loop init statements (like `i = x`) ---
+// --- suppress for-loop init statements (like `i = x`) ---
+// but STILL continue to successors
+if (this.isInitOfForLoop(nodeId)) {
+    // follow normal control flow without emitting this node
+    const succ = this.getAllSuccessors(nodeId);
+    let out = "";
+    for (const { nodeId: nxt } of succ) {
+        out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel);
+    }
+    return out;
 }
+
+
+
+
+// 2) any nodes explicitly skipped for this loop body (typically increments)
+if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
+    if (node && (node.type === 'var' || node.type === 'process')) {
+        return "";
+    }
+}
+
 
 
         if (!node) return "";
@@ -1971,12 +2031,24 @@ return dfs(branchId, 0);
         
         if (forLoopInfo) {
             // prevent increment being emitted inside loop body
+// create a *local* skip list for this loop only
+const localSkips = new Set();
+
+// skip increment (always safe)
 if (forLoopInfo.incrementNodeId) {
-    this.nodesToSkip.add(forLoopInfo.incrementNodeId);
+    localSkips.add(forLoopInfo.incrementNodeId);
 }
+
+// skip init ONLY if it is the direct predecessor of the decision
 if (forLoopInfo.initNodeId) {
-    this.nodesToSkip.add(forLoopInfo.initNodeId);
+    const incoming = this.incomingMap.get(node.id) || [];
+    const comesDirectlyBefore = incoming.some(c => c.sourceId === forLoopInfo.initNodeId);
+
+    if (comesDirectlyBefore) {
+        localSkips.add(forLoopInfo.initNodeId);
+    }
 }
+
 
 
             // Compile as for loop
@@ -1997,9 +2069,15 @@ if (forLoopInfo.initNodeId) {
 const forBodyContext = [...contextStack, `loop_${node.id}`];
 const forVisited = new Set();  // fresh per-loop context
 
-code +=
-    this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
-    || `${indent}    pass\n`;
+const oldGlobalSkips = this.nodesToSkip;
+this.nodesToSkip = localSkips;
+
+code += this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1)
+      || `${indent}    pass\n`;
+
+this.nodesToSkip = oldGlobalSkips;  // restore after body
+
+
 
             
             // Handle loop exit
