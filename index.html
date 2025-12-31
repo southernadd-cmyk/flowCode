@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.42</title>
+    <title>FlowCode v3.43</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.42</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.43</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2054,9 +2054,10 @@ if (forLoopInfo.initNodeId) {
             // Compile as for loop
             // Build range() with optional step parameter
             let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}`;
-            if (forLoopInfo.step && Math.abs(forLoopInfo.step) !== 1) {
-                rangeStr += `, ${forLoopInfo.step}`;
-            }
+            if (forLoopInfo.step !== 1) {
+    rangeStr += `, ${forLoopInfo.step}`;
+}
+
             rangeStr += ')';
             
             code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
@@ -2229,16 +2230,17 @@ let finalStep  = step;
 // --- DECREASING LOOPS (DOWNWARD) ---
 if (comparisonOp === '>' || comparisonOp === '>=') {
 
-    // ensure negative step
-    finalStep = -Math.abs(step);
+// force negative step
+finalStep = -Math.abs(step);
 
-    if (comparisonOp === '>=') {
-        // include the end value once — range is exclusive
-        finalEnd = `(${endValue}) - 1`;
-    } else {
-        // exclusive already
-        finalEnd = endValue;
-    }
+// range() is exclusive, so:
+//   i > 0  → range(start, end, -1)        (stops before end)
+//   i >= 0 → range(start, end-1, -1)      (include zero)
+if (comparisonOp === '>=') {
+    finalEnd = `${parseInt(endValue) - 1}`;
+} else {
+    finalEnd = endValue;
+}
 
 // --- INCREASING LOOPS (UPWARD) ---
 } else {
