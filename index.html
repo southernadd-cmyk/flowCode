@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.45</title>
+    <title>FlowCode v3.46</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.45</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.46</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1722,14 +1722,15 @@ return headers;
         });
 
     // Use iterative compilation with manual stack management
-    return this.compileNode(startNode.id, new Set(), [], 0);
+    return this.compileNode(startNode.id, new Set(), [], 0,false,false);
 }
 
 
     /**
      * Compile a node with context tracking
      */
-    compileNode(nodeId, visitedInPath, contextStack, indentLevel, inLoopHeader = false) {
+     compileNode(nodeId, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) 
+        {
         if (!nodeId || nodeId === 'end') return "";
         
         const node = this.nodes.find(n => n.id === nodeId);
@@ -1742,7 +1743,9 @@ if (this.isInitOfForLoop(nodeId)) {
     const succ = this.getAllSuccessors(nodeId);
     let out = "";
     for (const { nodeId: nxt } of succ) {
-        out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel);
+        out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
     }
     return out;
 }
@@ -1751,12 +1754,38 @@ if (this.isInitOfForLoop(nodeId)) {
 
 // 2) any nodes explicitly skipped for this loop body (typically increments)
 //    make them *control-flow transparent*: don't emit, but continue to successor
+// make skipped nodes completely control-flow transparent
 if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
-    if (node && (node.type === 'var' || node.type === 'process')) {
-        const nextNodeId = this.getSuccessor(nodeId, 'next');
-        return this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel);
+
+// if this is the loop header produced by for-loop lowering
+if (nodeId === this.loopHeaderId) {
+
+    // INSIDE the loop we only want the YES branch
+    const yesId = this.getSuccessor(nodeId, 'yes');
+    const exitId = this.getSuccessor(nodeId, 'no');
+
+    if (inLoopBody) {
+        return this.compileNode(yesId, new Set(visitedInPath), [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
+    } else {
+        return this.compileNode(exitId, new Set(visitedInPath), [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
     }
 }
+
+// normal skip — not a loop header
+const succ = this.getAllSuccessors(nodeId);
+let out = "";
+for (const { nodeId: nxt } of succ) {
+    out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
+}
+return out;
+}
+
 
 
 
@@ -1770,7 +1799,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
     // Already lowered once → do NOT lower again → just continue to successor
     if (this.loweredImplicitLoops.has(nodeId)) {
         const next = this.getSuccessor(nodeId, "next");
-        return this.compileNode(next, visitedInPath, contextStack, indentLevel);
+        return this.compileNode(next, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
     }
 
     // Mark lowered so we don’t recurse forever
@@ -1806,7 +1837,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
         // Handle different node types
         switch (node.type) {
             case 'decision':
-                return this.compileDecision(node, visitedInPath, contextStack, indentLevel);
+                return this.compileDecision(node, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
                 
             case 'start':
                 // Just continue to next node
@@ -1869,7 +1902,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
         }
         
         // Continue compilation
-        code += this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel);
+        code += this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
         
         return code;
     }
@@ -1899,7 +1934,9 @@ const bodyCode =
         nextId,
         new Set(), // fresh visited set to stop recursion chain explosion
         [...contextStack, `implicit_${nodeId}`],
-        indentLevel + 1
+        indentLevel + 1,
+    inLoopBody,
+    inLoopHeader
     ) || "";
 
 const fullBody = (nodeCode + bodyCode).trim()
@@ -1951,7 +1988,14 @@ return code;
     /**
  * Compile decision node (could be if, while, or for)
  */
-compileDecision(node, visitedInPath, contextStack, indentLevel) {
+ compileDecision(
+    node,
+    visitedInPath,
+    contextStack,
+    indentLevel,
+    inLoopBody = false,
+    inLoopHeader = false
+) {
     const yesId = this.getSuccessor(node.id, 'yes');
     const noId  = this.getSuccessor(node.id, 'no');
 
@@ -1959,7 +2003,9 @@ compileDecision(node, visitedInPath, contextStack, indentLevel) {
     // just treat it as a normal if/else to avoid re-creating the loop.
     const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
     if (isAlreadyLoop) {
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
     }
 
     // Simple loop detection: does this branch eventually lead back to me?
@@ -1980,11 +2026,15 @@ compileDecision(node, visitedInPath, contextStack, indentLevel) {
             visitedInPath,
             contextStack,
             indentLevel,
-            useNoBranch
+            useNoBranch,
+    inLoopBody,
+    inLoopHeader
         );
     } else {
         // Plain if/else
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel);
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
     }
 }
 
@@ -2064,146 +2114,156 @@ return false;
 /**
      * Compile loop structure (while or for)
      */
-    compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
-        const savedSkip = new Set(this.nodesToSkip);
+/**
+ * Compile loop structure (while or for)
+ *
+ * node         = decision node (loop header)
+ * loopBodyId   = entry node of looping branch
+ * exitId       = entry node of exit branch (after loop)
+ * useNoBranch  = true when NO branch is the loop body
+ */
+ compileLoop(
+    node,
+    loopBodyId,
+    exitId,
+    visitedInPath,
+    contextStack,
+    indentLevel,
+    useNoBranch = false,
+    inLoopBody = false,
+    inLoopHeader = false
+) {
 
-        const indent = "    ".repeat(indentLevel);
-        let code = "";
 
-        // Try to detect if it's a for loop pattern (only for YES branch loops)
-        const forLoopInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
-        
-        if (forLoopInfo) {
-            // prevent increment being emitted inside loop body
-// create a *local* skip list for this loop only
-const localSkips = new Set();
+const indent = "    ".repeat(indentLevel);
+let code = "";
 
-// skip increment (always safe)
-if (forLoopInfo.incrementNodeId) {
-    localSkips.add(forLoopInfo.incrementNodeId);
-}
+// -------------------------------
+// 1) Try COUNTED FOR loop lowering
+// -------------------------------
 
-// skip init ONLY if it is the direct predecessor of the decision
-if (forLoopInfo.initNodeId) {
-    const incoming = this.incomingMap.get(node.id) || [];
-    const comesDirectlyBefore = incoming.some(c => c.sourceId === forLoopInfo.initNodeId);
+const forInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
 
-    if (comesDirectlyBefore) {
-        localSkips.add(forLoopInfo.initNodeId);
+if (forInfo) {
+
+    // mark this decision node as the active loop header
+    this.loopHeaderId = node.id;
+
+    // -------------------------------
+    // create a local skip set
+    // -------------------------------
+    const savedSkip = this.nodesToSkip;
+    const localSkips = new Set();
+
+    // skip increment statement always
+    if (forInfo.incrementNodeId) {
+        localSkips.add(forInfo.incrementNodeId);
     }
+
+    // optionally skip init if it directly precedes header
+    if (forInfo.initNodeId) {
+        const incoming = this.incomingMap.get(node.id) || [];
+        const direct = incoming.some(c => c.sourceId === forInfo.initNodeId);
+        if (direct) localSkips.add(forInfo.initNodeId);
+    }
+
+    // MOST IMPORTANT:
+    // the loop header itself must not emit AND must not follow both branches
+    localSkips.add(node.id);
+
+    this.nodesToSkip = localSkips;
+
+    // -------------------------------
+    // build Python for-range()
+    // -------------------------------
+    let step = forInfo.step;
+    if (!step) {
+        step = (parseInt(forInfo.start) <= parseInt(forInfo.end)) ? 1 : -1;
+    }
+
+    const rangeStr = `range(${forInfo.start}, ${forInfo.end}, ${step})`;
+
+    code += `${indent}for ${forInfo.variable} in ${rangeStr}:\n`;
+
+    if (this.useHighlighting) {
+        code += `${indent}    highlight('${node.id}')\n`;
+    }
+
+    // -------------------------------
+    // compile loop body ONLY along loop branch
+    // -------------------------------
+    const loopCtx = [...contextStack, `loop_${node.id}`];
+
+    const bodyCode = this.compileNode(
+        loopBodyId,
+        new Set(),
+        loopCtx,
+        indentLevel + 1,
+        /* inLoopBody = */ true,true
+    );
+
+    code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
+
+    // -------------------------------
+    // compile exit path AFTER loop
+    // -------------------------------
+    this.nodesToSkip = savedSkip;
+
+    if (exitId) {
+        code += this.compileNode(
+            exitId,
+            visitedInPath,
+            contextStack,
+            indentLevel,
+    inLoopBody,
+    inLoopHeader
+        );
+    }
+
+    return code;
 }
 
+// -------------------------------
+// 2) OTHERWISE → WHILE LOOP
+// -------------------------------
 
+// YES-branch loop → normal condition
+// NO-branch loop  → negate condition
+let condition = node.text;
+if (useNoBranch) condition = `not (${condition})`;
 
-            // Compile as for loop
-            // Build range() with optional step parameter
-            let step = forLoopInfo.step;
+code += `${indent}while ${condition}:\n`;
 
-// infer step automatically if not given
-if (!step) {
-    if (forLoopInfo.start > forLoopInfo.end) step = -1;
-    else step = 1;
-}
-
-let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}, ${step})`;
-
-            
-            code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
-            if (this.useHighlighting) {
+if (this.useHighlighting) {
     code += `${indent}    highlight('${node.id}')\n`;
 }
-            
-            // Compile loop body (exclude the increment statement)
-// compile loop body normally so highlight runs every iteration
-const forBodyContext = [...contextStack, `loop_${node.id}`];
-const forVisited = new Set();  // fresh per-loop context
 
-const oldGlobalSkips = this.nodesToSkip;
-this.nodesToSkip = localSkips;
+const whileCtx = [...contextStack, `loop_${node.id}`];
 
-// compile loop body
-let body = "";
+const bodyCode = this.compileNode(
+    loopBodyId,
+    new Set(),
+    whileCtx,
+    indentLevel + 1,true,
+    /* inLoopBody = */ true
+);
 
-// do NOT compile the loop header again
-if (loopBodyId && loopBodyId !== node.id) {
-    body = this.compileNode(loopBodyId, forVisited, forBodyContext, indentLevel + 1);
+code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
+
+// exit path after while
+if (exitId) {
+    code += this.compileNode(
+        exitId,
+        visitedInPath,
+        contextStack,
+        indentLevel,
+    inLoopBode,
+    inLoopHeader
+    );
 }
 
-
-// ------------------------------------------------------
-// NEW: detect when body is logically empty
-// (only whitespace, comments, highlights etc.)
-// ------------------------------------------------------
-const bodyTrimmed = (body || "")
-    // remove whitespace
-    .replace(/\s+/g, "")
-    // remove highlights
-    .replace(/highlight\(.*?\)/g, "")
-    // remove comments
-    .replace(/^#.*$/gm, "")
-    // remove accidental re-emitted decision
-    .replace(/if.*?:passelse:.*/g, "");
-
-if (!bodyTrimmed) {
-    body = `${indent}    pass\n`;
+return code;
 }
-
-
-// emit final body
-code += body;
-
-
-this.nodesToSkip = oldGlobalSkips;  // restore after body
-
-
-
-            
-            // Handle loop exit
-            if (exitId) {
-                code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
-            }
-            this.nodesToSkip = savedSkip;
-
-            return code;
-        } else {
-            // Compile as while loop
-            // If NO branch loops, negate the condition
-            let condition = node.text;
-            if (useNoBranch) {
-                // Negate the condition: wrap in not() or invert operators
-                // Simple approach: wrap in not()
-                condition = `not (${node.text})`;
-            }
-            
-            code += `${indent}while ${condition}:\n`;
-            if (this.useHighlighting) {
-    code += `${indent}    highlight('${node.id}')\n`;
-}
-            // Push loop context
-            const newContextStack = [...contextStack, `loop_${node.id}`];
-            const newVisited = new Set([...visitedInPath]);
-            
-            // Compile loop body
-// compile loop body with normal compiler — highlight works per-iteration
-const whileBodyContext = [...contextStack, `loop_${node.id}`];
-const whileVisited = new Set();  // do NOT reuse visitedInPath here
-
-code +=
-    this.compileNode(loopBodyId, whileVisited, whileBodyContext, indentLevel + 1)
-    || `${indent}    pass\n`;
-
-            
-            // Handle loop exit
-            // Use original visited set (not the loop body's visited set) for the exit path
-            // This allows proper compilation of nodes after the loop
-            if (exitId) {
-                code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
-            }
-            this.nodesToSkip = savedSkip;
-
-            return code;
-        }
-    }
 
     /**
      * Detect for loop pattern:
@@ -2472,9 +2532,11 @@ if (node && node.type === 'decision') {
     }
 
     /**
-     * Compile loop body, stopping at back edges
+     * Compile loop body, stopping at back edges    
      */
-    compileLoopBody(loopHeaderId, startId, skipNodeId, visitedInPath, contextStack, indentLevel) {
+    compileLoopBody(loopHeaderId, startId, skipNodeId, visitedInPath, contextStack, indentLevel,
+    inLoopBody = false,
+    inLoopHeader = false) {
         let code = "";
         let currentId = startId;
         const visitedInLoop = new Set([...visitedInPath]);
@@ -2552,7 +2614,7 @@ if (node && node.type === 'decision') {
             }
 
             // Compile the node normally
-            const nodeCode = this.compileNode(currentId, visitedInLoop, contextStack, indentLevel, true);
+            const nodeCode = this.compileNode(currentId, visitedInLoop, contextStack, indentLevel, true, true);
             code += nodeCode;
 
             
@@ -2573,7 +2635,9 @@ if (node && node.type === 'decision') {
 /**
  * Compile if/else statement with support for elif
  */
-compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
+compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+    inLoopBody = false,
+    inLoopHeader = false) {
     const indent = "    ".repeat(indentLevel);
     let code = `${indent}if ${node.text}:\n`;
 
@@ -2583,7 +2647,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
     const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
     ifVisited.add(ifDecisionContextId);
 
-    const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1);
+    const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1 ,inLoopBody,inLoopHeader);
     code += ifCode || `${indent}    pass\n`;
 
     // ----- ELSE / ELIF -----
@@ -2606,7 +2670,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
                 elseVisited.add(elseDecisionContextId);
 
                 code += `${indent}else:\n`;
-                const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
+                const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,inLoopBody,inLoopHeader);
                 code += elseCode || `${indent}    pass\n`;
             } else {
                 // Safe to treat as an elif chain
@@ -2620,7 +2684,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel) {
             elseVisited.add(elseDecisionContextId);
 
             code += `${indent}else:\n`;
-            const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1);
+            const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,inLoopBody,inLoopHeader);
             code += elseCode || `${indent}    pass\n`;
         }
     }
@@ -2654,7 +2718,7 @@ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
         const elifContext = [...contextStack, `elif_${currentElif.id}`];
         const elifVisited = new Set(visitedInPath);
 
-        const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1);
+        const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1,inLoopBody,inLoopHeader);
         code += elifCode || `${indent}    pass\n`;
 
         if (!elifNoId) break;
@@ -2669,7 +2733,7 @@ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
 
         // Final else clause
         code += `${indent}else:\n`;
-        const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1);
+        const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1,inLoopBody,inLoopHeader);
         code += elseCode || `${indent}    pass\n`;
 
         break;
