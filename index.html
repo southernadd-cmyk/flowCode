@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.4</title>
+    <title>FlowCode v3.41</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.4</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.41</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1580,6 +1580,7 @@ class FlowchartCompiler {
         this.connections = connections;
         this.useHighlighting = useHighlighting;
         this.loweredImplicitLoops = new Set();   // prevents stack overflow on implicit loops
+        this.nodesToSkip = new Set();
 
         // Build adjacency maps for faster lookups
         this.outgoingMap = new Map();
@@ -1691,6 +1692,10 @@ return headers;
         if (!nodeId || nodeId === 'end') return "";
         
         const node = this.nodes.find(n => n.id === nodeId);
+// --- skip nodes suppressed by loop transforms (e.g., for-loop increment) ---
+if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
+    return "";
+}
 
 
         if (!node) return "";
@@ -1965,6 +1970,15 @@ return dfs(branchId, 0);
         const forLoopInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
         
         if (forLoopInfo) {
+            // prevent increment being emitted inside loop body
+if (forLoopInfo.incrementNodeId) {
+    this.nodesToSkip.add(forLoopInfo.incrementNodeId);
+}
+if (forLoopInfo.initNodeId) {
+    this.nodesToSkip.add(forLoopInfo.initNodeId);
+}
+
+
             // Compile as for loop
             // Build range() with optional step parameter
             let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}`;
@@ -2167,7 +2181,8 @@ return {
     start: finalStart,
     end: finalEnd,
     step: finalStep,
-    incrementNodeId: incrementInfo.node.id
+    incrementNodeId: incrementInfo.node.id,
+    initNodeId: initNode?.id ?? null
 };
 }
 
