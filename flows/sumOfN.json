@@ -1,0 +1,118 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "start",
+      "text": "Start",
+      "x": 432.8000183105469,
+      "y": 4.799995422363281
+    },
+    {
+      "id": "n2",
+      "type": "input",
+      "text": "Enter n",
+      "varName": "n",
+      "x": 296.0000305175781,
+      "y": 90.39999389648438,
+      "prompt": "Enter an integer",
+      "dtype": "int"
+    },
+    {
+      "id": "n3",
+      "type": "process",
+      "text": "total = 0",
+      "x": 42.399993896484375,
+      "y": 81.60003662109375
+    },
+    {
+      "id": "n4",
+      "type": "process",
+      "text": "i = 1",
+      "x": 107.20001220703125,
+      "y": 257.6000061035156
+    },
+    {
+      "id": "n5",
+      "type": "decision",
+      "text": "i <= n",
+      "x": 367.20001220703125,
+      "y": 227.19998168945312
+    },
+    {
+      "id": "n6",
+      "type": "process",
+      "text": "total = total + i",
+      "x": 80,
+      "y": 440
+    },
+    {
+      "id": "n7",
+      "type": "process",
+      "text": "i = i + 1",
+      "x": 80,
+      "y": 520
+    },
+    {
+      "id": "n8",
+      "type": "output",
+      "text": "f\"Sum of first {n} numbers is {total}\"",
+      "x": 619.2000122070312,
+      "y": 470.3999938964844
+    },
+    {
+      "id": "n9",
+      "type": "end",
+      "text": "End",
+      "x": 300,
+      "y": 440
+    }
+  ],
+  "connections": [
+    {
+      "from": "n1",
+      "to": "n2",
+      "port": "next"
+    },
+    {
+      "from": "n2",
+      "to": "n3",
+      "port": "next"
+    },
+    {
+      "from": "n3",
+      "to": "n4",
+      "port": "next"
+    },
+    {
+      "from": "n4",
+      "to": "n5",
+      "port": "next"
+    },
+    {
+      "from": "n5",
+      "to": "n6",
+      "port": "yes"
+    },
+    {
+      "from": "n5",
+      "to": "n8",
+      "port": "no"
+    },
+    {
+      "from": "n6",
+      "to": "n7",
+      "port": "next"
+    },
+    {
+      "from": "n7",
+      "to": "n5",
+      "port": "next"
+    },
+    {
+      "from": "n8",
+      "to": "n9",
+      "port": "next"
+    }
+  ],
+  "version": "3.0"
+}
