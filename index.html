@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.46</title>
+    <title>FlowCode v3.47</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.46</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.47</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2674,7 +2674,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
                 code += elseCode || `${indent}    pass\n`;
             } else {
                 // Safe to treat as an elif chain
-                code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel);
+                code += this.compileElifChain(noNode, visitedInPath, contextStack, indentLevel ,inLoopBody,inLoopHeader);
             }
         } else {
             // Simple else branch (no decision node at the top)
@@ -2698,7 +2698,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
 /**
  * Handle elif chains safely (no infinite A ↔ B bouncing)
  */
-compileElifChain(elifNode, visitedInPath, contextStack, indentLevel) {
+compileElifChain(elifNode, visitedInPath, contextStack, indentLevel ,inLoopBody,inLoopHeader) {
     let code = "";
     const indent = "    ".repeat(indentLevel);
 
