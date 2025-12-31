@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.47</title>
+    <title>FlowCode v3.48</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.47</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.48</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1588,6 +1588,9 @@ class FlowchartCompiler {
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
         this.loopHeaderCache = new Map(); // Cache for loop header detection
+        this.forPatternCache = new Map();
+this.forPatternInProgress = new Set();
+
         this.buildMaps();
     }
 
@@ -1812,7 +1815,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
         nodeId,
         visitedInPath,
         contextStack,
-        indentLevel
+        indentLevel,
+    inLoopBody,
+    inLoopHeader
     );
 }
 // ================================================================
@@ -1911,7 +1916,9 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
     
     
     
-    compileImplicitForeverLoop(nodeId, visitedInPath, contextStack, indentLevel) {
+    compileImplicitForeverLoop(nodeId, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader) {
 
 const indent = "    ".repeat(indentLevel);
 let code = "";
@@ -2257,7 +2264,7 @@ if (exitId) {
         visitedInPath,
         contextStack,
         indentLevel,
-    inLoopBode,
+    inLoopBody,
     inLoopHeader
     );
 }
@@ -2281,6 +2288,19 @@ return code;
  *   numeric OR variable bounds
  */
  detectForLoopPattern(decisionId) {
+// cache already computed answers
+if (this.forPatternCache.has(decisionId)) {
+    return this.forPatternCache.get(decisionId);
+}
+
+// prevent re-entry recursion explosions
+if (this.forPatternInProgress.has(decisionId)) {
+
+return null;
+
+}
+
+this.forPatternInProgress.add(decisionId);
 
 // -------------------------------
 // 1) Find initialisation before decision (walk back in straight line)
@@ -2404,13 +2424,18 @@ const incId = incrementInfo.node.id;
 
 if (!this.pathIsDirectIncrementToHeader(incId, decisionId)) {
     // ❌ not a clean counted loop — leave it as while + inner logic
-    return null;
+    this.forPatternInProgress.delete(decisionId);
+this.forPatternCache.set(decisionId, null);
+return null;
+
 }
 
 // -------------------------------
 // 6) otherwise it's a valid counted for-loop
 // -------------------------------
-return {
+this.forPatternInProgress.delete(decisionId);
+
+const result = {
     variable: varName,
     start: finalStart,
     end: finalEnd,
@@ -2418,6 +2443,10 @@ return {
     incrementNodeId: incId,
     initNodeId: initNode?.id ?? null
 };
+
+this.forPatternCache.set(decisionId, result);
+return result;
+
 
  }
 
@@ -2498,7 +2527,10 @@ if (node && node.type === 'decision') {
 
     }
     
-    return null;
+    this.forPatternInProgress.delete(decisionId);
+this.forPatternCache.set(decisionId, null);
+return null;
+
 }
 
     /**
