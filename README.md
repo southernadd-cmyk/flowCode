@@ -1,4 +1,4 @@
-# FlowCode v3.39
+# FlowCode v3.4
 
 Build **real, executable flowcharts** in the browser — then automatically generate Python code and run it step-by-step.
 
@@ -12,7 +12,7 @@ Major update highlights:
 - ✅ Improved zoom & pan controls
 - ✅ Massive compiler upgrades:
   - **implicit forever loop support**
-  - safer recursion prevention
+  - **ongoing loop detection improvements**
 - ✅ **Export options modal**
   - PNG image
   - JSON diagram
