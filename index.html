@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.48</title>
+    <title>FlowCode v3.49</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.48</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.49</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -933,6 +933,8 @@ onclick="App.stopSim()">
     Hide Challenge Details
   </button>
 </div>
+
+
 <script>
 
 const FLOWCODE_CHALLENGES = [
@@ -1738,6 +1740,11 @@ return headers;
         
         const node = this.nodes.find(n => n.id === nodeId);
 
+// prevent infinite recursion by node revisits along same path
+if (visitedInPath.has(nodeId)) {
+    return "";
+}
+visitedInPath.add(nodeId);
 // --- suppress for-loop init statements (like `i = x`) ---
 // --- suppress for-loop init statements (like `i = x`) ---
 // but STILL continue to successors
@@ -1746,7 +1753,7 @@ if (this.isInitOfForLoop(nodeId)) {
     const succ = this.getAllSuccessors(nodeId);
     let out = "";
     for (const { nodeId: nxt } of succ) {
-        out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel,
+        out += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel,
     inLoopBody,
     inLoopHeader);
     }
@@ -1768,11 +1775,11 @@ if (nodeId === this.loopHeaderId) {
     const exitId = this.getSuccessor(nodeId, 'no');
 
     if (inLoopBody) {
-        return this.compileNode(yesId, new Set(visitedInPath), [...contextStack], indentLevel,
+        return this.compileNode(yesId, visitedInPath, [...contextStack], indentLevel,
     inLoopBody,
     inLoopHeader);
     } else {
-        return this.compileNode(exitId, new Set(visitedInPath), [...contextStack], indentLevel,
+        return this.compileNode(exitId, visitedInPath, [...contextStack], indentLevel,
     inLoopBody,
     inLoopHeader);
     }
@@ -1782,7 +1789,7 @@ if (nodeId === this.loopHeaderId) {
 const succ = this.getAllSuccessors(nodeId);
 let out = "";
 for (const { nodeId: nxt } of succ) {
-    out += this.compileNode(nxt, new Set(visitedInPath), [...contextStack], indentLevel,
+    out += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel,
     inLoopBody,
     inLoopHeader);
 }
@@ -1822,14 +1829,7 @@ if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
 }
 // ================================================================
 
-        // Create unique context identifier
-        const contextId = `${nodeId}_${contextStack.join('_')}_${indentLevel}`;
-        
-        // Prevent infinite recursion in the same context
-        if (visitedInPath.has(contextId)) {
-            return "";
-        }
-        visitedInPath.add(contextId);
+
         
         const indent = "    ".repeat(indentLevel);
         let code = "";
@@ -2675,7 +2675,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
 
     // ----- IF BRANCH -----
     const ifContext = [...contextStack, `if_${node.id}`];
-    const ifVisited = new Set(visitedInPath);
+    const ifVisited = visitedInPath;
     const ifDecisionContextId = `${node.id}_${ifContext.join('_')}_${indentLevel + 1}`;
     ifVisited.add(ifDecisionContextId);
 
@@ -2697,7 +2697,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
                 // Treat it as a plain else: block, whose contents happen
                 // to start with another while-loop decision.
                 const elseContext = [...contextStack, `else_${node.id}`];
-                const elseVisited = new Set(visitedInPath);
+                const elseVisited = visitedInPath;
                 const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
                 elseVisited.add(elseDecisionContextId);
 
@@ -2711,7 +2711,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
         } else {
             // Simple else branch (no decision node at the top)
             const elseContext = [...contextStack, `else_${node.id}`];
-            const elseVisited = new Set(visitedInPath);
+            const elseVisited = visitedInPath;
             const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
             elseVisited.add(elseDecisionContextId);
 
@@ -2748,7 +2748,7 @@ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel ,inLoopBody,
         code += `${indent}elif ${currentElif.text}:\n`;
 
         const elifContext = [...contextStack, `elif_${currentElif.id}`];
-        const elifVisited = new Set(visitedInPath);
+        const elifVisited = visitedInPath;
 
         const elifCode = this.compileNode(elifYesId, elifVisited, elifContext, indentLevel + 1,inLoopBody,inLoopHeader);
         code += elifCode || `${indent}    pass\n`;
