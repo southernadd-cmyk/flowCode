@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.43</title>
+    <title>FlowCode v3.44</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.43</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.44</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2019,10 +2019,48 @@ const dfs = (id, depth = 0) => {
 
 return dfs(branchId, 0);
 }
+
+
+// ensure increment -> header path has NO other decisions
+pathIsDirectIncrementToHeader(incId, headerId) {
+
+const stack = [incId];
+const visited = new Set();
+
+while (stack.length) {
+    const cur = stack.pop();
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+
+    if (cur === headerId) return true;
+
+    const outgoing = this.outgoingMap.get(cur) || [];
+
+    for (const edge of outgoing) {
+        const nxt = edge.targetId;
+
+        if (nxt === headerId) {
+            return true; // direct OK
+        }
+
+        const node = this.nodes.find(n => n.id === nxt);
+
+        // 🚫 reject if another decision is in between
+        if (node && node.type === "decision") return false;
+
+        stack.push(nxt);
+    }
+}
+
+return false;
+}
+
 /**
      * Compile loop structure (while or for)
      */
     compileLoop(node, loopBodyId, exitId, visitedInPath, contextStack, indentLevel, useNoBranch = false) {
+        const savedSkip = new Set(this.nodesToSkip);
+
         const indent = "    ".repeat(indentLevel);
         let code = "";
 
@@ -2053,12 +2091,16 @@ if (forLoopInfo.initNodeId) {
 
             // Compile as for loop
             // Build range() with optional step parameter
-            let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}`;
-            if (forLoopInfo.step !== 1) {
-    rangeStr += `, ${forLoopInfo.step}`;
+            let step = forLoopInfo.step;
+
+// infer step automatically if not given
+if (!step) {
+    if (forLoopInfo.start > forLoopInfo.end) step = -1;
+    else step = 1;
 }
 
-            rangeStr += ')';
+let rangeStr = `range(${forLoopInfo.start}, ${forLoopInfo.end}, ${step})`;
+
             
             code += `${indent}for ${forLoopInfo.variable} in ${rangeStr}:\n`;
             if (this.useHighlighting) {
@@ -2085,7 +2127,8 @@ this.nodesToSkip = oldGlobalSkips;  // restore after body
             if (exitId) {
                 code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
-            
+            this.nodesToSkip = savedSkip;
+
             return code;
         } else {
             // Compile as while loop
@@ -2121,7 +2164,8 @@ code +=
             if (exitId) {
                 code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel);
             }
-            
+            this.nodesToSkip = savedSkip;
+
             return code;
         }
     }
@@ -2256,15 +2300,31 @@ if (comparisonOp === '>=') {
     }
 }
 
+// -------------------------------
+// 5) NEW SAFETY CHECK
+// increment must flow back to THIS decision directly,
+// and MUST NOT pass through any other decision nodes
+// -------------------------------
+const incId = incrementInfo.node.id;
+
+if (!this.pathIsDirectIncrementToHeader(incId, decisionId)) {
+    // ❌ not a clean counted loop — leave it as while + inner logic
+    return null;
+}
+
+// -------------------------------
+// 6) otherwise it's a valid counted for-loop
+// -------------------------------
 return {
     variable: varName,
     start: finalStart,
     end: finalEnd,
     step: finalStep,
-    incrementNodeId: incrementInfo.node.id,
+    incrementNodeId: incId,
     initNodeId: initNode?.id ?? null
 };
-}
+
+ }
 
 /**
  * Find increment node using BFS to handle longer paths
@@ -2403,7 +2463,9 @@ if (node && node.type === 'decision') {
             // Check if this node has a back edge to the loop header
             const outgoing = this.outgoingMap.get(currentId) || [];
             const hasBackEdge = outgoing.some(conn => 
-                conn.targetId === loopHeaderId && (conn.port === 'next' || conn.port === 'yes'));
+    conn.targetId === loopHeaderId &&
+    (conn.port === 'next' || conn.port === 'yes' || conn.port === 'no'));
+
             
             // Also check if next node is any loop header in the context stack
             const nextId = this.getSuccessor(currentId, 'next');
