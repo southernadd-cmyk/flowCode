@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.36</title>
+    <title>FlowCode v3.37</title>
 
     <!-- LIBS -->
 
@@ -645,7 +645,7 @@
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.36</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.37</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -677,7 +677,7 @@ onclick="App.stopSim()">
             
                 <ul class="dropdown-menu">
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Max of Three</a></li>
-                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Two Loops</a></li>
+                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('2loops.json')">Nested For Loops</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('whileloop.json')">While Loop</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('WhileTrue.json')">While True Loop</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
@@ -2197,6 +2197,18 @@ findIncrementNodeBFS(startId, stopId, varName) {
                 });
             }
         }
+
+        // ALSO follow the NO branch (needed for nested loops where increment is on NO)
+if (node && node.type === 'decision') {
+    const noId = this.getSuccessor(current.nodeId, 'no');
+    if (noId && !current.visited.has(noId)) {
+        queue.push({
+            nodeId: noId,
+            visited: new Set([...current.visited])
+        });
+    }
+}
+
     }
     
     return null;
