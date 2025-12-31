@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    {
+      "id": "n6",
+      "type": "decision",
+      "x": 253.33334350585938,
+      "y": 299.3999938964844,
+      "text": "x > 0",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n7",
+      "type": "start",
+      "x": 110,
+      "y": 49,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n8",
+      "type": "var",
+      "x": 270.3333435058594,
+      "y": 155.73333740234375,
+      "text": "x = 10",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n9",
+      "type": "process",
+      "x": 133.19998168945312,
+      "y": 512.7999877929688,
+      "text": "x = x - 1",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n10",
+      "type": "output",
+      "x": 590.9332885742188,
+      "y": 414.86663818359375,
+      "text": "\"GO!\"",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n11",
+      "type": "end",
+      "x": 457.5999755859375,
+      "y": 522.7999877929688,
+      "text": "End",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n12",
+      "type": "output",
+      "x": 66,
+      "y": 338.40008544921875,
+      "text": "x",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n7",
+      "port": "next",
+      "to": "n8"
+    },
+    {
+      "from": "n8",
+      "port": "next",
+      "to": "n6"
+    },
+    {
+      "from": "n6",
+      "port": "yes",
+      "to": "n9"
+    },
+    {
+      "from": "n6",
+      "port": "no",
+      "to": "n10"
+    },
+    {
+      "from": "n10",
+      "port": "next",
+      "to": "n11"
+    },
+    {
+      "from": "n9",
+      "port": "next",
+      "to": "n12"
+    },
+    {
+      "from": "n12",
+      "port": "next",
+      "to": "n6"
+    }
+  ],
+  "version": "3.0"
+}
