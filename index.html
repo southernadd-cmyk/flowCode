@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.39</title>
+    <title>FlowCode v3.4</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.39</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.4</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -2040,104 +2040,135 @@ code +=
 /**
  * Improved for loop detection with path analysis
  */
-detectForLoopPattern(decisionId) {
-    // Look for variable initialization before the decision
-    const incoming = this.incomingMap.get(decisionId) || [];
-    let initNode = null;
-    let varName = null;
-    let startValue = null;
-    
-    for (const conn of incoming) {
-        const node = this.nodes.find(n => n.id === conn.sourceId);
-        if (node && (node.type === 'var' || node.type === 'process')) {
-            // Check if it looks like initialization: "i = 0"
-            const match = node.text.match(/^\s*(\w+)\s*=\s*(\d+)\s*$/);
-            if (match) {
-                initNode = node;
-                varName = match[1];
-                startValue = match[2];
-                break;
-            }
-        }
+/**
+ * Detect for loop pattern (increasing and decreasing)
+ * Supports:
+ *   i = 0      / i = start
+ *   i < end    / i <= end / i > end / i >= end
+ *   i = i + k  / i += k / i = i - k / i -= k
+ *   numeric OR variable bounds
+ */
+ detectForLoopPattern(decisionId) {
+
+// -------------------------------
+// 1) Find initialisation before decision (walk back in straight line)
+// -------------------------------
+let initNode = null;
+let varName = null;
+let startValue = null;
+
+const visitedBack = new Set();
+const stack = [...(this.incomingMap.get(decisionId) || [])];
+
+while (stack.length > 0) {
+    const conn = stack.pop();
+    if (!conn || visitedBack.has(conn.sourceId)) continue;
+
+    visitedBack.add(conn.sourceId);
+
+    const node = this.nodes.find(n => n.id === conn.sourceId);
+    if (!node) continue;
+
+    // stop if control flow *branches* – we only allow straight-line init chains
+    const incomings = this.incomingMap.get(node.id) || [];
+    if (incomings.length > 1) continue;
+
+    // match: i = 0   OR   i = x   (number or identifier)
+    const m = node.text?.match(/^\s*(\w+)\s*=\s*([\w\d_]+)\s*$/);
+    if (m) {
+        initNode = node;
+        varName = m[1];
+        startValue = m[2];
+        break;
     }
-    
-    if (!varName) return null;
-    
-    // Parse condition to get end value
-    const decisionNode = this.nodes.find(n => n.id === decisionId);
-    const condition = decisionNode.text;
-    
-    // Try to extract end value from condition
-    let endValue = null;
-    let comparisonOp = null;
-    const patterns = [
-        { regex: new RegExp(`${varName}\\s*<\\s*(\\d+)`), op: '<' },
-        { regex: new RegExp(`${varName}\\s*<=\\s*(\\d+)`), op: '<=' },
-        { regex: new RegExp(`${varName}\\s*>\\s*(\\d+)`), op: '>' },
-        { regex: new RegExp(`${varName}\\s*>=\\s*(\\d+)`), op: '>=' }
-    ];
-    
-    for (const pattern of patterns) {
-        const match = condition.match(pattern.regex);
-        if (match) {
-            endValue = match[1];
-            comparisonOp = pattern.op;
-            break;
-        }
+
+    // continue walking backwards
+    (this.incomingMap.get(node.id) || []).forEach(prev => stack.push(prev));
+}
+
+if (!varName) return null;
+
+// -------------------------------
+// 2) Parse loop condition
+// -------------------------------
+const decisionNode = this.nodes.find(n => n.id === decisionId);
+if (!decisionNode || !decisionNode.text) return null;
+
+const condition = decisionNode.text.trim();
+
+let endValue = null;
+let comparisonOp = null;
+
+const condPatterns = [
+    { re: new RegExp(`${varName}\\s*<\\s*([\\w\\d_]+)`), op: '<'  },
+    { re: new RegExp(`${varName}\\s*<=\\s*([\\w\\d_]+)`), op: '<=' },
+    { re: new RegExp(`${varName}\\s*>\\s*([\\w\\d_]+)`), op: '>'  },
+    { re: new RegExp(`${varName}\\s*>=\\s*([\\w\\d_]+)`), op: '>=' },
+];
+
+for (const p of condPatterns) {
+    const m = condition.match(p.re);
+    if (m) {
+        endValue = m[1];
+        comparisonOp = p.op;
+        break;
     }
-    
-    if (!endValue) return null;
-    
-    // Look for increment statement in the loop body using BFS
-    const yesId = this.getSuccessor(decisionId, 'yes');
-    const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
-    
-    if (incrementInfo) {
-        // Determine step size and direction
-        let step = incrementInfo.step || 1;
-        const isDecrement = incrementInfo.isDecrement || false;
-        
-        // Handle range conversion based on comparison operator
-        let finalStart = startValue;
-        let finalEnd = endValue;
-        let finalStep = step;
-        
-        if (comparisonOp === '>' || comparisonOp === '>=') {
-            // Decrementing loop: i = 10, i > 0, i = i - 1
-            // For i > 0: range(10, 0, -1) gives [10,9,8,...,1] ✓
-            // For i >= 0: range(10, -1, -1) gives [10,9,8,...,0] ✓
-            finalStart = startValue;
-            if (comparisonOp === '>=') {
-                // i >= endValue means we want to include endValue, so stop at endValue - 1
-                finalEnd = `${parseInt(endValue) - 1}`;
-            } else {
-                // i > endValue means we stop when i == endValue, so range stops at endValue
-                finalEnd = endValue;
-            }
-            finalStep = -Math.abs(step);
-        } else {
-            // Incrementing loop: i = 0, i < 10, i = i + 1
-            finalStart = startValue;
-            if (comparisonOp === '<=') {
-                // i <= endValue means we want to include endValue, so range goes to endValue + 1
-                finalEnd = `${parseInt(endValue) + 1}`;
-            } else {
-                // i < endValue means range stops at endValue (exclusive)
-                finalEnd = endValue;
-            }
-            finalStep = Math.abs(step);
-        }
-        
-        return {
-            variable: varName,
-            start: finalStart,
-            end: finalEnd,
-            step: finalStep,
-            incrementNodeId: incrementInfo.node.id
-        };
+}
+
+if (!endValue) return null;
+
+// -------------------------------
+// 3) Find increment anywhere in loop body (BFS)
+// -------------------------------
+const yesId = this.getSuccessor(decisionId, 'yes');
+const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
+
+if (!incrementInfo) return null;
+
+let step = incrementInfo.step || 1;
+
+// -------------------------------
+// 4) Handle increasing vs decreasing loops
+// -------------------------------
+let finalStart = startValue;
+let finalEnd   = endValue;
+let finalStep  = step;
+
+// --- DECREASING LOOPS (DOWNWARD) ---
+if (comparisonOp === '>' || comparisonOp === '>=') {
+
+    // ensure negative step
+    finalStep = -Math.abs(step);
+
+    if (comparisonOp === '>=') {
+        // include the end value once — range is exclusive
+        finalEnd = `(${endValue}) - 1`;
+    } else {
+        // exclusive already
+        finalEnd = endValue;
     }
-    
-    return null;
+
+// --- INCREASING LOOPS (UPWARD) ---
+} else {
+
+    // ensure positive step
+    finalStep = Math.abs(step);
+
+    if (comparisonOp === '<=') {
+        // include the end value
+        finalEnd = `(${endValue}) + 1`;
+    } else {
+        finalEnd = endValue;
+    }
+}
+
+return {
+    variable: varName,
+    start: finalStart,
+    end: finalEnd,
+    step: finalStep,
+    incrementNodeId: incrementInfo.node.id
+};
 }
 
 /**
