@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.5</title>
+    <title>FlowCode v3.51</title>
 
     <!-- LIBS -->
 
@@ -649,7 +649,7 @@ left:-100px!important;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.5</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.51</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1988,7 +1988,32 @@ switch (node.type) {
 
 return code;
 }
+/**
+ * Simple if/else compilation without elif chains for nested decision structures
+ */
+ compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+    inLoopBody = false,
+    inLoopHeader = false) {
+    const indent = "    ".repeat(indentLevel);
+    let code = `${indent}if ${node.text}:\n`;
 
+    // Compile YES branch
+    const ifContext = [...contextStack, `if_${node.id}`];
+    const ifVisited = new Set([...visitedInPath]);
+    const ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLoopBody, inLoopHeader);
+    code += ifCode || `${indent}    pass\n`;
+
+    // Compile NO branch
+    if (noId) {
+        code += `${indent}else:\n`;
+        const elseContext = [...contextStack, `else_${node.id}`];
+        const elseVisited = new Set([...visitedInPath]);
+        const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1, inLoopBody, inLoopHeader);
+        code += elseCode || `${indent}    pass\n`;
+    }
+
+    return code;
+}
     /**
      * Compile decision node (could be if, while, or for)
      */
@@ -2038,13 +2063,12 @@ return code;
     inLoopHeader
         );
     } else {
-        // Plain if/else
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+        // Plain if/else - BUT use a simpler approach for nested decisions
+        return this.compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody,
     inLoopHeader);
     }
 }
-
     /**
      * Check if a decision node is a loop header
      */
@@ -2667,9 +2691,25 @@ return null;
 /**
  * Compile if/else statement with support for elif
  */
-compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
+    
+    // Check if this decision is part of a "find largest/smallest" pattern
+    // where we have nested decisions that should stay as separate if/else blocks
+    const yesNode = this.nodes.find(n => n.id === yesId);
+    const noNode = this.nodes.find(n => n.id === noId);
+    
+    // If either branch leads to another decision, use simple if/else
+    // This prevents elif chains for nested decision trees
+    if ((yesNode && yesNode.type === 'decision') || 
+        (noNode && noNode.type === 'decision')) {
+        return this.compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+    inLoopBody,
+    inLoopHeader);
+    }
+    
+    // Otherwise, use the original elif chain logic
     const indent = "    ".repeat(indentLevel);
     let code = `${indent}if ${node.text}:\n`;
 
@@ -2689,7 +2729,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
         if (noNode && noNode.type === 'decision') {
             // Check if this "else" decision is itself a loop header.
             // If it is, we MUST NOT turn it into an elif chain, or we get
-            // exactly the infinite recursion you’re seeing.
+            // exactly the infinite recursion you're seeing.
             const yesOfNo        = this.getSuccessor(noNode.id, 'yes');
             const noBranchIsLoop = this.isLoopHeader(noNode.id, yesOfNo);
 
@@ -2722,9 +2762,7 @@ compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     }
 
     return code;
-}
-
-    /**
+}   /**
      * Handle elif chains
      */
 /**
