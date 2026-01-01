@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.53</title>
+    <title>FlowCode v3.54</title>
 
     <!-- LIBS -->
 
@@ -242,15 +242,36 @@ background-color:#eed202 ;
         
         /* ========== INPUT/OUTPUT (Blue Parallelogram) ========== */
         .shape-output, .shape-input {
-            width: 140px;
-            height: 50px;
-            background: var(--color-input-output) !important;
-            border: none !important;
-            clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
-            color: white;
-        }
+    width: 140px;
+    height: 50px;
+    background: var(--color-input-output) !important;
+    border: none !important;
+    clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
+    color: white;
+    position: relative;
+}
+
+.shape-output.selected, .shape-input.selected {
+    /* Remove clip-path when selected to show rectangular border */
+    clip-path: none !important;
+    border: 3px solid var(--accent) !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25),
+                0 6px 16px rgba(59, 130, 246, 0.3) !important;
+    /* But keep the background shape with a pseudo-element */
+}
+
+.shape-output.selected::before, .shape-input.selected::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    background: var(--color-input-output);
+    clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
+    z-index: -1;
+}
         
-        /* Remove the skew from the inner text since we used clip-path */
         .shape-output .inner-text, .shape-input .inner-text {
             transform: none !important;
             padding: 0 10px;
@@ -262,7 +283,7 @@ background-color:#eed202 ;
             background-image: none !important;
             box-shadow: none;
         }
-        
+
         /* ========== DECISION (Yellow Diamond) ========== */
         .shape-decision { 
             width: 130px; 
@@ -668,7 +689,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.53</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.54</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
