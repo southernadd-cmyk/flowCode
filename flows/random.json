@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "id": "n7",
+      "type": "start",
+      "x": 144,
+      "y": 62,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n8",
+      "type": "process",
+      "x": 117.00003051757812,
+      "y": 238.99996948242188,
+      "text": "import random",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n10",
+      "type": "end",
+      "x": 141.99993896484375,
+      "y": 350.1999816894531,
+      "text": "End",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n11",
+      "type": "var",
+      "x": 441,
+      "y": 231,
+      "text": "x = random.randint(1,100)",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n12",
+      "type": "output",
+      "x": 396.4000244140625,
+      "y": 422.1999816894531,
+      "text": "x",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n7",
+      "port": "next",
+      "to": "n8"
+    },
+    {
+      "from": "n8",
+      "port": "next",
+      "to": "n11"
+    },
+    {
+      "from": "n11",
+      "port": "next",
+      "to": "n12"
+    },
+    {
+      "from": "n12",
+      "port": "next",
+      "to": "n10"
+    }
+  ],
+  "version": "3.0"
+}
