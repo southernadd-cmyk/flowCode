@@ -14,7 +14,7 @@
       "varName": "n",
       "x": 296.0000305175781,
       "y": 90.39999389648438,
-      "prompt": "Enter an integer",
+      "prompt": "\"Enter an integer\"",
       "dtype": "int"
     },
     {
