@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "n7",
+      "type": "start",
+      "x": 144,
+      "y": 62,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n8",
+      "type": "process",
+      "x": 194.60000610351562,
+      "y": 158.1999969482422,
+      "text": "import antigravity",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n9",
+      "type": "output",
+      "x": 122.80001831054688,
+      "y": 279,
+      "text": "\"FLY!✈️\"",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n10",
+      "type": "end",
+      "x": 220.39996337890625,
+      "y": 387.79998779296875,
+      "text": "End",
+      "varName": "x",
+      "prompt": "\"Enter value\"",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n7",
+      "port": "next",
+      "to": "n8"
+    },
+    {
+      "from": "n8",
+      "port": "next",
+      "to": "n9"
+    },
+    {
+      "from": "n9",
+      "port": "next",
+      "to": "n10"
+    }
+  ],
+  "version": "3.0"
+}
