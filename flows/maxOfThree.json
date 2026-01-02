@@ -14,7 +14,7 @@
       "y": 45.20000457763672,
       "text": "",
       "varName": "a",
-      "prompt": "enter a",
+      "prompt": "\"enter a\"",
       "dtype": "int"
     },
     {
@@ -24,7 +24,7 @@
       "y": 154,
       "text": "",
       "varName": "b",
-      "prompt": "enter b",
+      "prompt": "\"enter b\"",
       "dtype": "int"
     },
     {
@@ -34,7 +34,7 @@
       "y": 270.79998779296875,
       "text": "",
       "varName": "c",
-      "prompt": "enter c",
+      "prompt": "\"enter c\"",
       "dtype": "int"
     },
     {
