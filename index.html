@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.57</title>
+    <title>FlowCode v3.58</title>
 
     <!-- LIBS -->
 
@@ -660,7 +660,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.57</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.58</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -3194,7 +3194,7 @@ this.loadExampleFromFile("welcome.json");
     handleInput(prompt) {
         return new Promise((resolve) => {
             const modal = new bootstrap.Modal(document.getElementById('inputModal'));
-            document.getElementById('modal-prompt').innerText = prompt || "Enter value:";
+            document.getElementById('modal-prompt').innerText = prompt || "\"Enter value:\"";
             const field = document.getElementById('modal-field');
             field.value = ""; modal.show();
             const finish = () => { modal.hide(); resolve(field.value); };
@@ -3207,7 +3207,7 @@ this.loadExampleFromFile("welcome.json");
         const id = `n${this.nextId++}`;
         let text = '';
         let varName = "x";
-        let prompt = "Enter value";
+        let prompt = "\"Enter value\"";
         let dtype = "int";
         
         switch(type) {
@@ -3222,7 +3222,7 @@ this.loadExampleFromFile("welcome.json");
 
     case 'output': text = 'x'; break;
     case 'process': text = 'x = x + 1'; break;
-    case 'input': text = ''; varName = "x"; prompt = "Enter value"; dtype = "int"; break;
+    case 'input': text = ''; varName = "x"; prompt = "\"Enter value\""; dtype = "int"; break;
 }
 
         
