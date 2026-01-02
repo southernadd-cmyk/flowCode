@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.61</title>
+    <title>FlowCode v3.62</title>
  <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="shortcut icon" href="favicon.ico" />
@@ -664,7 +664,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.61</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.62</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -955,540 +955,289 @@ onclick="App.stopSim()">
 <script>
 
 const FLOWCODE_CHALLENGES = [
+  /* ----------------------------- LEVEL 1 — SEQUENCE ----------------------------- */
+  {
+    "id": 1,
+    "diff": 1,
+    "title": "Print Shop – Poster Quote",
+    "skills": ["input","output","sequence"],
+    "task": "Calculate total cost for posters at £3 each.",
+    "pseudocode": "INPUT posters\nSET cost = posters * 3\nOUTPUT cost",
+    "success": "Outputs correct total cost"
+  },
+  {
+    "id": 2,
+    "diff": 1,
+    "title": "Helpdesk Ticket Message",
+    "skills": ["input","output","sequence"],
+    "task": "Create formatted helpdesk ticket text.",
+    "pseudocode": "INPUT name\nINPUT device\nINPUT fault\nOUTPUT \"Ticket created for \" + name + \" with \" + device + \" fault: \" + fault",
+    "success": "Outputs sentence correctly"
+  },
+  {
+    "id": 3,
+    "diff": 1,
+    "title": "Photocopy Billing",
+    "skills": ["input","output","sequence"],
+    "task": "Calculate total price for B&W and colour copies.",
+    "pseudocode": "INPUT bw\nINPUT colour\nSET total = (bw * 0.05) + (colour * 0.12)\nOUTPUT total",
+    "success": "Correct calculation"
+  },
+  {
+    "id": 4,
+    "diff": 1,
+    "title": "Minutes to Seconds",
+    "skills": ["input","output","sequence"],
+    "task": "Convert minutes entered to seconds.",
+    "pseudocode": "INPUT minutes\nSET seconds = minutes * 60\nOUTPUT seconds",
+    "success": "Correct conversion"
+  },
+  {
+    "id": 5,
+    "diff": 1,
+    "title": "Simple Pay Calculator",
+    "skills": ["input","output","sequence"],
+    "task": "Multiply hours worked by hourly rate.",
+    "pseudocode": "INPUT hours\nINPUT rate\nSET pay = hours * rate\nOUTPUT pay",
+    "success": "Outputs correct pay"
+  },
 
-/* ----------------------- Difficulty 1 (Sequence) ----------------------- */
-{
- id: 1, diff: 1,
- title: "Name, age, favourite colour",
- skills: ["input","output","sequence"],
- task: "Ask the user for their name, age and favourite colour. Output all three on separate lines.",
- detail: "This challenge practises basic input and output. Each question should be asked one after the other. Each answer must be printed on its own line in the correct order.",
- pseudocode:
-`OUTPUT "Enter your name"
-INPUT name
-OUTPUT "Enter your age"
-INPUT age
-OUTPUT "Enter your favourite colour"
-INPUT colour
-OUTPUT name
-OUTPUT age
-OUTPUT colour`,
- success: "Program asks for all three values and prints them each on a new line."
-},
+  /* ----------------------------- LEVEL 2 — SELECTION ----------------------------- */
+  {
+    "id": 6,
+    "diff": 2,
+    "title": "Apprenticeship Eligibility",
+    "skills": ["selection"],
+    "task": "Check if student is 16 or over.",
+    "pseudocode": "INPUT age\nIF age >= 16 THEN\n OUTPUT \"Eligible\"\nELSE\n OUTPUT \"Not eligible\"\nENDIF",
+    "success": "Outputs correct eligibility"
+  },
+  {
+    "id": 7,
+    "diff": 2,
+    "title": "Password Length Check",
+    "skills": ["selection"],
+    "task": "Warn if password is too short.",
+    "pseudocode": "INPUT length\nIF length < 8 THEN\n OUTPUT \"Too weak\"\nELSE\n OUTPUT \"OK\"\nENDIF",
+    "success": "Outputs correct message"
+  },
+  {
+    "id": 8,
+    "diff": 2,
+    "title": "Mobile Usage Discount",
+    "skills": ["selection"],
+    "task": "Check if minutes used qualifies for discount.",
+    "pseudocode": "INPUT minutes\nIF minutes > 500 THEN\n OUTPUT \"Apply discount\"\nELSE\n OUTPUT \"No discount\"\nENDIF",
+    "success": "Correct decision"
+  },
+  {
+    "id": 9,
+    "diff": 2,
+    "title": "Exam Grade",
+    "skills": ["selection"],
+    "task": "Output Pass or Fail based on mark 50.",
+    "pseudocode": "INPUT mark\nIF mark >= 50 THEN\n OUTPUT \"Pass\"\nELSE\n OUTPUT \"Fail\"\nENDIF",
+    "success": "Correct grade"
+  },
+  {
+    "id": 10,
+    "diff": 2,
+    "title": "IT Shop Delivery Charge",
+    "skills": ["selection"],
+    "task": "Add delivery if under £50 spend.",
+    "pseudocode": "INPUT total\nIF total < 50 THEN\n SET total = total + 4.99\nENDIF\nOUTPUT total",
+    "success": "Adds delivery when required"
+  },
 
-{
- id: 2, diff: 1,
- title: "Echo my name",
- skills: ["input","output","sequence"],
- task: "Ask for the user's name and output it back to them.",
- detail: "The program should ask for the user's name and repeat it back. This is often called an 'echo' program.",
- pseudocode:
-`OUTPUT "What is your name?"
-INPUT name
-OUTPUT name`,
- success: "Name the user types appears exactly back on the screen."
-},
+  /* ----------------------------- LEVEL 3 — FOR LOOPS ----------------------------- */
+  {
+    "id": 11,
+    "diff": 3,
+    "title": "Invoice Number Printing",
+    "skills": ["loop"],
+    "task": "Print numbers 1 to N.",
+    "pseudocode": "INPUT n\nFOR i = 1 TO n\n OUTPUT i\nNEXT i",
+    "success": "Correct list output"
+  },
+  {
+    "id": 12,
+    "diff": 3,
+    "title": "Sticker Printer",
+    "skills": ["loop"],
+    "task": "Print message N times.",
+    "pseudocode": "INPUT n\nFOR i = 1 TO n\n OUTPUT \"Sticker printed\"\nNEXT i",
+    "success": "Correct repeat count"
+  },
+  {
+    "id": 13,
+    "diff": 3,
+    "title": "Times Table Maker",
+    "skills": ["loop"],
+    "task": "Print 1–10 multiplication table.",
+    "pseudocode": "INPUT n\nFOR i = 1 TO 10\n OUTPUT n * i\nNEXT i",
+    "success": "Correct products"
+  },
+  {
+    "id": 14,
+    "diff": 3,
+    "title": "Sum of First N",
+    "skills": ["loop"],
+    "task": "Calculate 1 + 2 + ... + N.",
+    "pseudocode": "INPUT n\nSET total = 0\nFOR i = 1 TO n\n SET total = total + i\nNEXT i\nOUTPUT total",
+    "success": "Correct total"
+  },
+  {
+    "id": 15,
+    "diff": 3,
+    "title": "Days Worked Hours Total",
+    "skills": ["loop"],
+    "task": "Total hours worked across days.",
+    "pseudocode": "INPUT days\nSET total = 0\nFOR i = 1 TO days\n INPUT hours\n SET total = total + hours\nNEXT i\nOUTPUT total",
+    "success": "Correct accumulation"
+  },
 
-{
- id: 3, diff: 1,
- title: "First name then surname",
- skills: ["input","output","sequence"],
- task: "Ask for first name and surname. Output them on separate lines.",
- detail: "Take two separate inputs. Output the first name and surname one under the other. No joining required.",
- pseudocode:
-`OUTPUT "Enter first name"
-INPUT firstName
-OUTPUT "Enter surname"
-INPUT surname
-OUTPUT firstName
-OUTPUT surname`,
- success: "Two different outputs appear, one per line, in the same order asked."
-},
+  /* ----------------------------- LEVEL 4 — LOOPS + SELECTION ----------------------------- */
+  {
+    "id": 16,
+    "diff": 4,
+    "title": "Website Uptime Monitor",
+    "skills": ["loop","selection"],
+    "task": "Count slow ping responses.",
+    "pseudocode": "SET slow = 0\nFOR i = 1 TO 10\n INPUT ping\n IF ping > 200 THEN\n  SET slow = slow + 1\n ENDIF\nNEXT i\nOUTPUT slow",
+    "success": "Counts correctly"
+  },
+  {
+    "id": 17,
+    "diff": 4,
+    "title": "Password Retry Until Correct",
+    "skills": ["loop","selection"],
+    "task": "Keep asking password until correct.",
+    "pseudocode": "SET password = \"letmein\"\nINPUT guess\nWHILE guess != password\n INPUT guess\nENDWHILE\nOUTPUT \"Access granted\"",
+    "success": "Loops until correct"
+  },
+  {
+    "id": 18,
+    "diff": 4,
+    "title": "Loyalty Card Stamp Counter",
+    "skills": ["loop","selection"],
+    "task": "Ask repeatedly to add stamp.",
+    "pseudocode": "SET stamps = 0\nINPUT answer\nWHILE answer == \"yes\"\n SET stamps = stamps + 1\n INPUT answer\nENDWHILE\nOUTPUT stamps",
+    "success": "Counts stamps correctly"
+  },
+  {
+    "id": 19,
+    "diff": 4,
+    "title": "Even Number Finder",
+    "skills": ["loop","selection"],
+    "task": "Print all even numbers up to N.",
+    "pseudocode": "INPUT n\nFOR i = 1 TO n\n IF i % 2 == 0 THEN\n  OUTPUT i\n ENDIF\nNEXT i",
+    "success": "Even numbers correct"
+  },
+  {
+    "id": 20,
+    "diff": 4,
+    "title": "Guess the Secret Number",
+    "skills": ["loop","selection"],
+    "task": "Repeat guessing until secret number matched.",
+    "pseudocode": "SET secret = 7\nINPUT guess\nWHILE guess != secret\n INPUT guess\nENDWHILE\nOUTPUT \"Correct\"",
+    "success": "Stops only when correct"
+  },
 
-{
- id: 4, diff: 1,
- title: "Full name one line",
- skills: ["input","output","sequence"],
- task: "Ask for first name and surname, then output the full name on one line.",
- detail: "This time the two values should be printed on the same line with a space between them.",
- pseudocode:
-`OUTPUT "Enter first name"
-INPUT firstName
-OUTPUT "Enter surname"
-INPUT surname
-OUTPUT firstName + " " + surname`,
- success: "The output shows first name and surname together on one line."
-},
+  /* ----------------------------- LEVEL 5 — LISTS / ARRAYS ----------------------------- */
+  {
+    "id": 21,
+    "diff": 5,
+    "title": "Store Student Marks",
+    "skills": ["list","loop"],
+    "task": "Input five marks and output them.",
+    "pseudocode": "CREATE list\nFOR i = 1 TO 5\n INPUT mark\n APPEND mark TO list\nNEXT i\nOUTPUT list",
+    "success": "Stores 5 marks"
+  },
+  {
+    "id": 22,
+    "diff": 5,
+    "title": "Average of Marks",
+    "skills": ["list","loop"],
+    "task": "Calculate average of 5 marks.",
+    "pseudocode": "SET total = 0\nFOR i = 1 TO 5\n INPUT mark\n SET total = total + mark\nNEXT i\nSET average = total / 5\nOUTPUT average",
+    "success": "Correct average"
+  },
+  {
+    "id": 23,
+    "diff": 5,
+    "title": "Highest Priority Job",
+    "skills": ["list","loop","selection"],
+    "task": "Find highest priority value in list.",
+    "pseudocode": "INPUT n\nINPUT first\nSET max = first\nFOR i = 2 TO n\n INPUT value\n IF value > max THEN\n  SET max = value\n ENDIF\nNEXT i\nOUTPUT max",
+    "success": "Outputs maximum"
+  },
+  {
+    "id": 24,
+    "diff": 5,
+    "title": "Network Latency Average",
+    "skills": ["list","loop"],
+    "task": "Average 5 network latency readings.",
+    "pseudocode": "SET total = 0\nFOR i = 1 TO 5\n INPUT ping\n SET total = total + ping\nNEXT i\nOUTPUT total / 5",
+    "success": "Correct mean latency"
+  },
+  {
+    "id": 25,
+    "diff": 5,
+    "title": "Count Failed Login Attempts",
+    "skills": ["list","loop","selection"],
+    "task": "Count login attempts recorded as FAIL.",
+    "pseudocode": "SET fails = 0\nFOR i = 1 TO 5\n INPUT result\n IF result == \"FAIL\" THEN\n  SET fails = fails + 1\n ENDIF\nNEXT i\nOUTPUT fails",
+    "success": "Counts fail values"
+  },
 
-{
- id: 5, diff: 1,
- title: "Add two numbers",
- skills: ["input","output","arithmetic"],
- task: "Ask the user for two numbers. Add them together and output the answer.",
- detail: "The program should store both numbers, calculate the sum in a variable, then output it.",
- pseudocode:
-`OUTPUT "Enter first number"
-INPUT num1
-OUTPUT "Enter second number"
-INPUT num2
-total ← num1 + num2
-OUTPUT total`,
- success: "Correct total displayed for any two numbers entered."
-},
-
-{
- id: 6, diff: 1,
- title: "Multiply two numbers",
- skills: ["input","output","arithmetic"],
- task: "Ask for two numbers. Output the product.",
- detail: "Very similar to addition, but multiply instead. Use a variable to store the result.",
- pseudocode:
-`OUTPUT "Enter first number"
-INPUT a
-OUTPUT "Enter second number"
-INPUT b
-answer ← a * b
-OUTPUT answer`,
- success: "Product printed correctly."
-},
-
-{
- id: 7, diff: 1,
- title: "Add and multiply",
- skills: ["input","output","arithmetic"],
- task: "Ask for two numbers. Output both their sum and their product.",
- detail: "The program must calculate two different values and output both.",
- pseudocode:
-`OUTPUT "Enter first number"
-INPUT a
-OUTPUT "Enter second number"
-INPUT b
-sum ← a + b
-product ← a * b
-OUTPUT sum
-OUTPUT product`,
- success: "Both correct values shown — order does not matter."
-},
-
-/* ----------------------- Difficulty 2 (Selection) ----------------------- */
-{
- id: 8, diff: 2,
- title: "Correct alphabet guess?",
- skills: ["input","output","selection"],
- task: "Ask the user how many letters are in the alphabet. Output 'Correct' if they enter 26, otherwise 'Incorrect'.",
- detail: "This is your first simple IF statement with an ELSE outcome.",
- pseudocode:
-`OUTPUT "How many letters are in the alphabet?"
-INPUT guess
-IF guess = 26 THEN
-    OUTPUT "Correct"
-ELSE
-    OUTPUT "Incorrect"
-ENDIF`,
- success: "Entering 26 prints Correct, any other answer prints Incorrect."
-},
-
-{
- id: 9, diff: 2,
- title: "Cool name",
- skills: ["selection","input","output"],
- task: "Store your favourite name in a variable. Ask the user for their name. If it matches, output 'You are cool', otherwise output 'Nice to meet you'.",
- detail: "Choose any favourite name. Must compare strings.",
- pseudocode:
-`favourite ← "alex"   // or your choice
-OUTPUT "What is your name?"
-INPUT name
-IF name = favourite THEN
-    OUTPUT "You are cool"
-ELSE
-    OUTPUT "Nice to meet you"
-ENDIF`,
- success: "Correct message shown depending on whether names match."
-},
-
-{
- id: 10, diff: 2,
- title: "Largest of two numbers",
- skills: ["selection","arithmetic","output"],
- task: "Ask for two numbers. Output the largest.",
- detail: "Do not assume the first number is bigger. Test using IF / ELSE.",
- pseudocode:
-`OUTPUT "Enter first number"
-INPUT a
-OUTPUT "Enter second number"
-INPUT b
-IF a > b THEN
-    OUTPUT a
-ELSE
-    OUTPUT b
-ENDIF`,
- success: "Always outputs the larger of the two values."
-},
-
-{
- id: 11, diff: 2,
- title: "Exam pass or fail",
- skills: ["selection"],
- task: "Ask for a test score out of 100. Output PASS if 50 or more, otherwise FAIL.",
- detail: "Single threshold comparison challenge.",
- pseudocode:
-`OUTPUT "Enter score out of 100"
-INPUT score
-IF score >= 50 THEN
-    OUTPUT "PASS"
-ELSE
-    OUTPUT "FAIL"
-ENDIF`,
- success: "Outputs PASS at 50 or more, FAIL below 50."
-},
-
-{
- id: 12, diff: 2,
- title: "Even or odd",
- skills: ["selection","arithmetic"],
- task: "Ask for a whole number. Output whether it is even or odd.",
- detail: "Hint: use remainder/modulus % 2.",
- pseudocode:
-`OUTPUT "Enter a whole number"
-INPUT n
-IF n MOD 2 = 0 THEN
-    OUTPUT "Even"
-ELSE
-    OUTPUT "Odd"
-ENDIF`,
- success: "Identifies even and odd correctly."
-},
-
-/* ----------------------- Difficulty 3 (Iteration basics) ----------------------- */
-{
- id: 13, diff: 3,
- title: "Count to ten",
- skills: ["iteration","output","for"],
- task: "Output the numbers 1 to 10. Use a loop.",
- detail: "Introduce counted loops. One output per line.",
- pseudocode:
-`FOR x ← 1 TO 10
-    OUTPUT x
-NEXT x`,
- success: "Outputs: 1 2 3 4 5 6 7 8 9 10."
-},
-
-{
- id: 14, diff: 3,
- title: "Count down",
- skills: ["iteration","output","for"],
- task: "Output the numbers from 10 down to 1.",
- detail: "Use a loop that decreases each time.",
- pseudocode:
-`FOR x ← 10 DOWNTO 1
-    OUTPUT x
-NEXT x`,
- success: "Countdown prints correctly in reverse order."
-},
-
-{
- id: 15, diff: 3,
- title: "Multiplication table",
- skills: ["iteration","arithmetic"],
- task: "Ask for a number between 1 and 12. Output its times table up to 12.",
- detail: "This combines multiplication and loops.",
- pseudocode:
-`OUTPUT "Enter a number 1–12"
-INPUT n
-FOR x ← 1 TO 12
-    OUTPUT n * x
-NEXT x`,
- success: "Twelve results appear correctly."
-},
-
-{
- id: 16, diff: 3,
- title: "Sum of first 10 numbers",
- skills: ["iteration","accumulator"],
- task: "Use a loop to add the numbers 1 to 10 and output the total.",
- detail: "You must use an accumulator variable.",
- pseudocode:
-`total ← 0
-FOR x ← 1 TO 10
-    total ← total + x
-NEXT x
-OUTPUT total`,
- success: "Outputs 55."
-},
-
-/* ----------------------- Difficulty 4 (While loops) ----------------------- */
-{
- id: 17, diff: 4,
- title: "Repeat until correct answer",
- skills: ["while","selection"],
- task: "Keep asking 'What is 7 + 5?' until the user enters the correct answer.",
- detail: "The program must repeat until condition is met.",
- pseudocode:
-`answer ← 0
-WHILE answer <> 12
-    OUTPUT "What is 7 + 5?"
-    INPUT answer
-ENDWHILE
-OUTPUT "Correct!"`,
- success: "Loop only stops when 12 is typed."
-},
-
-{
- id: 18, diff: 4,
- title: "Password checker",
- skills: ["while","selection","input"],
- task: "Store a password. Keep asking for the password until the user types it correctly.",
- detail: "No limit on attempts.",
- pseudocode:
-`password ← "secret"
-guess ← ""
-WHILE guess <> password
-    OUTPUT "Enter password"
-    INPUT guess
-ENDWHILE
-OUTPUT "Access granted"`,
- success: "Continues to loop until correct password entered."
-},
-
-{
- id: 19, diff: 4,
- title: "Number guessing game",
- skills: ["while","selection"],
- task: "Choose a number. Keep asking the user to guess until they get it right.",
- detail: "Fixed number chosen by programmer (no randomness needed).",
- pseudocode:
-`target ← 7
-guess ← 0
-WHILE guess <> target
-    OUTPUT "Guess the number"
-    INPUT guess
-ENDWHILE
-OUTPUT "Well done"`,
- success: "Runs repeatedly until correct number guessed."
-},
-
-{
- id: 20, diff: 4,
- title: "Menu repeater",
- skills: ["while","selection"],
- task: "Display a simple menu repeatedly until the user chooses QUIT.",
- detail: "Typical loop-menu problem.",
- pseudocode:
-`choice ← ""
-WHILE choice <> "QUIT"
-    OUTPUT "1) Option A"
-    OUTPUT "2) Option B"
-    OUTPUT "Type QUIT to exit"
-    INPUT choice
-ENDWHILE
-OUTPUT "Goodbye"`,
- success: "Menu keeps repeating until QUIT typed."
-},
-
-/* ----------------------- Difficulty 5 (Lists) ----------------------- */
-{
- id: 21, diff: 5,
- title: "List of 5 names",
- skills: ["list","output"],
- task: "Store 5 names in a list. Output all of them.",
- detail: "Names can be any strings",
- pseudocode:
-`names ← ["Ali","Ben","Chris","Dana","Eva"]
-FOR i ← 0 TO 4
-    OUTPUT names[i]
-NEXT i`,
- success: "All names appear once each."
-},
-
-{
- id: 22, diff: 5,
- title: "Search for a name",
- skills: ["list","selection"],
- task: "Store 5 names. Ask the user for a name and say whether it is in the list.",
- detail: "Use IF with IN check or loop scan.",
- pseudocode:
-`names ← ["Ali","Ben","Chris","Dana","Eva"]
-OUTPUT "Enter name to search"
-INPUT target
-found ← FALSE
-FOR i ← 0 TO 4
-    IF names[i] = target THEN
-        found ← TRUE
-    ENDIF
-NEXT i
-IF found = TRUE THEN
-    OUTPUT "Found"
-ELSE
-    OUTPUT "Not found"
-ENDIF`,
- success: "Correctly identifies present and missing names."
-},
-
-{
- id: 23, diff: 5,
- title: "Total shopping bill",
- skills: ["list","iteration","accumulator"],
- task: "Store several prices in a list. Use a loop to total them and output the bill.",
- detail: "Use accumulator and list traversal.",
- pseudocode:
-`prices ← [1.50, 2.00, 0.99, 3.25]
-total ← 0
-FOR i ← 0 TO 3
-    total ← total + prices[i]
-NEXT i
-OUTPUT total`,
- success: "Total printed correctly."
-},
-
-{
- id: 24, diff: 5,
- title: "Highest value in a list",
- skills: ["list","iteration","selection"],
- task: "Store some numbers in a list. Use a loop to find and output the largest.",
- detail: "Track current maximum.",
- pseudocode:
-`nums ← [5, 12, 3, 20, 7]
-max ← nums[0]
-FOR i ← 1 TO 4
-    IF nums[i] > max THEN
-        max ← nums[i]
-    ENDIF
-NEXT i
-OUTPUT max`,
- success: "Largest value displayed."
-},
-
-/* ----------------------- Difficulty 6–8 (Mixed challenges) ----------------------- */
-{
- id: 25, diff: 6,
- title: "Times quiz",
- skills: ["selection","iteration","accumulator"],
- task: "Ask 5 multiplication questions and keep score of correct answers.",
- detail: "No random needed — fixed or simple numbers allowed.",
- pseudocode:
-`score ← 0
-FOR q ← 1 TO 5
-    OUTPUT "What is 3 × 4?"
-    INPUT ans
-    IF ans = 12 THEN
-        score ← score + 1
-    ENDIF
-NEXT q
-OUTPUT score`,
- success: "Score must increase correctly when correct answers given."
-},
-
-{
- id: 26, diff: 6,
- title: "Grade calculator",
- skills: ["selection"],
- task: "Ask for a percentage and output grade: A, B, C, D or U.",
- detail: "Use IF…ELSEIF…ELSE ladder.",
- pseudocode:
-`OUTPUT "Enter percentage"
-INPUT p
-IF p >= 80 THEN
-    OUTPUT "A"
-ELSE IF p >= 70 THEN
-    OUTPUT "B"
-ELSE IF p >= 60 THEN
-    OUTPUT "C"
-ELSE IF p >= 50 THEN
-    OUTPUT "D"
-ELSE
-    OUTPUT "U"
-ENDIF`,
- success: "Correct grade for correct range."
-},
-
-{
- id: 27, diff: 7,
- title: "ATM simulator",
- skills: ["selection","while","arithmetic"],
- task: "Simulate balance, withdraw and deposit options until user quits.",
- detail: "Simple menu repetition — no overdraft logic required.",
- pseudocode:
-`balance ← 0
-choice ← ""
-WHILE choice <> "QUIT"
-    OUTPUT "BALANCE / DEPOSIT / WITHDRAW / QUIT"
-    INPUT choice
-    IF choice = "DEPOSIT" THEN
-        INPUT amount
-        balance ← balance + amount
-    ELSE IF choice = "WITHDRAW" THEN
-        INPUT amount
-        balance ← balance - amount
-    ENDIF
-ENDWHILE
-OUTPUT balance`,
- success: "Balance updates correctly after each operation."
-},
-
-{
- id: 28, diff: 7,
- title: "Rock Paper Scissors (text)",
- skills: ["selection","while"],
- task: "Player vs computer, text version. Ask choices and output winner.",
- detail: "Computer choice may be fixed (no randomness required).",
- pseudocode:
-`computer ← "ROCK"
-player ← ""
-WHILE player <> "QUIT"
-    OUTPUT "Enter ROCK PAPER or SCISSORS"
-    INPUT player
-    IF player = computer THEN
-        OUTPUT "Draw"
-    ELSE IF player = "PAPER" AND computer = "ROCK" THEN
-        OUTPUT "Player wins"
-    ELSE
-        OUTPUT "Computer wins"
-    ENDIF
-ENDWHILE`,
- success: "Correct result displayed for combinations used."
-},
-
-{
- id: 29, diff: 8,
- title: "Times table practice until 10 correct",
- skills: ["iteration","while","accumulator"],
- task: "Ask random times questions repeatedly until the user scores 10 correct.",
- detail: "You may reuse the same question each time if randomness unsupported.",
- pseudocode:
-`score ← 0
-WHILE score < 10
-    OUTPUT "What is 6 × 7?"
-    INPUT ans
-    IF ans = 42 THEN
-        score ← score + 1
-    ENDIF
-ENDWHILE
-OUTPUT "Finished"`,
- success: "Stops exactly when score reaches 10."
-},
-
-{
- id: 30, diff: 8,
- title: "Average of list",
- skills: ["list","iteration","arithmetic"],
- task: "Ask the user to enter 5 numbers. Store in a list. Output average.",
- detail: "Must use loop to total and divide by length.",
- pseudocode:
-`numbers ← empty list
-FOR i ← 1 TO 5
-    INPUT n
-    append n to numbers
-NEXT i
-total ← 0
-FOR i ← 1 TO 5
-    total ← total + numbers[i]
-NEXT i
-average ← total / 5
-OUTPUT average`,
- success: "Correct mean value shown."
-}
-
-];
+  /* ----------------------------- LEVEL 6 — CAPSTONE ----------------------------- */
+  {
+    "id": 26,
+    "diff": 6,
+    "title": "Cyber Login Lockout",
+    "skills": ["loop","selection"],
+    "task": "Block account after 3 wrong attempts.",
+    "pseudocode": "SET attempts = 0\nSET pin = 1234\nWHILE attempts < 3\n INPUT guess\n IF guess == pin THEN\n  OUTPUT \"Success\"\n  STOP\n ENDIF\n SET attempts = attempts + 1\nENDWHILE\nOUTPUT \"Locked\"",
+    "success": "Locks after 3 tries"
+  },
+  {
+    "id": 27,
+    "diff": 6,
+    "title": "USB Order Discount System",
+    "skills": ["selection","arithmetic"],
+    "task": "Apply discount for bulk orders.",
+    "pseudocode": "INPUT qty\nSET price = qty * 6\nIF qty >= 20 THEN\n SET price = price * 0.8\nELSE IF qty >= 10 THEN\n SET price = price * 0.9\nENDIF\nOUTPUT price",
+    "success": "Correct discount applied"
+  },
+  {
+    "id": 28,
+    "diff": 6,
+    "title": "Network Cable Cutter",
+    "skills": ["loop","arithmetic"],
+    "task": "Cut 3m sections from cable and count leftover.",
+    "pseudocode": "INPUT total\nSET count = 0\nWHILE total >= 3\n SET total = total - 3\n SET count = count + 1\nENDWHILE\nOUTPUT count\nOUTPUT total",
+    "success": "Correct cut count and remainder"
+  },
+  {
+    "id": 29,
+    "diff": 6,
+    "title": "Backup Storage Filler",
+    "skills": ["loop","selection","arithmetic"],
+    "task": "Add files until storage reaches 1000MB.",
+    "pseudocode": "SET used = 0\nSET files = 0\nWHILE used < 1000\n INPUT size\n SET used = used + size\n SET files = files + 1\nENDWHILE\nOUTPUT used\nOUTPUT files",
+    "success": "Stops near capacity"
+  },
+  {
+    "id": 30,
+    "diff": 6,
+    "title": "Project Task Burndown",
+    "skills": ["loop","arithmetic","selection"],
+    "task": "Count days until project tasks reach zero.",
+    "pseudocode": "INPUT tasks\nSET days = 0\nWHILE tasks > 0\n INPUT done\n SET tasks = tasks - done\n SET days = days + 1\nENDWHILE\nOUTPUT days",
+    "success": "Outputs correct day count"
+  }
+]
+;
 
 // open modal
 document.getElementById("btn-challenges").addEventListener("click", () => {
@@ -1521,7 +1270,7 @@ function loadChallenge(ch) {
     document.getElementById("challenge-diff").textContent = "Difficulty " + ch.diff;
     document.getElementById("challenge-task").textContent = ch.task;
     document.getElementById("challenge-detail").textContent = ch.detail;
-    document.getElementById("challenge-success").textContent = ch.success;
+    document.getElementById("challenge-success").textContent = "Success Criteria: " + ch.success;
     document.getElementById("challenge-code").textContent = ch.pseudocode; // ✅ Fixed
     document.getElementById("challenge-skills").textContent = "Skills: " + ch.skills.join(", ");
     
@@ -3283,7 +3032,27 @@ this.loadExampleFromFile("welcome.json");
     },
 
     createNode(type, x, y) {
-        const id = `n${this.nextId++}`;
+
+// ★ Prevent more than one START node
+if (type === "start") {
+    const hasStart = this.nodes.some(n => n.type === "start");
+    if (hasStart) {
+        alert("Only one Start node is allowed.");
+        return;
+    }
+}
+
+// ★ Prevent more than one END node
+if (type === "end") {
+    const hasEnd = this.nodes.some(n => n.type === "end");
+    if (hasEnd) {
+        alert("Only one End node is allowed.");
+        return;
+    }
+}
+
+const id = `n${this.nextId++}`;
+
         let text = '';
         let varName = "x";
         let prompt = "\"Enter value\"";
