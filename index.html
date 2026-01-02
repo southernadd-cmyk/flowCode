@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.55</title>
+    <title>FlowCode v3.56</title>
 
     <!-- LIBS -->
 
@@ -660,7 +660,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.55</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.56</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -691,6 +691,7 @@ onclick="App.stopSim()">
                 </button>
             
                 <ul class="dropdown-menu">
+                <li><a class="dropdown-item" onclick="App.loadExampleFromFile('basicIF.json')">If / Else</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('maxOfThree.json')">Maximum Number of 3 Inputs</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('sumOfN.json')">Sum of first N Numbers</a></li>
                 <li><a class="dropdown-item" onclick="App.loadExampleFromFile('forloop.json')">For Loop</a></li>
@@ -2036,8 +2037,15 @@ return code;
  compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
-    const indent = "    ".repeat(indentLevel);
-    let code = `${indent}if ${node.text}:\n`;
+        const indent = "    ".repeat(indentLevel);
+    let code = "";
+    
+    // FIX: Add highlight for the decision node itself
+    if (this.useHighlighting) {
+        code += `${indent}highlight('${node.id}')\n`;
+    }
+    
+    code += `${indent}if ${node.text}:\n`;  
 
     // Compile YES branch
     const ifContext = [...contextStack, `if_${node.id}`];
@@ -2086,7 +2094,7 @@ return code;
     const isLoopYes = this.isLoopHeader(node.id, yesId);
     const isLoopNo  = noId ? this.isLoopHeader(node.id, noId) : false;
     const isLoop    = isLoopYes || isLoopNo;
-
+    
     if (isLoop) {
         // YES or NO branch is the loop body
         const loopBodyId  = isLoopYes ? yesId : noId;
