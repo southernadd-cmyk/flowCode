@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.56</title>
+    <title>FlowCode v3.57</title>
 
     <!-- LIBS -->
 
@@ -660,7 +660,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.56</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.57</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1897,7 +1897,8 @@ if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
             
         case 'input':
             const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
-            code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
+            code += `${indent}${node.varName} = ${wrap}${node.prompt})\n`;
+            //code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
             if (node.dtype === 'int') code = code.trimEnd() + ")\n";
             break;
             
@@ -3670,8 +3671,8 @@ node.prompt = node.prompt || node.text || "";
 
             <label class="small fw-bold">Input type</label>
             <select id="edit-input-dtype" class="form-select">
-                <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Number</option>
-                <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>Text</option>
+                <option value="int" ${node.dtype === 'int' ? 'selected' : ''}>Integer Number</option>
+                <option value="str" ${node.dtype === 'str' ? 'selected' : ''}>String</option>
             </select>
 
             <div class="mt-2 small text-muted">
@@ -3688,8 +3689,8 @@ node.prompt = node.prompt || node.text || "";
 
                 document.getElementById("input-preview").innerText =
                     t === "int"
-                        ? `${v} = int(input("${p}"))`
-                        : `${v} = input("${p}")`;
+                        ? `${v} = int(input(${p}))`
+                        : `${v} = input(${p})`;
             };
 
             document.getElementById("edit-input-var").oninput = updatePreview;
