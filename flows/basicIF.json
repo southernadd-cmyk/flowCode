@@ -1,0 +1,97 @@
+{
+  "nodes": [
+    {
+      "id": "n17",
+      "type": "start",
+      "x": 244,
+      "y": 51,
+      "text": "Start",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n19",
+      "type": "input",
+      "x": 182.79998779296875,
+      "y": 154.40003967285156,
+      "text": "",
+      "varName": "choice",
+      "prompt": "Are you enjoying FlowCode?",
+      "dtype": "str"
+    },
+    {
+      "id": "n20",
+      "type": "decision",
+      "x": 246.199951171875,
+      "y": 263.6000671386719,
+      "text": "choice.lower() == \"yes\"",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n21",
+      "type": "output",
+      "x": 106,
+      "y": 443,
+      "text": "\"Yeah!😃\"",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n22",
+      "type": "output",
+      "x": 464.5999755859375,
+      "y": 412.79998779296875,
+      "text": "\"Oh no! Let us know on Github how we could be better\"",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    },
+    {
+      "id": "n23",
+      "type": "end",
+      "x": 319.20001220703125,
+      "y": 562.2000122070312,
+      "text": "End",
+      "varName": "x",
+      "prompt": "Enter value",
+      "dtype": "int"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n17",
+      "port": "next",
+      "to": "n19"
+    },
+    {
+      "from": "n19",
+      "port": "next",
+      "to": "n20"
+    },
+    {
+      "from": "n20",
+      "port": "yes",
+      "to": "n21"
+    },
+    {
+      "from": "n20",
+      "port": "no",
+      "to": "n22"
+    },
+    {
+      "from": "n21",
+      "port": "next",
+      "to": "n23"
+    },
+    {
+      "from": "n22",
+      "port": "next",
+      "to": "n23"
+    }
+  ],
+  "version": "3.0"
+}
