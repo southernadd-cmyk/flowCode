@@ -3240,8 +3240,8 @@ this.loadExampleFromFile("welcome.json");
     el.style.top = node.y + 'px';
     
     let label = node.text;
-    if (node.type === 'output') label = `print(${node.text})`;
-    if (node.type === 'input') label = `${node.varName} = input(${node.prompt})`;
+    if (node.type === 'output') label = `${node.text}`;
+    if (node.type === 'input') label = `${node.prompt}`;
     
     // Logic for the Diamond SVG
     if (node.type === 'decision') {
