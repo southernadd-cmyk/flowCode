@@ -17,7 +17,7 @@
       "y": 154.40003967285156,
       "text": "",
       "varName": "choice",
-      "prompt": "Are you enjoying FlowCode?",
+      "prompt": "\"Are you enjoying FlowCode?\"",
       "dtype": "str"
     },
     {
