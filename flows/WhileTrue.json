@@ -7,7 +7,7 @@
       "y": 21.199996948242188,
       "text": "Start",
       "varName": "x",
-      "prompt": "Enter value",
+      "prompt": "\"Enter value\"",
       "dtype": "int"
     },
     {
@@ -17,7 +17,7 @@
       "y": 109,
       "text": "x = True",
       "varName": "x",
-      "prompt": "Enter value",
+      "prompt": "\"Enter value\"",
       "dtype": "int"
     },
     {
@@ -27,7 +27,7 @@
       "y": 228.80001831054688,
       "text": "x = not(x)",
       "varName": "x",
-      "prompt": "Enter value",
+      "prompt": "\"Enter value\"",
       "dtype": "int"
     },
     {
@@ -37,7 +37,7 @@
       "y": 380.1999816894531,
       "text": "x",
       "varName": "x",
-      "prompt": "Enter value",
+      "prompt": "\"Enter value\"",
       "dtype": "int"
     }
   ],
