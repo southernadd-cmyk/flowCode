@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.58</title>
+    <title>FlowCode v3.59</title>
 
     <!-- LIBS -->
 
@@ -660,7 +660,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.58</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.59</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -3241,7 +3241,7 @@ this.loadExampleFromFile("welcome.json");
     
     let label = node.text;
     if (node.type === 'output') label = `print(${node.text})`;
-    if (node.type === 'input') label = `${node.varName} = input()`;
+    if (node.type === 'input') label = `${node.varName} = input(${node.prompt})`;
     
     // Logic for the Diamond SVG
     if (node.type === 'decision') {
