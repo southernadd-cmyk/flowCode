@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.6</title>
+    <title>FlowCode v3.61</title>
  <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="shortcut icon" href="favicon.ico" />
@@ -664,7 +664,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.6</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.61</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -1725,14 +1725,15 @@ return headers;
     /**
      * Main compilation entry point
      */
-     compile() {
+/**
+ * Main compilation entry point
+ */
+ compile() {
     const startNode = this.nodes.find(n => n.type === 'start');
     if (!startNode) return "# Add a Start node.";
     
     this.buildMaps(); // Ensure maps are up to date
     this.implicitLoopHeaders = this.findImplicitForeverLoopHeaders();
-
-
 
     this.nodes
         .filter(n => n.type === "decision")
@@ -1744,9 +1745,18 @@ return headers;
         });
 
     // Use iterative compilation with manual stack management
-    return this.compileNode(startNode.id, new Set(), [], 0,false,false);
+    let code = this.compileNode(startNode.id, new Set(), [], 0, false, false);
+    
+    // Add END node highlight as the very last line if we're in highlighting mode
+    if (this.useHighlighting) {
+        const endNode = this.nodes.find(n => n.type === 'end');
+        if (endNode) {
+            code += `highlight('${endNode.id}')\n`;
+        }
+    }
+    
+    return code;
 }
-
 
     /**
      * Compile a node with context tracking
@@ -1764,8 +1774,8 @@ return headers;
         
         // Add highlight if in execution mode
         if (this.useHighlighting) {
-            code += `${indent}highlight('${node.id}')\n`;
-            code += `${indent}# END NODE REACHED\n`;
+           // code += `${indent}highlight('${node.id}')\n`;
+          //  code += `${indent}# END NODE REACHED\n`;
         }
         
         // End nodes should STOP compilation - don't continue to any successors
@@ -1790,14 +1800,29 @@ if (this.isInitOfForLoop(nodeId)) {
         highlightCode += `${indent}highlight('${nodeId}')\n`;
     }
     
-    const succ = this.getAllSuccessors(nodeId);
-    let out = highlightCode;
-    for (const { nodeId: nxt } of succ) {
+// normal skip — not a loop header
+const succ = this.getAllSuccessors(nodeId);
+let out = highlightCode;
+for (const { nodeId: nxt } of succ) {
+    // Check if this is a back edge to a loop header that's in our context
+    let isBackEdgeToCurrentLoop = false;
+    for (const ctx of contextStack) {
+        if (ctx.startsWith('loop_')) {
+            const loopHeaderId = ctx.replace('loop_', '');
+            if (nxt === loopHeaderId) {
+                isBackEdgeToCurrentLoop = true;
+                break;
+            }
+        }
+    }
+    
+    if (!isBackEdgeToCurrentLoop) {
         out += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel,
     inLoopBody,
     inLoopHeader);
     }
-    return out;
+}
+return out;
 }
 
 // 2) any nodes explicitly skipped for this loop body (typically increments)
@@ -1815,27 +1840,35 @@ if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
     // if this is the loop header produced by for-loop lowering
     if (nodeId === this.loopHeaderId) {
         
-        // INSIDE the loop we only want the YES branch
-        const yesId = this.getSuccessor(nodeId, 'yes');
-        const exitId = this.getSuccessor(nodeId, 'no');
-        
-        // Check if we're in THIS specific loop's context
-        const isInThisLoopContext = contextStack.some(ctx => ctx === `loop_${nodeId}`);
-        
-        // If we're in this loop's context OR explicitly in loop body, take YES branch
-        // Otherwise, take the exit branch
-        if (isInThisLoopContext || inLoopBody) {
-            return highlightCode + this.compileNode(yesId, visitedInPath, [...contextStack], indentLevel,
-        inLoopBody,
-        inLoopHeader);
-        } else {
-            return highlightCode + this.compileNode(exitId, visitedInPath, [...contextStack], indentLevel,
-        inLoopBody,
-        inLoopHeader);
-        }
+    // Check if we're in THIS specific loop's context
+    const isInThisLoopContext = contextStack.some(ctx => ctx === `loop_${nodeId}`);
+    
+    // Check if this is a for-loop
+    const forInfo = this.detectForLoopPattern(nodeId);
+    
+    // If this is a for-loop header AND we're reaching it from within its loop
+    // (either in context or in loop body), just highlight and stop
+    // The Python for-loop handles the iteration control
+    if (forInfo && (isInThisLoopContext || inLoopBody)) {
+        return highlightCode;  // Just highlight, don't compile branches
     }
     
-    // normal skip — not a loop header
+    // Original logic for while loops...
+    const yesId = this.getSuccessor(nodeId, 'yes');
+    const exitId = this.getSuccessor(nodeId, 'no');
+    
+    if (isInThisLoopContext || inLoopBody) {
+        return highlightCode + this.compileNode(yesId, visitedInPath, [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
+    } else {
+        return highlightCode + this.compileNode(exitId, visitedInPath, [...contextStack], indentLevel,
+    inLoopBody,
+    inLoopHeader);
+    }
+}
+
+// normal skip — not a loop header
     const succ = this.getAllSuccessors(nodeId);
     let out = highlightCode; // Start with highlight
     for (const { nodeId: nxt } of succ) {
@@ -1957,6 +1990,9 @@ if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
     
     return code;
 }
+
+
+
 compileSingleNode(nodeId, indentLevel) {
     const node = this.nodes.find(n => n.id === nodeId);
     if (!node) return "";
@@ -2199,8 +2235,23 @@ return false;
 }
 
 /**
-     * Compile loop structure (while or for)
-     */
+ * Check if a path from startId eventually leads to targetId
+ */
+ pathLeadsTo(startId, targetId, visited = new Set()) {
+    if (!startId || visited.has(startId)) return false;
+    if (startId === targetId) return true;
+    
+    visited.add(startId);
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        if (this.pathLeadsTo(edge.targetId, targetId, visited)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 /**
  * Compile loop structure (while or for)
  *
@@ -2281,54 +2332,76 @@ if (forInfo) {
     // -------------------------------
     const loopCtx = [...contextStack, `loop_${node.id}`];
 
-    const bodyCode = this.compileNode(
-        loopBodyId,
-        new Set(),
-        loopCtx,
-        indentLevel + 1,
-        /* inLoopBody = */ true,true
-    );
+// After compiling the loop body in the for-loop section:
+const bodyCode = this.compileNode(
+    loopBodyId,
+    new Set(),
+    loopCtx,
+    indentLevel + 1,
+    /* inLoopBody = */ true,true
+);
 
-    code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
+// Add highlight for the increment node if we're using highlighting
+let finalBodyCode = bodyCode;
+
+code += finalBodyCode.trim() ? finalBodyCode : `${indent}    pass\n`;
 
 // -------------------------------
 // compile exit path AFTER loop
 // -------------------------------
+// compile exit path AFTER loop
+// compile exit path AFTER loop
 this.nodesToSkip = savedSkip;
-if (this.useHighlighting) {
-    // Add highlight for when loop condition becomes false (exit)
-    code += `${indent}highlight('${node.id}')\n`;
-}
-if (exitId) {
-    // Don't compile exit path here if we're in a loop context
-    // The exit path will be handled by the parent loop
-    const exitNode = this.nodes.find(n => n.id === exitId);
-    
-    // Only compile exit path if we're not in a loop body context
-    // OR if the exit path leads directly to an END node
-    if (exitNode && exitNode.type === 'end') {
-        // Just add the END node compilation without continuing
-        const endIndent = "    ".repeat(indentLevel);
-        if (this.useHighlighting) {
-            code += `${endIndent}highlight('${exitId}')\n`;
-            code += `${endIndent}# END NODE REACHED\n`;
-        }
-    } else if (!inLoopBody) {
-        // Only compile exit path if we're not currently inside another loop body
-        code += this.compileNode(
-            exitId,
-            visitedInPath,
-            contextStack,
-            indentLevel,
-            inLoopBody,    // Pass the current inLoopBody flag
-            inLoopHeader   // Pass the current inLoopHeader flag
-        );
-    }
-    // If inLoopBody is true, we don't compile the exit path here
-    // because it will be handled by the parent loop
-}
 
-    return code;
+if (exitId) {
+    console.log(`Checking exit for loop ${node.id}, exitId: ${exitId}, inLoopBody: ${inLoopBody}, contextStack:`, contextStack);
+    
+    // Check if the exit path eventually leads back to a loop header in our context
+    // If so, it's part of nested loop flow; if not, it's a true exit
+    let leadsToLoopHeader = false;
+    
+    for (const ctx of contextStack) {
+        if (ctx.startsWith('loop_')) {
+            const outerLoopHeaderId = ctx.replace('loop_', '');
+            // Check if exitId eventually reaches this outer loop header
+            const leads = this.pathLeadsTo(exitId, outerLoopHeaderId, new Set([node.id]));
+            console.log(`  Does ${exitId} lead to outer loop ${outerLoopHeaderId}? ${leads}`);
+            if (leads) {
+                leadsToLoopHeader = true;
+                break;
+            }
+        }
+    }
+    
+    console.log(`  leadsToLoopHeader: ${leadsToLoopHeader}`);
+    
+    // If we're in a nested loop AND the exit doesn't lead back to an outer loop,
+    // then don't compile it (it's a premature exit to END)
+    if (inLoopBody && !leadsToLoopHeader) {
+        console.log(`  SKIPPING exit path - nested loop exit to END`);
+        // Skip this exit path - it's a final exit but we're still in an outer loop
+        return code;
+    }
+    
+    console.log(`  COMPILING exit path`);
+    
+    // Otherwise compile the exit path
+    if (this.useHighlighting && !inLoopBody) {
+        // Add highlight for when loop condition becomes false (exit)
+        code += `${indent}highlight('${node.id}')\n`;
+    }
+    
+    const exitContext = [...contextStack, `loop_${node.id}`];
+    code += this.compileNode(
+        exitId,
+        visitedInPath,
+        exitContext,
+        indentLevel,
+        false,  // Exit path is NOT in a loop body
+        false
+    );
+}
+return code;
 }
 
 // -------------------------------
