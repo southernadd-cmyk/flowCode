@@ -1,4 +1,4 @@
-# FlowCode v3.5
+# FlowCode v3.6
 
 Build **real, executable flowcharts** in the browser — then automatically generate Python code and run it step-by-step.
 
