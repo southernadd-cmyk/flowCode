@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.62</title>
+    <title>FlowCode v3.63</title>
  <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="shortcut icon" href="favicon.ico" />
@@ -664,7 +664,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.62</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.63</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
@@ -736,15 +736,17 @@ onclick="App.stopSim()">
         </div>
 
         <div id="canvas">
-            <div style="position:absolute; top:12px; right:12px; z-index:10;">
+            <div style="position:absolute; top:12px; right:12px; z-index:10;border:solid 2px #2563eb">
+    
                 <button class="btn btn-sm btn-light" onclick="App.zoomIn()">
-                  +
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+
                 </button>
                 <button class="btn btn-sm btn-light" onclick="App.zoomOut()">
-                  −
+                    <i class="fa-solid fa-magnifying-glass-minus"></i>
                 </button>
                 <button class="btn btn-sm btn-light" onclick="App.resetView()">
-                  reset
+                    <i class="fa-solid fa-refresh"></i>
                 </button>
               </div>
               
@@ -939,7 +941,7 @@ onclick="App.stopSim()">
         min-width: 300px;
      ">
   <div id="banner-handle" style="cursor: move; border-bottom: 1px solid #ddd; margin-bottom: 5px; padding-bottom: 2px;">
-     <i class="fa-solid fa-grip-lines me-2"></i> Challenge Active
+     <i class="fa-solid fa-grip-lines me-2"></i> Active Challenge: 
   </div>
   <span id="active-challenge-text"></span>
   <hr style="margin: 8px 0;"/>
