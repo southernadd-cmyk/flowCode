@@ -1,40 +1,120 @@
 {
   "nodes": [
-    { "id": "n1", "type": "start", "x": 120, "y": 60, "text": "Start" },
-
-    { "id": "n2", "type": "var", "x": 120, "y": 140, "text": "i = 0" },
-
-    { "id": "n3", "type": "decision", "x": 120, "y": 230, "text": "i < 3" },
-
-    { "id": "n4", "type": "var", "x": 360, "y": 230, "text": "j = 0" },
-
-    { "id": "n5", "type": "decision", "x": 360, "y": 320, "text": "j < 2" },
-
-    { "id": "n6", "type": "output", "x": 360, "y": 410, "text": "i, j" },
-
-    { "id": "n7", "type": "process", "x": 360, "y": 500, "text": "j = j + 1" },
-
-    { "id": "n8", "type": "process", "x": 120, "y": 320, "text": "i = i + 1" },
-
-    { "id": "n9", "type": "end", "x": 120, "y": 430, "text": "End" }
+    {
+      "id": "n1",
+      "type": "start",
+      "x": 9.5999755859375,
+      "y": 140,
+      "text": "Start"
+    },
+    {
+      "id": "n2",
+      "type": "var",
+      "x": 120,
+      "y": 140,
+      "text": "i = 0"
+    },
+    {
+      "id": "n3",
+      "type": "decision",
+      "x": 120,
+      "y": 230,
+      "text": "i < 3"
+    },
+    {
+      "id": "n4",
+      "type": "var",
+      "x": 335.199951171875,
+      "y": 70.80000305175781,
+      "text": "j = 0"
+    },
+    {
+      "id": "n5",
+      "type": "decision",
+      "x": 264.800048828125,
+      "y": 348.8000183105469,
+      "text": "j < 2"
+    },
+    {
+      "id": "n6",
+      "type": "output",
+      "x": 309.60003662109375,
+      "y": 541.1999816894531,
+      "text": "i, j"
+    },
+    {
+      "id": "n7",
+      "type": "process",
+      "x": 626.4000244140625,
+      "y": 495.20001220703125,
+      "text": "j = j + 1"
+    },
+    {
+      "id": "n8",
+      "type": "process",
+      "x": 483.199951171875,
+      "y": 248.79995727539062,
+      "text": "i = i + 1"
+    },
+    {
+      "id": "n9",
+      "type": "end",
+      "x": 99.20001220703125,
+      "y": 510,
+      "text": "End"
+    }
   ],
   "connections": [
-    { "from": "n1", "to": "n2", "port": "next" },
-
-    { "from": "n2", "to": "n3", "port": "next" },
-
-    { "from": "n3", "to": "n4", "port": "yes" },
-    { "from": "n3", "to": "n9", "port": "no" },
-
-    { "from": "n4", "to": "n5", "port": "next" },
-
-    { "from": "n5", "to": "n6", "port": "yes" },
-    { "from": "n5", "to": "n8", "port": "no" },
-
-    { "from": "n6", "to": "n7", "port": "next" },
-
-    { "from": "n7", "to": "n5", "port": "next" },
-
-    { "from": "n8", "to": "n3", "port": "next" }
-  ]
+    {
+      "from": "n1",
+      "to": "n2",
+      "port": "next"
+    },
+    {
+      "from": "n2",
+      "to": "n3",
+      "port": "next"
+    },
+    {
+      "from": "n3",
+      "to": "n4",
+      "port": "yes"
+    },
+    {
+      "from": "n3",
+      "to": "n9",
+      "port": "no"
+    },
+    {
+      "from": "n4",
+      "to": "n5",
+      "port": "next"
+    },
+    {
+      "from": "n5",
+      "to": "n6",
+      "port": "yes"
+    },
+    {
+      "from": "n5",
+      "to": "n8",
+      "port": "no"
+    },
+    {
+      "from": "n6",
+      "to": "n7",
+      "port": "next"
+    },
+    {
+      "from": "n7",
+      "to": "n5",
+      "port": "next"
+    },
+    {
+      "from": "n8",
+      "to": "n3",
+      "port": "next"
+    }
+  ],
+  "version": "3.0"
 }
