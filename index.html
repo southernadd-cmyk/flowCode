@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowCode v3.66</title>
+    <title>FlowCode v3.67</title>
  <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="shortcut icon" href="favicon.ico" />
@@ -377,20 +377,18 @@ background-color:#eed202 ;
 
 /* Small INPUT ribbon in top-left corner */
 .shape-input::before {
-  content: "I";
+    content: "\21E4";
   position: absolute;
-  top: 4px;
-  right: 8px;
 
-  padding: 1px 2px;
-  font-size: 11px;
+  right: 8px;
+  opacity: .25;
+
+  font-size: 4rem;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-
-  background: rgba(79, 16, 239, 0.7);  /* tweak to match your theme */
-  color: #fff;
-  border-radius: 6px 2px 6px 0;      /* slight ribbon look */
+  color: #2e2d2d;
+     /* slight ribbon look */
 
   pointer-events: none;              /* don’t block clicks on the node */
   z-index: 2;                        /* sit above shape borders/fills */
@@ -399,21 +397,20 @@ background-color:#eed202 ;
 
 /* Small INPUT ribbon in top-left corner */
 .shape-output::before {
-  content: "O";
+    content: "\21A6";
   position: absolute;
-  top: 4px;
-  right: 8px;
 
-  padding: 1px 2px;
-  font-size: 11px;
+  right: 8px;
+  opacity: .25;
+
+  font-size: 4rem;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
 
-  background: rgba(79, 16, 239, 0.7);   /* tweak to match your theme */
-  color: #fff;
+  
+  color: #2e2d2d;
   border-radius: 6px 2px 6px 0;      /* slight ribbon look */
-
   pointer-events: none;              /* don’t block clicks on the node */
   z-index: 2;                     /* sit above shape borders/fills */
 }
@@ -827,7 +824,7 @@ background-color:#eed202 ;
 
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.66</small></span>
+        <span class="headerfont navbar-brand fw-bold"><i class="fa-solid fa-code-branch me-2"></i>FlowCode<small class="text-muted">v3.67</small></span>
         <div class="d-flex gap-2">
 
             <button id="btn-challenges" class="btn btn-outline-secondary">
