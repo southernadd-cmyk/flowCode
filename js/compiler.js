@@ -167,7 +167,16 @@ return headers;
     
     return code;
 }
-
+/**
+ * Check if a node is a convergence point (multiple paths lead to it)
+ * These nodes may need to be compiled multiple times from different paths
+ */
+isConvergencePoint(nodeId) {
+    const incoming = this.incomingMap.get(nodeId) || [];
+    // Nodes with multiple incoming connections are convergence points
+    // Common examples: loop increments, merge points after if/else
+    return incoming.length > 1;
+}
     /**
      * Compile a node with context tracking
      */
@@ -194,15 +203,27 @@ return headers;
             return code; // highlight already emitted
         }
     
+        // ============================================
+        // ✅ NEW: ALLOW convergence points to be revisited
+        // ============================================
+        const isConvergencePoint = this.isConvergencePoint(nodeId);
+        
         // ===========================
-        // cycle protection PER CONTEXT
+        // cycle protection PER CONTEXT - UPDATED
         // ===========================
-        if (visitedInPath.has(nodeId)) return "";
-        visitedInPath.add(nodeId);
-
+        if (!isConvergencePoint && visitedInPath.has(nodeId)) {
+            console.log(`Skipping already visited node: ${nodeId}`);
+            return "";
+        }
+        
+        // Only add to visited if NOT a convergence point
+        if (!isConvergencePoint) {
+            visitedInPath.add(nodeId);
+        }
     
         // ===========================
         // skip for-loop init nodes
+        // ===========================
         if (this.isInitOfForLoop(nodeId)) {
             console.log(`Skipping for-loop init node: ${nodeId}`);
             const succ = this.getAllSuccessors(nodeId);
@@ -244,7 +265,6 @@ return headers;
             return code;
         }
     
-
         if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
             if (this.loweredImplicitLoops.has(nodeId)) {
                 const next = this.getSuccessor(nodeId, "next");
@@ -295,7 +315,7 @@ return headers;
         }
     
         // ===========================
-        // follow next unless it’s a loop back edge
+        // follow next unless it's a loop back edge
         // ===========================
         const nextNodeId = this.getSuccessor(nodeId, "next");
     
