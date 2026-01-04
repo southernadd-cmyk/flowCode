@@ -145,7 +145,7 @@ box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
     left:-100px!important;
 }
 body { 
-    font-family: 'Anonymous Pro', 'Courier New', monospace; 
+    font-family: 'Anonymous Pro', 'Courier New', monospace!important;
     height: 100vh; 
     overflow: hidden; 
     background-color: #ffffff; 
@@ -787,4 +787,5 @@ z-index: 2;                     /* sit above shape borders/fills */
     background: rgba(56, 189, 248, 0.2);
     color: #38bdf8;
 }
+
 
