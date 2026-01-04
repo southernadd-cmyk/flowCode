@@ -702,12 +702,21 @@ if (inLoopBody && nextNodeId) {
     }
 }
 
-// Normal loop back edge check
+// In compileNode method, update the back edge check section:
+
+// Normal loop back edge check - SIMPLIFIED
 if (contextStack.some(ctx => ctx.startsWith("loop_"))) {
     for (const ctx of contextStack) {
         if (ctx.startsWith("loop_")) {
             const hdr = ctx.replace("loop_", "");
-            if (nextNodeId === hdr) return code;
+            // Check if this node directly connects to the loop header
+            const outgoing = this.outgoingMap.get(nodeId) || [];
+            const goesToHeader = outgoing.some(edge => edge.targetId === hdr);
+            
+            if (goesToHeader) {
+                console.log(`Node ${nodeId} has back edge to loop header ${hdr} - stopping`);
+                return code; // Stop here, don't compile successor
+            }
         }
     }
 }
@@ -838,6 +847,9 @@ return code;
     /**
  * Compile decision node using dominator-based loop detection
  */
+/**
+ * Compile decision node using dominator-based loop detection
+ */
 compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
     const yesId = this.getSuccessor(node.id, 'yes');
     const noId = this.getSuccessor(node.id, 'no');
@@ -850,9 +862,54 @@ compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = fal
     }
     
     // ============================================
-    // DOMINATOR-BASED LOOP DETECTION
+    // SIMPLE WHILE-LOOP PATTERN DETECTION
     // ============================================
+    // Check for classic while-loop pattern BEFORE dominator analysis
+    const isSimpleWhile = this.isWhileLoopPattern(node.id);
     
+    if (isSimpleWhile) {
+        console.log(`Simple while-loop pattern detected at ${node.id}: ${node.text}`);
+        
+        // Determine which branch is the loop body
+// Determine which branch is the loop body
+const yesLoops = this.canReach(yesId, node.id, new Set());
+const noLoops = noId ? this.canReach(noId, node.id, new Set()) : false;
+        
+        let loopBodyId, exitId, useNoBranch;
+        
+        if (yesLoops && !noLoops) {
+            // YES is loop body, NO is exit (standard while)
+            loopBodyId = yesId;
+            exitId = noId;
+            useNoBranch = false;
+        } else if (!yesLoops && noLoops) {
+            // NO is loop body, YES is exit (inverted while)
+            loopBodyId = noId;
+            exitId = yesId;
+            useNoBranch = true;
+        } else {
+            // Both or neither loop - not a simple while
+            console.log(`Not a simple while loop: both branches loop or neither loops`);
+        }
+        
+        if (loopBodyId) {
+            return this.compileLoop(
+                node,
+                loopBodyId,
+                exitId,
+                visitedInPath,
+                contextStack,
+                indentLevel,
+                useNoBranch,
+                false,
+                true
+            );
+        }
+    }
+    
+    // ============================================
+    // DOMINATOR-BASED LOOP DETECTION (for complex cases)
+    // ============================================
     if (this.isLoopHeader(node.id)) {
         console.log(`Dominator analysis: ${node.id} is a loop header`);
         
@@ -866,8 +923,8 @@ compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = fal
                 contextStack,
                 indentLevel,
                 loopInfo.useNoBranch,
-                false,  // Not in loop body yet
-                true    // This is a loop header
+                false,
+                true
             );
         }
     }
@@ -914,6 +971,26 @@ compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = fal
  * vs INDIRECT (goes through outer loop/other flow)
  */
 
+
+isWhileLoopPattern(decisionId) {
+    const yesId = this.getSuccessor(decisionId, 'yes');
+    const noId = this.getSuccessor(decisionId, 'no');
+    
+    // For a while loop, one branch should loop back to the decision
+    // and the other should exit
+    
+    // Check if YES branch eventually loops back (don't avoid the decision itself!)
+    const yesLoops = this.canReach(yesId, decisionId, new Set());
+    const noLoops = noId ? this.canReach(noId, decisionId, new Set()) : false;
+    
+    console.log(`isWhileLoopPattern(${decisionId}): yesId=${yesId}, noId=${noId}, yesLoops=${yesLoops}, noLoops=${noLoops}`);
+    
+    // Valid while loop patterns:
+    // 1. YES loops back, NO exits (standard while loop)
+    // 2. NO loops back, YES exits (do-while style)
+    
+    return (yesLoops && !noLoops) || (!yesLoops && noId && noLoops);
+}
 
 
 
@@ -1752,7 +1829,7 @@ return null;
             // If it is, we MUST NOT turn it into an elif chain, or we get
             // exactly the infinite recursion you're seeing.
             const yesOfNo        = this.getSuccessor(noNode.id, 'yes');
-            const noBranchIsLoop = this.isLoopHeader(noNode.id, yesOfNo);
+            const noBranchIsLoop = this.isLoopHeader(noNode.id);
 
             if (noBranchIsLoop) {
                 // Treat it as a plain else: block, whose contents happen
