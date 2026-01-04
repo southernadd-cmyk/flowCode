@@ -86,7 +86,7 @@ this.applyViewportTransform();
 
 // 4️⃣ Redraw connectors at real coordinates
 this.drawConns();
-
+document.getElementById("zoombox").style.display = "none";
 // 5️⃣ wait for layout/paint
 await new Promise(r => requestAnimationFrame(r));
 
@@ -102,7 +102,7 @@ this.viewportX = oldX;
 this.viewportY = oldY;
 this.applyViewportTransform();
 this.drawConns();
-
+document.getElementById("zoombox").style.display = "block";
 // 8️⃣ Download
 canvas.toBlob(blob => {
     if (!blob) {
