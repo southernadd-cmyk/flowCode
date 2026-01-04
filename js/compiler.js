@@ -40,11 +40,26 @@ for (const dec of this.nodes.filter(n => n.type === "decision")) {
     // must match the detected init node
     if (info.initNodeId !== nodeId) continue;
 
-    // must be unmittel predecessor in straight-line code
-    const incoming = this.incomingMap.get(dec.id) || [];
-    const directlyBefore = incoming.some(c => c.sourceId === nodeId);
+// must be in a straight-line chain that reaches the header
+const incoming = this.incomingMap.get(dec.id) || [];
+const straightLine = (nodeId) => {
+    let cur = nodeId;
+    const seen = new Set();
+    while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        if (cur === dec.id) return true;
 
-    if (directlyBefore) return true;
+
+        const inc = this.incomingMap.get(cur) || [];
+        if (inc.length !== 1) return false;   // stop at branching
+
+        cur = inc[0].sourceId;
+    }
+    return false;
+};
+
+if (!straightLine(nodeId)) return false;
+
 }
 
 return false;
@@ -141,6 +156,8 @@ return headers;
  * Main compilation entry point
  */
  compile() {
+    this.forPatternCache.clear();
+    this.forPatternInProgress.clear();
     const startNode = this.nodes.find(n => n.type === 'start');
     if (!startNode) return "# Add a Start node.";
     
@@ -406,9 +423,9 @@ return code;
     let code = "";
     
     // FIX: Add highlight for the decision node itself
-    if (this.useHighlighting) {
-        code += `${indent}highlight('${node.id}')\n`;
-    }
+   // if (this.useHighlighting) {
+    //    code += `${indent}highlight('${node.id}')\n`;
+   // }
     
     code += `${indent}if ${node.text}:\n`;  
 
@@ -556,6 +573,37 @@ while (stack.length) {
 
 return false;
 }
+// True if ALL paths from loop body to header go through increment node
+incrementDominatesHeader(loopHeaderId, incrementId, loopBodyId) {
+    if (loopBodyId === incrementId) {
+        return true;
+    }
+    // DFS without passing increment — if we reach header, increment did NOT dominate
+    const stack = [loopBodyId];
+    const visited = new Set();
+
+    while (stack.length) {
+        const cur = stack.pop();
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+
+        // If we reached header WITHOUT crossing increment → domination fails
+        if (cur === loopHeaderId) {
+            return false;
+        }
+
+        // If we hit increment, we stop exploring that branch (that branch is safe)
+        if (cur === incrementId) continue;
+
+        const outgoing = this.outgoingMap.get(cur) || [];
+        for (const edge of outgoing) {
+            stack.push(edge.targetId);
+        }
+    }
+
+    // If NO path reaches header without passing increment → domination holds
+    return true;
+}
 
 /**
  * Check if a path from startId eventually leads to targetId
@@ -603,7 +651,9 @@ let code = "";
 // 1) Try COUNTED FOR loop lowering
 // -------------------------------
 
-const forInfo = !useNoBranch ? this.detectForLoopPattern(node.id) : null;
+// Try for-loop lowering regardless of whether loop is on YES or NO
+const forInfo = this.detectForLoopPattern(node.id);
+
 
 if (forInfo) {
 
@@ -797,50 +847,61 @@ return null;
 
 }
 
-this.forPatternInProgress.add(decisionId);
 
+
+this.forPatternInProgress.add(decisionId);
 // -------------------------------
-// 1) Find initialisation before decision (walk back in straight line)
+// 1) Find initialisation before decision (look for any assignment to loop variable)
 // -------------------------------
-let initNode = null;
+const decisionNode = this.nodes.find(n => n.id === decisionId);
+if (!decisionNode || !decisionNode.text) return null;
+
+// Extract variable name from decision condition (e.g., "x < max" → "x")
 let varName = null;
+const condMatch = decisionNode.text.match(/^\s*(\w+)\s*[<>=!]/);
+if (!condMatch) return null;
+varName = condMatch[1];
+
+console.log(`For-loop detection looking for variable: ${varName} in decision: ${decisionNode.text}`);
+
+let initNode = null;
 let startValue = null;
 
-const visitedBack = new Set();
-const stack = [...(this.incomingMap.get(decisionId) || [])];
-
-while (stack.length > 0) {
-    const conn = stack.pop();
-    if (!conn || visitedBack.has(conn.sourceId)) continue;
-
-    visitedBack.add(conn.sourceId);
-
-    const node = this.nodes.find(n => n.id === conn.sourceId);
-    if (!node) continue;
-
-    // stop if control flow *branches* – we only allow straight-line init chains
-    const incomings = this.incomingMap.get(node.id) || [];
-    if (incomings.length > 1) continue;
-
-    // match: i = 0   OR   i = x   (number or identifier)
-    const m = node.text?.match(/^\s*(\w+)\s*=\s*([\w\d_]+)\s*$/);
-    if (m) {
-        initNode = node;
-        varName = m[1];
-        startValue = m[2];
-        break;
+// Search ALL nodes (not just direct predecessors) for initialization
+for (const node of this.nodes) {
+    if (node.type === "var" || node.type === "process") {
+        // Check if this node assigns to our loop variable
+        const m = node.text?.match(new RegExp(`^\\s*${varName}\\s*=\\s*([\\w\\d_]+)\\s*$`));
+        if (m) {
+            console.log(`Found potential init node: ${node.id} with text: ${node.text}`);
+            
+            // Check if this node reaches the decision (path exists)
+            if (this.pathExists(node.id, decisionId, new Set())) {
+                console.log(`Path confirmed from ${node.id} to ${decisionId}`);
+                initNode = node;
+                startValue = m[1];
+                break;
+            } else {
+                console.log(`No path from ${node.id} to ${decisionId}`);
+            }
+        }
     }
-
-    // continue walking backwards
-    (this.incomingMap.get(node.id) || []).forEach(prev => stack.push(prev));
 }
 
-if (!varName) return null;
+if (!varName || !startValue) {
+    console.log(`No initialization found for variable ${varName}`);
+    return null;
+}
+
+console.log(`Found initialization: ${varName} = ${startValue} at node ${initNode?.id}`);
 
 // -------------------------------
 // 2) Parse loop condition
 // -------------------------------
-const decisionNode = this.nodes.find(n => n.id === decisionId);
+
+
+
+
 if (!decisionNode || !decisionNode.text) return null;
 
 const condition = decisionNode.text.trim();
@@ -918,13 +979,12 @@ if (comparisonOp === '>=') {
 // and MUST NOT pass through any other decision nodes
 // -------------------------------
 const incId = incrementInfo.node.id;
+const loopBodyId = this.getSuccessor(decisionId, 'yes');
 
-if (!this.pathIsDirectIncrementToHeader(incId, decisionId)) {
-    // ❌ not a clean counted loop — leave it as while + inner logic
+if (!this.incrementDominatesHeader(decisionId, incId, loopBodyId)) {
     this.forPatternInProgress.delete(decisionId);
-this.forPatternCache.set(decisionId, null);
-return null;
-
+    this.forPatternCache.set(decisionId, null);
+    return null;
 }
 
 // -------------------------------
@@ -946,7 +1006,24 @@ return result;
 
 
  }
-
+/**
+ * Check if a path exists from startId to targetId
+ */
+pathExists(startId, targetId, visited = new Set()) {
+    if (!startId || visited.has(startId)) return false;
+    if (startId === targetId) return true;
+    
+    visited.add(startId);
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        if (this.pathExists(edge.targetId, targetId, visited)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 /**
  * Find increment node using BFS to handle longer paths
  * Returns object with node, step size, and direction info
