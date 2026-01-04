@@ -317,18 +317,62 @@ isConvergencePoint(nodeId) {
         // ===========================
         // follow next unless it's a loop back edge
         // ===========================
-        const nextNodeId = this.getSuccessor(nodeId, "next");
+// ===========================
+// follow next unless it's a loop back edge OR we emit a break
+// ===========================
+const nextNodeId = this.getSuccessor(nodeId, "next");
+
+// BREAK DETECTION: If we're in a loop body and next goes to END
+if (inLoopBody && nextNodeId) {
+    const nextNode = this.nodes.find(n => n.id === nextNodeId);
     
-        if (contextStack.some(ctx => ctx.startsWith("loop_"))) {
-            for (const ctx of contextStack) {
-                if (ctx.startsWith("loop_")) {
-                    const hdr = ctx.replace("loop_", "");
-                    if (nextNodeId === hdr) return code;
-                }
+    // Case: Next is END → emit break and stop
+    if (nextNode && nextNode.type === "end") {
+        const indent = "    ".repeat(indentLevel);
+        code += `${indent}break\n`;
+        return code;  // Don't follow to END
+    }
+    
+    // Case: Check if this path exits our current loop
+    // (doesn't go back to any loop header in context)
+    let exitsCurrentLoop = true;
+    
+    for (const ctx of contextStack) {
+        if (ctx.startsWith('loop_')) {
+            const loopHeaderId = ctx.replace('loop_', '');
+            
+            // If next leads back to OUR loop header, it's not a break
+            if (this.pathLeadsTo(nextNodeId, loopHeaderId, new Set([nodeId]))) {
+                exitsCurrentLoop = false;
+                break;
+            }
+            
+            // Also check if next IS our loop header
+            if (nextNodeId === loopHeaderId) {
+                exitsCurrentLoop = false;
+                break;
             }
         }
+    }
     
-        return code + this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+    if (exitsCurrentLoop) {
+        const indent = "    ".repeat(indentLevel);
+        code += `${indent}break\n`;
+        return code;  // Don't follow exit path
+    }
+}
+
+// Normal loop back edge check
+if (contextStack.some(ctx => ctx.startsWith("loop_"))) {
+    for (const ctx of contextStack) {
+        if (ctx.startsWith("loop_")) {
+            const hdr = ctx.replace("loop_", "");
+            if (nextNodeId === hdr) return code;
+        }
+    }
+}
+
+return code + this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
     }
     
 
@@ -496,14 +540,26 @@ return code;
             );
         }
         
-        // Case 2: We're in a loop body AND it's an INDIRECT loop → compile as if/else
-        // (This catches FizzBuzz: goes through outer loop, not direct)
-        if (inLoopBody && isIndirectLoop && !isDirectLoop) {
-            console.log(`Indirect loop inside loop body → if/else`);
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-                inLoopBody, inLoopHeader);
-        }
-        
+// Case 2: We're in a loop body AND it's an INDIRECT loop → compile as if/else with break detection
+if (inLoopBody && isIndirectLoop && !isDirectLoop) {
+    console.log(`Indirect loop inside loop body → checking for break conditions`);
+    
+    // Check if either branch exits the loop
+    const yesExits = this.doesBranchExitLoop(yesId, contextStack, node.id);
+    const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
+    
+    console.log(`  ${node.id}: yesExits=${yesExits}, noExits=${noExits}`);
+    
+    // If a branch exits, use special compilation with break
+    if (yesExits || noExits) {
+        return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits, 
+                                           visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+    }
+    
+    // Otherwise regular if/else
+    return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+        inLoopBody, inLoopHeader);
+}
         // Case 3: Not in loop body but indirect loop → could be outer loop
         if (!inLoopBody && isIndirectLoop) {
             const loopBodyId = isIndirectLoopYes ? yesId : noId;
@@ -722,6 +778,100 @@ incrementDominatesHeader(loopHeaderId, incrementId, loopBodyId) {
     }
     
     return false;
+}
+
+/**
+ * Check if a branch exits the current loop (goes to END or outside loop)
+ */
+doesBranchExitLoop(startId, contextStack, currentNodeId) {
+    if (!startId) return false;
+    
+    // Find our loop header from context
+    let currentLoopHeaderId = null;
+    for (const ctx of contextStack) {
+        if (ctx.startsWith('loop_')) {
+            currentLoopHeaderId = ctx.replace('loop_', '');
+            break;
+        }
+    }
+    
+    if (!currentLoopHeaderId) return false; // Not in a loop
+    
+    const visited = new Set();
+    const stack = [startId];
+    
+    while (stack.length > 0) {
+        const current = stack.pop();
+        if (visited.has(current) || current === currentNodeId) continue;
+        visited.add(current);
+        
+        const node = this.nodes.find(n => n.id === current);
+        
+        // Found END → exits loop
+        if (node && node.type === 'end') {
+            return true;
+        }
+        
+        // Found our loop header → doesn't exit (it's a back edge)
+        if (current === currentLoopHeaderId) {
+            continue; // Don't explore further from header
+        }
+        
+        // Check successors
+        const outgoing = this.outgoingMap.get(current) || [];
+        for (const edge of outgoing) {
+            stack.push(edge.targetId);
+        }
+    }
+    
+    return false;
+}
+/**
+ * Compile a decision inside loop where branches might exit with break
+ */
+compileLoopExitDecision(node, yesId, noId, yesExits, noExits, 
+    visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader) {
+const indent = "    ".repeat(indentLevel);
+let code = `${indent}if ${node.text}:\n`;
+
+// Compile YES branch
+const ifContext = [...contextStack, `if_${node.id}`];
+const ifVisited = new Set([...visitedInPath]);
+let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLoopBody, inLoopHeader);
+
+// Add break if this branch exits loop
+if (yesExits && !ifCode.includes('break')) {
+ifCode = ifCode.trim();
+if (ifCode) {
+ifCode += `\n${indent}    break`;
+} else {
+ifCode = `${indent}    break`;
+}
+}
+
+code += ifCode || `${indent}    pass\n`;
+
+// Compile NO branch
+if (noId) {
+code += `${indent}else:\n`;
+const elseContext = [...contextStack, `else_${node.id}`];
+const elseVisited = new Set([...visitedInPath]);
+let elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1, inLoopBody, inLoopHeader);
+
+// Add break if this branch exits loop
+if (noExits && !elseCode.includes('break')) {
+elseCode = elseCode.trim();
+if (elseCode) {
+elseCode += `\n${indent}    break`;
+} else {
+elseCode = `${indent}    break`;
+}
+}
+
+code += elseCode || `${indent}    pass\n`;
+}
+
+return code;
 }
 /**
  * Compile loop structure (while or for)
