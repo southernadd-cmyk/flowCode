@@ -1,0 +1,790 @@
+:root {
+    /* Backgrounds */
+    --bg-canvas: #f8fafc;
+    --bg-sidebar: #ffffff;
+    --bg-panel: #f1f5f9;
+    
+    /* Professional Flowchart Colors (Softer, modern) */
+    --color-start-end: #10b981;    /* Emerald 500 */
+    --color-process: #6366f1;      /* Indigo 500 */
+    --color-decision: #f59e0b;     /* Amber 500 */
+    --color-input-output: #0ea5e9; /* Sky 500 */
+    --color-variable: #8b5cf6;     /* Violet 500 */
+    --color-list: #ec4899;         /* Pink 500 */
+    
+    /* UI Accents */
+    --accent: #2563eb;
+    --border-subtle: #e2e8f0;
+    --text-main: #1e293b;
+    --node-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --node-selected: 0 0 0 3px rgba(37, 99, 235, 0.4);
+}
+#palette::-webkit-scrollbar-track {
+    background: #92eda1; /* Matches the sidebar bg */
+}    
+
+
+/* WELCOME SCREEN STYLES */
+.welcome-overlay {
+position: fixed;
+inset: 0;
+
+z-index: 11000;
+background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+display: flex;
+align-items: center;
+justify-content: center;
+overflow-y: auto;
+padding: 2rem;
+transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.welcome-content {
+max-width: 900px;
+width: 100%;
+padding-top:35vh;
+text-align: center;
+animation: fadeInSlide 0.6s ease-out;
+}
+
+@keyframes fadeInSlide {
+from { opacity: 0; transform: translateY(20px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+.welcome-header h1 {
+color: #0f172a;
+letter-spacing: 4px;
+margin-bottom: 0.5rem;
+}
+
+.tagline {
+color: #64748b;
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 2px;
+font-size: 0.9rem;
+margin-bottom: 3rem;
+}
+
+.welcome-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+gap: 1.5rem;
+margin-bottom: 3rem;
+}
+
+.feature-card {
+background: white;
+padding: 2rem;
+border-radius: 16px;
+border: 1px solid #e2e8f0;
+box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+transition: transform 0.2s ease;
+}
+
+.feature-card:hover {
+transform: translateY(-5px);
+}
+
+.feature-card i {
+font-size: 2rem;
+color: #2563eb;
+margin-bottom: 1rem;
+}
+
+.feature-card h6 {
+font-weight: 800;
+color: #1e293b;
+}
+
+.feature-card p {
+font-size: 0.9rem;
+color: #64748b;
+margin-bottom: 0;
+}
+
+.welcome-instructions {
+background: #ffffff;
+border-radius: 16px;
+padding: 2rem;
+text-align: left;
+border: 1px solid #e2e8f0;
+margin-bottom: 3rem;
+}
+
+.welcome-instructions li {
+margin-bottom: 0.75rem;
+font-size: 0.95rem;
+}
+
+.welcome-footer {
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+#welcomeCloseBtn {
+border-radius: 50px;
+transition: all 0.3s ease;
+}
+
+#welcomeCloseBtn:hover {
+transform: scale(1.05);
+box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
+}
+
+/* For mobile accessibility */
+@media (max-width: 768px) {
+.welcome-overlay { padding: 1rem; }
+.welcome-header h1 { font-size: 2.5rem; }
+.welcome-instructions .border-start-md { border-left: none !important; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
+}
+
+.dropdown-menu[data-bs-popper] {
+    left:-100px!important;
+}
+body { 
+    font-family: 'Anonymous Pro', 'Courier New', monospace; 
+    height: 100vh; 
+    overflow: hidden; 
+    background-color: #ffffff; 
+    margin: 0;
+    color: #1e293b;
+}
+.headerfont,.modal-title{
+    font-family: 'Major Mono Display', monospace;
+}
+
+.wrapper { 
+    height: calc(100vh - 56px); 
+    display: flex; 
+    flex-direction: column; 
+}
+
+.main-area { 
+    flex: 1; 
+    display: flex; 
+    overflow: hidden; 
+}
+.node .inner-text {
+    display: block;
+
+    /* ellipsis behaviour */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    /* keeps text inside padding limits */
+    max-width: 95%;
+    line-height: 1.2;
+}
+
+/* ========== PALETTE ========== */
+#palette {
+    width: 260px;
+    background: var(--bg-sidebar);
+    padding: 24px 16px;
+    border-right: 1px solid var(--border-subtle);
+    overflow-y:auto;
+}
+
+.palette-header {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #94a3b8;
+    margin: 20px 0 12px 4px;
+}
+
+.palette-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-main);
+    transition: all 0.15s ease-in-out;
+}
+
+.palette-item:hover {
+    background: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+.palette-item:active {
+    transform: translateY(0);
+}
+
+/* ========== CANVAS ========== */
+#canvas { 
+    flex: 1; 
+    background-color: var(--bg-canvas); 
+    position: relative; 
+    overflow: hidden; 
+    background-image: 
+        radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+    background-size: 48px 48px;
+}
+
+svg#connections-layer { 
+    position: absolute; 
+    inset: 0; 
+    pointer-events: none; 
+    overflow:hidden;
+    z-index: 1; 
+    width: 100%; 
+    height: 100%; 
+}
+
+/* ========== FLOWCHART NODES ========== */
+.node { 
+    position: absolute; 
+    background: white;
+    border: 3px solid #334155; 
+    text-align: center; 
+    font-size: 11.5px; 
+    font-weight: 700; 
+    user-select: none; 
+    cursor: move; 
+    z-index: 2; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    padding: 6px; 
+    box-shadow: 0 4px 12px var(--node-shadow);
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    transform-origin: center center;
+}
+
+.node:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.node.selected { 
+    border-color: var(--accent); 
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25),
+                0 6px 16px rgba(59, 130, 246, 0.3);
+    z-index: 100;
+}
+
+/* NEW: simple grow + green, no pulse */
+.node.running { 
+    /*transform: scale(1.02);*/
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25) !important;
+    
+    color: #ffffff !important;
+    z-index: 101;
+}
+
+/* ========== START/END (Green Oval) ========== */
+.shape-start, .shape-end { 
+    width: 95px; 
+    height: 40px; 
+    border-radius: 25px;
+    background: linear-gradient(135deg, var(--color-start-end) 0%, #16a34a 100%);
+    border-color: var(--border-start-end);
+    color: white;
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* when running, just follow the global green, no extra glow */
+.shape-start.running, .shape-end.running {
+filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25) !important;
+background-color:#eed202 ;
+    background-image: none !important;
+    box-shadow: none;
+}
+
+/* ========== PROCESS (Blue Rectangle) ========== */
+.shape-process { 
+    width: 120px; 
+    height: 50px; 
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--color-process) 0%, #2563eb 100%);
+    border-color: var(--border-process);
+    color: white;
+    font-weight: 700;
+}
+
+.shape-process.running {
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25) !important;
+    background-color:#eed202 ;
+    background-image: none !important;
+    box-shadow: none;
+}
+
+/* ========== VARIABLE (Purple Rectangle) ========== */
+.shape-var { 
+    width: 120px; 
+    height: 50px; 
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--color-variable) 0%, #7c3aed 100%);
+    border-color: var(--border-variable);
+    color: white;
+    font-weight: 700;
+}
+
+.shape-var.running {
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25) !important;
+    background-color:#eed202 ;
+    background-image: none !important;
+    box-shadow: none;
+}
+
+/* ========== INPUT/OUTPUT (Blue Parallelogram) ========== */
+.shape-output, .shape-input {
+    width: 140px;
+    height: 50px;
+    background: var(--color-input-output) !important;
+    border: none !important;
+    transform: skewX(-15deg);
+    color: white;
+}
+
+
+/* Small INPUT ribbon in top-left corner */
+.shape-input::before {
+content: "\21E4";
+position: absolute;
+
+right: 8px;
+opacity: .25;
+
+font-size: 4rem;
+font-weight: 700;
+letter-spacing: 1px;
+text-transform: uppercase;
+color: #2e2d2d;
+/* slight ribbon look */
+
+pointer-events: none;              /* don’t block clicks on the node */
+z-index: 2;                        /* sit above shape borders/fills */
+}
+
+
+/* Small INPUT ribbon in top-left corner */
+.shape-output::before {
+content: "\21A6";
+position: absolute;
+
+right: 8px;
+opacity: .25;
+
+font-size: 4rem;
+font-weight: 700;
+letter-spacing: 1px;
+text-transform: uppercase;
+
+
+color: #2e2d2d;
+border-radius: 6px 2px 6px 0;      /* slight ribbon look */
+pointer-events: none;              /* don’t block clicks on the node */
+z-index: 2;                     /* sit above shape borders/fills */
+}
+/* Remove the skew from the inner text since we used clip-path */
+.shape-output .inner-text, .shape-input .inner-text {
+    transform: skewX(15deg);
+    padding: 0 10px;
+}
+
+.shape-output.running, .shape-input.running {
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25);
+    background-color:#eed202 ;
+    background-image: none !important;
+    box-shadow: none;
+}
+
+/* ========== DECISION (Yellow Diamond) ========== */
+.shape-decision { 
+    width: 130px; 
+    height: 110px; 
+    background: transparent !important; 
+    border: none !important; 
+    box-shadow: none !important; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.decision-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    fill: var(--color-decision);
+    stroke: var(--border-decision);
+    stroke-width: 3px;
+    z-index: -1;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+    transition: all 0.2s ease;
+}
+
+
+.node.running .decision-svg {
+
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25);
+   /* fill: #d2f10c !important;
+    stroke: #14532d !important;*/
+   
+}
+
+.node.selected .decision-svg {
+    stroke: var(--accent);
+    stroke-width: 2px;
+}
+
+.shape-decision .inner-text { 
+    transform: none; 
+    width: 70%;
+    font-size: 11px;
+    font-weight: 800;
+    z-index: 2;
+    color: white;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+
+/* ========== LIST (Cyan Rectangle with Accent) ========== */
+.shape-list {
+    width: 140px;
+    height: 50px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--color-list) 0%, #0891b2 100%);
+    border-color: var(--border-list);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    color: white;
+    font-weight: 700;
+}
+
+.shape-list::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: rgba(255, 255, 255, 0.4);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.shape-list.running {
+    filter: grayscale(1) sepia(1) hue-rotate(35deg) saturate(25) !important;
+    background-color:#eed202 ;
+    background-image: none !important;
+    box-shadow: none;
+}
+
+.shape-list .inner-text {
+    width: 100%;
+    transform: none;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+/* ========== CONNECTION DOTS ========== */
+.dot { 
+    width: 12px; 
+    height: 12px; 
+    background: #ffffff; 
+    border: 3px solid #475569; 
+    border-radius: 50%; 
+    position: absolute; 
+    z-index: 5; 
+    cursor: crosshair;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.dot:hover {
+    transform: scale(1.3);
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.dot.in { 
+    top: -6px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+}
+
+.dot.out { 
+    bottom: -6px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+}
+
+/* Decision-specific dots */
+.shape-decision .dot.in { 
+    top: -6px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+} 
+
+.shape-decision .dot.out-yes { 
+    bottom: -6px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background: #22c55e;
+    border-color: #16a34a;
+}
+
+.shape-decision .dot.out-yes:hover {
+    background: #16a34a;
+    transform: translateX(-50%) scale(1.3);
+}
+
+.shape-decision .dot.out-no { 
+    top: 50%; 
+    right: -6px; 
+    transform: translateY(-50%);
+    background: #ef4444;
+    border-color: #dc2626;
+}
+
+.shape-decision .dot.out-no:hover {
+    background: #dc2626;
+    transform: translateY(-50%) scale(1.3);
+}
+
+/* ========== CONNECTION LABELS ========== */
+.conn-label { 
+    position: absolute; 
+    font-size: 10px; 
+    font-weight: 800; 
+    background: white; 
+    padding: 3px 8px; 
+    border: 2px solid #e2e8f0; 
+    border-radius: 6px; 
+    z-index: 3; 
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.5px;
+}
+
+#nodes-layer, #connections-layer {
+    transform-origin: 0 0;
+}
+
+/* ========== UTILITY CLASSES ========== */
+.text-muted {
+    color: #9ca3af !important;
+    font-weight: 400;
+}
+
+#console .text-muted {
+    color: var(--fc-console-muted) !important;
+}
+
+/* ========== SCROLLBAR STYLING ========== */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+#console::-webkit-scrollbar-track {
+    background: #0f1419;
+}
+
+#console::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+
+/* ========== DRAGGABLE CHALLENGE BANNER ========== */
+#active-challenge-banner {
+    pointer-events: auto;
+    cursor: move;
+}
+#active-challenge-banner button {
+    pointer-events: auto;
+    cursor: pointer;
+}
+#active-challenge-banner {
+    z-index: 9999;
+    position: absolute;
+}
+
+/* ========== OUTPUT PANEL, CODE, CONSOLE, VARWATCH ========== */
+
+/* 1. MAIN OUTPUT CONTAINER */
+#output-panel { 
+    width: 480px; 
+    display: flex; 
+    flex-direction: column; 
+    background: #0f172a; /* Deep Slate 900 */
+    border-left: 1px solid #1e293b;
+    box-shadow: -10px 0 20px rgba(0,0,0,0.2);
+}
+
+/* 2. PYTHON CODE AREA (Top Section) */
+.code-display { 
+    flex: 1; 
+    padding: 40px 24px 24px 24px; /* Extra top padding for the pseudo-label */
+    font-family: 'JetBrains Mono', 'Fira Code', monospace; 
+    font-size: 13px; 
+    color: #cbd5e1; 
+    background: #0f172a; 
+    white-space: pre; 
+    overflow-y: auto; 
+    line-height: 1.6;
+    border-bottom: 2px solid #1e293b;
+    position: relative;
+}
+
+/* CSS-ONLY Label for Code Area */
+.code-display::before {
+    content: "\f3e2  PYTHON PREVIEW";
+    position: absolute;
+    top: 12px;
+    left: 24px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #a8ecba;
+    font-family: "Font Awesome 6 Brands";
+    font-weight: 400;
+}
+
+/* 3. TERMINAL CONSOLE (Middle Section) */
+#console { 
+    height: 250px; 
+    background: #020617; /* Rich Black */
+    color: #e2e8f0; 
+    padding: 45px 16px 16px 16px; /* Top padding makes room for the pseudo-header */
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 13px; 
+    overflow-y: auto; 
+    border-top: 1px solid #334155;
+    line-height: 1.5;
+    position: relative;
+    border-bottom: 2px solid #1e293b;
+}
+
+/* CSS-ONLY Terminal Header Bar */
+#console::before {
+    content: "TERMINAL";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: #1e293b;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    padding-left: 36px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* CSS-ONLY Terminal Icon (FontAwesome-like dot) */
+#console::after {
+    content: "";
+    position: absolute;
+    top: 11px;
+    left: 16px;
+    width: 10px;
+    height: 10px;
+    background: #10b981; /* Green dot */
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+/* 4. VARIABLE WATCH (Bottom Section) */
+#varwatch {
+    height: 180px !important; 
+    background: #0f172a !important; 
+    padding: 40px 16px 16px 16px !important;
+    position: relative;
+    border-top: 1px solid #1e293b !important;
+}
+
+/* CSS-ONLY Header for VarWatch */
+#varwatch::before {
+    content: "DEBUGGER / VARIABLES";
+    position: absolute;
+    top: 15px;
+    left: 16px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #38bdf8; /* Sky Blue */
+    letter-spacing: 1px;
+}
+
+/* Target the table created by JS inside VarWatch */
+#varwatch-table table {
+    width: 100%;
+    border-spacing: 0;
+    margin-top: 5px;
+}
+
+#varwatch-table tr {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+#varwatch-table td {
+    padding: 6px 0 !important;
+    font-size: 12px;
+}
+
+/* Left column (Var name) */
+#varwatch-table td:first-child {
+    color: #94a3b8 !important;
+    font-weight: 600;
+}
+
+/* Right column (Value) */
+#varwatch-table td:last-child {
+    color: #22d3ee !important; /* Cyan */
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* 5. SCROLLBARS (Universal Dark Polish for these) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Text Selection Color */
+::selection {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+}
+
