@@ -26,43 +26,24 @@ this.forPatternInProgress = new Set();
         return `${indent}highlight('${nodeId}')\n`;
     }    
 // Returns true if this node is the init assignment of a detected for-loop
+// Returns true if this node is the init assignment of a detected for-loop
 isInitOfForLoop(nodeId) {
+    const node = this.nodes.find(n => n.id === nodeId);
+    if (!node || (node.type !== "var" && node.type !== "process")) return false;
 
-const node = this.nodes.find(n => n.id === nodeId);
-if (!node || (node.type !== "var" && node.type !== "process")) return false;
+    // Look at EVERY decision node to see if it's a for-loop header
+    for (const dec of this.nodes.filter(n => n.type === "decision")) {
+        const info = this.detectForLoopPattern(dec.id);
+        if (!info || !info.initNodeId) continue;
 
-// look at every decision node (possible loop header)
-for (const dec of this.nodes.filter(n => n.type === "decision")) {
-
-    const info = this.detectForLoopPattern(dec.id);
-    if (!info || !info.initNodeId) continue;
-
-    // must match the detected init node
-    if (info.initNodeId !== nodeId) continue;
-
-// must be in a straight-line chain that reaches the header
-const incoming = this.incomingMap.get(dec.id) || [];
-const straightLine = (nodeId) => {
-    let cur = nodeId;
-    const seen = new Set();
-    while (cur && !seen.has(cur)) {
-        seen.add(cur);
-        if (cur === dec.id) return true;
-
-
-        const inc = this.incomingMap.get(cur) || [];
-        if (inc.length !== 1) return false;   // stop at branching
-
-        cur = inc[0].sourceId;
+        // Check if this node is the init for ANY for-loop
+        if (info.initNodeId === nodeId) {
+            console.log(`Node ${nodeId} is init for for-loop at ${dec.id}`);
+            return true;
+        }
     }
+
     return false;
-};
-
-if (!straightLine(nodeId)) return false;
-
-}
-
-return false;
 }
 
 
@@ -222,8 +203,8 @@ return headers;
     
         // ===========================
         // skip for-loop init nodes
-        // ===========================
         if (this.isInitOfForLoop(nodeId)) {
+            console.log(`Skipping for-loop init node: ${nodeId}`);
             const succ = this.getAllSuccessors(nodeId);
             for (const { nodeId: nxt } of succ) {
                 code += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel, inLoopBody, inLoopHeader);
@@ -449,61 +430,160 @@ return code;
     /**
      * Compile decision node (could be if, while, or for)
      */
-    /**
- * Compile decision node (could be if, while, or for)
- */
- compileDecision(
-    node,
-    visitedInPath,
-    contextStack,
-    indentLevel,
-    inLoopBody = false,
-    inLoopHeader = false
-) {
-    const yesId = this.getSuccessor(node.id, 'yes');
-    const noId  = this.getSuccessor(node.id, 'no');
 
-    // If this decision node is *already* in a loop context,
-    // just treat it as a normal if/else to avoid re-creating the loop.
-    const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
-    if (isAlreadyLoop) {
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    }
-
-    // Simple loop detection: does this branch eventually lead back to me?
-    const isLoopYes = this.isLoopHeader(node.id, yesId);
-    const isLoopNo  = noId ? this.isLoopHeader(node.id, noId) : false;
-    const isLoop    = isLoopYes || isLoopNo;
+    compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
+        const yesId = this.getSuccessor(node.id, 'yes');
+        const noId = this.getSuccessor(node.id, 'no');
     
-    if (isLoop) {
-        // YES or NO branch is the loop body
-        const loopBodyId  = isLoopYes ? yesId : noId;
-        const exitId      = isLoopYes ? noId  : yesId;
-        const useNoBranch = !isLoopYes && isLoopNo;  // loop on "no" branch => negate condition
-
-        return this.compileLoop(
-            node,
-            loopBodyId,
-            exitId,
-            visitedInPath,
-            contextStack,
-            indentLevel,
-            useNoBranch,
-    inLoopBody,
-    inLoopHeader
-        );
-    } else {
-        // Plain if/else - BUT use a simpler approach for nested decisions
-        return this.compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-    inLoopBody,
-    inLoopHeader);
+        // If already a loop in context
+        const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+        if (isAlreadyLoop) {
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+                inLoopBody, inLoopHeader);
+        }
+    
+        // ============================================
+        // KEY: Check for DIRECT loops vs INDIRECT loops
+        // ============================================
+        
+        const isDirectLoopYes = this.isDirectLoopHeader(node.id, yesId);
+        const isDirectLoopNo = noId ? this.isDirectLoopHeader(node.id, noId) : false;
+        const isDirectLoop = isDirectLoopYes || isDirectLoopNo;
+        
+        // Also check OLD method for backward compatibility
+        const isIndirectLoopYes = this.isLoopHeader(node.id, yesId);
+        const isIndirectLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
+        const isIndirectLoop = isIndirectLoopYes || isIndirectLoopNo;
+        
+        console.log(`Decision ${node.id}: directLoop=${isDirectLoop}, indirectLoop=${isIndirectLoop}, inLoopBody=${inLoopBody}`);
+    
+        // Case 1: DIRECT loop → compile as while/for loop
+        if (isDirectLoop) {
+            const loopBodyId = isDirectLoopYes ? yesId : noId;
+            const exitId = isDirectLoopYes ? noId : yesId;
+            const useNoBranch = !isDirectLoopYes && isDirectLoopNo;
+    
+            return this.compileLoop(
+                node,
+                loopBodyId,
+                exitId,
+                visitedInPath,
+                contextStack,
+                indentLevel,
+                useNoBranch,
+                true,  // We're entering a loop body
+                true   // This is a loop header
+            );
+        }
+        
+        // Case 2: We're in a loop body AND it's an INDIRECT loop → compile as if/else
+        // (This catches FizzBuzz: goes through outer loop, not direct)
+        if (inLoopBody && isIndirectLoop && !isDirectLoop) {
+            console.log(`Indirect loop inside loop body → if/else`);
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+                inLoopBody, inLoopHeader);
+        }
+        
+        // Case 3: Not in loop body but indirect loop → could be outer loop
+        if (!inLoopBody && isIndirectLoop) {
+            const loopBodyId = isIndirectLoopYes ? yesId : noId;
+            const exitId = isIndirectLoopYes ? noId : yesId;
+            const useNoBranch = !isIndirectLoopYes && isIndirectLoopNo;
+    
+            return this.compileLoop(
+                node,
+                loopBodyId,
+                exitId,
+                visitedInPath,
+                contextStack,
+                indentLevel,
+                useNoBranch,
+                false,
+                true
+            );
+        }
+        
+        // Case 4: Not a loop at all → if/else
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+            inLoopBody, inLoopHeader);
     }
-}
+
     /**
-     * Check if a decision node is a loop header
-     */
+ * Check if a branch leads DIRECTLY back to the decision without passing through
+ * increment statements or outer loop headers
+ */
+/**
+ * Check if a decision is a DIRECT loop header (branches back to itself)
+ * vs INDIRECT (goes through outer loop/other flow)
+ */
+isDirectLoopHeader(nodeId, branchId) {
+    if (!branchId) return false;
+
+    const MAX_DEPTH = 50;
+    const visited = new Set();
+
+    const dfs = (id, depth = 0, passedThroughOtherDecision = false) => {
+        if (!id) return false;
+        if (depth > MAX_DEPTH) return false;
+
+        // Found our loop header
+        if (id === nodeId) {
+            // Direct loop: comes back WITHOUT passing through another decision
+            return !passedThroughOtherDecision;
+        }
+
+        if (visited.has(id)) return false;
+        visited.add(id);
+
+        const node = this.nodes.find(n => n.id === id);
+        let newPassedThroughOtherDecision = passedThroughOtherDecision;
+        
+        // Check if we pass through ANOTHER decision node
+        if (node && node.type === 'decision' && node.id !== nodeId) {
+            newPassedThroughOtherDecision = true;
+        }
+
+        const outgoing = this.outgoingMap.get(id) || [];
+        for (const edge of outgoing) {
+            if (dfs(edge.targetId, depth + 1, newPassedThroughOtherDecision)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    return dfs(branchId, 0, false);
+}
+isChainedDecisionPattern(decisionId) {
+    const node = this.nodes.find(n => n.id === decisionId);
+    if (!node || node.type !== 'decision') return false;
+
+    const yesId = this.getSuccessor(decisionId, 'yes');
+    const noId = this.getSuccessor(decisionId, 'no');
+
+    // Check yes branch - if it goes to output/process and doesn't loop back
+    if (yesId) {
+        const yesNode = this.nodes.find(n => n.id === yesId);
+        if (yesNode && (yesNode.type === 'output' || yesNode.type === 'process')) {
+            // Follow the chain from output
+            const yesNext = this.getSuccessor(yesId, 'next');
+            if (yesNext && yesNext !== decisionId) {
+                // If yes branch doesn't loop back immediately, it's likely a chained pattern
+            }
+        }
+    }
+
+    // Check no branch - if it goes to another decision, it's a chain
+    if (noId) {
+        const noNode = this.nodes.find(n => n.id === noId);
+        if (noNode && noNode.type === 'decision') {
+            return true; // Classic if-elif chain pattern
+        }
+    }
+
+    return false;
+}
 /**
  * Check if a decision node is a loop header by following all paths
  */
