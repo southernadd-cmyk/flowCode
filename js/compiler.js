@@ -850,11 +850,13 @@ if (exitId) {
     
     // If we're in a nested loop AND the exit doesn't lead back to an outer loop,
     // then don't compile it (it's a premature exit to END)
-    if (inLoopBody && !leadsToLoopHeader) {
-        console.log(`  SKIPPING exit path - nested loop exit to END`);
-        // Skip this exit path - it's a final exit but we're still in an outer loop
-        return code;
-    }
+// CORRECT:
+const hasOuterLoop = contextStack.some(ctx => ctx.startsWith('loop_'));
+if (inLoopBody && !leadsToLoopHeader && hasOuterLoop) {
+    console.log(`  SKIPPING exit path - nested loop exit to END`);
+    // Only skip if we have an outer loop AND exit doesn't lead back to it
+    return code;
+}
     
     console.log(`  COMPILING exit path`);
     
