@@ -609,19 +609,32 @@ if (inLoopBody && isIndirectLoop && !isDirectLoop) {
 }
 // Case 3: Not in loop body but indirect loop → could be outer loop
 if (!inLoopBody && isIndirectLoop) {
-    // SIMPLE CHECK: If YES branch goes directly to END, it's not a loop
+    // SIMPLE CHECK: If YES branch goes directly to output→END, it's not a loop
+    // This handles edge cases like flowchart (30).json
     const yesNode = this.nodes.find(n => n.id === yesId);
     if (yesNode && yesNode.type === 'output') {
         const yesNext = this.getSuccessor(yesId, 'next');
         const yesNextNode = this.nodes.find(n => n.id === yesNext);
         if (yesNextNode && yesNextNode.type === 'end') {
-            console.log(`Decision ${node.id} has YES→output→END → treating as if/else`);
+            console.log(`Decision ${node.id} has YES→output→END → treating as if/else, not loop`);
             return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
                 inLoopBody, inLoopHeader);
         }
     }
     
-    // Otherwise proceed as loop
+    // Also check NO branch for output→END pattern
+    const noNode = noId ? this.nodes.find(n => n.id === noId) : null;
+    if (noNode && noNode.type === 'output') {
+        const noNext = this.getSuccessor(noId, 'next');
+        const noNextNode = this.nodes.find(n => n.id === noNext);
+        if (noNextNode && noNextNode.type === 'end') {
+            console.log(`Decision ${node.id} has NO→output→END → treating as if/else, not loop`);
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+                inLoopBody, inLoopHeader);
+        }
+    }
+    
+    // Otherwise proceed as normal loop
     const loopBodyId = isIndirectLoopYes ? yesId : noId;
     const exitId = isIndirectLoopYes ? noId : yesId;
     const useNoBranch = !isIndirectLoopYes && isIndirectLoopNo;
