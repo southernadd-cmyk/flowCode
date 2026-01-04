@@ -5,18 +5,22 @@ class FlowchartCompiler {
         this.nodes = nodes;
         this.connections = connections;
         this.useHighlighting = useHighlighting;
-        this.loweredImplicitLoops = new Set();   // prevents stack overflow on implicit loops
+        this.loweredImplicitLoops = new Set();
         this.nodesToSkip = new Set();
-
-
-        // Build adjacency maps for faster lookups
+        this.forPatternCache = new Map();
+        this.forPatternInProgress = new Set();
+        
+        // Dominator analysis
+        this.dominators = new Map();           // nodeId -> Set of dominators
+        this.immediateDominator = new Map();   // nodeId -> immediate dominator ID
+        this.backEdges = [];                   // List of back edges [from, to]
+        this.loopHeaders = new Set();          // Set of loop header nodes
+        this.naturalLoops = new Map();         // loopHeaderId -> Set of nodes in the loop
         this.outgoingMap = new Map();
         this.incomingMap = new Map();
-        this.loopHeaderCache = new Map(); // Cache for loop header detection
-        this.forPatternCache = new Map();
-this.forPatternInProgress = new Set();
-
         this.buildMaps();
+        this.computeDominators();      // Step 1: Compute dominators
+        this.findBackEdgesAndLoops();  // Step 2: Identify loops
     }
 
     
@@ -142,10 +146,7 @@ isTrueLoopHeader(nodeId) {
         // Clear maps and cache
         this.outgoingMap.clear();
         this.incomingMap.clear();
-        if (this.loopHeaderCache) {
-            this.loopHeaderCache.clear();
-        }
-        
+
         // Initialize maps for all nodes
         this.nodes.forEach(node => {
             this.outgoingMap.set(node.id, []);
@@ -165,7 +166,299 @@ isTrueLoopHeader(nodeId) {
             this.incomingMap.set(conn.to, incoming);
         });
     }
+/**
+ * Compute dominators using iterative dataflow analysis
+ * Node D dominates node N if every path from Start to N must go through D
+ */
+computeDominators() {
+    const startNode = this.nodes.find(n => n.type === 'start');
+    if (!startNode) return;
+    
+    const allNodeIds = this.nodes.map(n => n.id);
+    const startId = startNode.id;
+    
+    // Initialize dominator sets
+    this.dominators.clear();
+    
+    // All nodes except start: dominated by all nodes initially
+    const allNodesSet = new Set(allNodeIds);
+    for (const nodeId of allNodeIds) {
+        if (nodeId === startId) {
+            this.dominators.set(nodeId, new Set([startId])); // Start dominates only itself
+        } else {
+            this.dominators.set(nodeId, new Set(allNodesSet)); // All nodes initially
+        }
+    }
+    
+    // Iterative fixed-point algorithm
+    let changed = true;
+    while (changed) {
+        changed = false;
+        
+        // Process nodes in reverse post-order would be better, but simple iteration works
+        for (const nodeId of allNodeIds) {
+            if (nodeId === startId) continue;
+            
+            const predecessors = (this.incomingMap.get(nodeId) || []).map(conn => conn.sourceId);
+            if (predecessors.length === 0) continue;
+            
+            // Intersection of dominators of all predecessors
+            let newDomSet = null;
+            for (const pred of predecessors) {
+                const predDoms = this.dominators.get(pred);
+                if (!predDoms) continue;
+                
+                if (newDomSet === null) {
+                    newDomSet = new Set(predDoms);
+                } else {
+                    // Intersection: keep only nodes in both sets
+                    for (const dom of newDomSet) {
+                        if (!predDoms.has(dom)) {
+                            newDomSet.delete(dom);
+                        }
+                    }
+                }
+            }
+            
+            if (newDomSet) {
+                // Node always dominates itself
+                newDomSet.add(nodeId);
+                
+                // Check if changed
+                const oldDomSet = this.dominators.get(nodeId);
+                if (!this.setsEqual(oldDomSet, newDomSet)) {
+                    this.dominators.set(nodeId, newDomSet);
+                    changed = true;
+                }
+            }
+        }
+    }
+    
+    // Compute immediate dominators
+    this.computeImmediateDominators(startId);
+}
 
+/**
+ * Helper to compare two sets
+ */
+setsEqual(setA, setB) {
+    if (setA.size !== setB.size) return false;
+    for (const item of setA) {
+        if (!setB.has(item)) return false;
+    }
+    return true;
+}
+
+/**
+ * Compute immediate dominator (the unique dominator that is closest to the node)
+ */
+computeImmediateDominators(startId) {
+    this.immediateDominator.clear();
+    
+    // Start node has no immediate dominator
+    this.immediateDominator.set(startId, null);
+    
+    for (const [nodeId, domSet] of this.dominators) {
+        if (nodeId === startId) continue;
+        
+        // Get strict dominators (excluding self)
+        const strictDoms = new Set(domSet);
+        strictDoms.delete(nodeId);
+        
+        if (strictDoms.size === 0) {
+            this.immediateDominator.set(nodeId, null);
+            continue;
+        }
+        
+        // Find immediate dominator: 
+        // The strict dominator that is not dominated by any other strict dominator
+        let idom = null;
+        const strictDomArray = Array.from(strictDoms);
+        
+        for (let i = 0; i < strictDomArray.length; i++) {
+            const candidate = strictDomArray[i];
+            let isIDom = true;
+            
+            for (let j = 0; j < strictDomArray.length; j++) {
+                if (i === j) continue;
+                const other = strictDomArray[j];
+                const otherDoms = this.dominators.get(other);
+                if (otherDoms && otherDoms.has(candidate)) {
+                    // 'candidate' is dominated by 'other', so not immediate
+                    isIDom = false;
+                    break;
+                }
+            }
+            
+            if (isIDom) {
+                idom = candidate;
+                break;
+            }
+        }
+        
+        this.immediateDominator.set(nodeId, idom);
+    }
+}
+/**
+ * Find back edges and identify natural loops
+ * Back edge definition: edge X → Y where Y dominates X
+ * Loop header: The target of a back edge (Y)
+ */
+findBackEdgesAndLoops() {
+    this.backEdges = [];
+    this.loopHeaders.clear();
+    this.naturalLoops.clear();
+    
+    // Find all back edges
+    for (const node of this.nodes) {
+        const outgoing = this.outgoingMap.get(node.id) || [];
+        
+        for (const edge of outgoing) {
+            const fromId = node.id;
+            const toId = edge.targetId;
+            
+            // Check if 'toId' dominates 'fromId'
+            const fromDoms = this.dominators.get(fromId);
+            if (fromDoms && fromDoms.has(toId)) {
+                // Back edge found: fromId → toId where toId dominates fromId
+                this.backEdges.push({from: fromId, to: toId, port: edge.port});
+                this.loopHeaders.add(toId);
+                
+                console.log(`Back edge: ${fromId} → ${toId} (${edge.port}), Loop header: ${toId}`);
+            }
+        }
+    }
+    
+    // Compute natural loop for each back edge
+    for (const backEdge of this.backEdges) {
+        const loopNodes = this.computeNaturalLoop(backEdge.from, backEdge.to);
+        this.naturalLoops.set(backEdge.to, loopNodes);
+        console.log(`Loop header ${backEdge.to} contains: ${Array.from(loopNodes).join(', ')}`);
+    }
+}
+
+/**
+ * Compute natural loop for a back edge X → Y
+ * The loop consists of Y plus all nodes that can reach X without passing through Y
+ */
+computeNaturalLoop(backEdgeFrom, backEdgeTo) {
+    const loopNodes = new Set([backEdgeTo, backEdgeFrom]);
+    const stack = [backEdgeFrom];
+    const visited = new Set([backEdgeTo]); // Don't pass through header
+    
+    while (stack.length > 0) {
+        const current = stack.pop();
+        if (visited.has(current)) continue;
+        visited.add(current);
+        
+        loopNodes.add(current);
+        
+        // Add predecessors (except the header)
+        const predecessors = (this.incomingMap.get(current) || []).map(conn => conn.sourceId);
+        for (const pred of predecessors) {
+            if (pred !== backEdgeTo && !visited.has(pred)) {
+                stack.push(pred);
+            }
+        }
+    }
+    
+    return loopNodes;
+}
+/**
+ * Dominator-based loop detection (100% accurate)
+ * Returns true if node is a loop header
+ */
+isLoopHeader(nodeId) {
+    return this.loopHeaders.has(nodeId);
+}
+
+/**
+ * Check if a specific branch creates a back edge to the decision
+ */
+isBackEdgeTo(decisionId, branchId) {
+    if (!branchId) return false;
+    
+    // Check all back edges to see if any starts from branchId (or its descendants)
+    // and ends at decisionId
+    for (const backEdge of this.backEdges) {
+        if (backEdge.to === decisionId) {
+            // Check if branchId can reach backEdge.from
+            if (this.canReach(branchId, backEdge.from, new Set([decisionId]))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Check if startId can reach targetId without passing through avoidId
+ */
+canReach(startId, targetId, avoidSet = new Set()) {
+    if (startId === targetId) return true;
+    
+    const visited = new Set();
+    const stack = [startId];
+    
+    while (stack.length > 0) {
+        const current = stack.pop();
+        if (visited.has(current) || avoidSet.has(current)) continue;
+        visited.add(current);
+        
+        if (current === targetId) return true;
+        
+        const outgoing = this.outgoingMap.get(current) || [];
+        for (const edge of outgoing) {
+            stack.push(edge.targetId);
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Get loop information for a loop header
+ */
+getLoopInfo(headerId) {
+    // Find all back edges to this header
+    const edgesToHeader = this.backEdges.filter(edge => edge.to === headerId);
+    if (edgesToHeader.length === 0) return null;
+    
+    // For simplicity, take the first back edge
+    const backEdge = edgesToHeader[0];
+    
+    // Determine which branch contains the loop body
+    const yesId = this.getSuccessor(headerId, 'yes');
+    const noId = this.getSuccessor(headerId, 'no');
+    
+    let loopBodyId = null;
+    let exitId = null;
+    let useNoBranch = false;
+    
+    // Check if YES branch leads to the back edge
+    if (yesId && this.canReach(yesId, backEdge.from, new Set([headerId]))) {
+        loopBodyId = yesId;
+        exitId = noId;
+        useNoBranch = false;
+    }
+    // Check if NO branch leads to the back edge
+    else if (noId && this.canReach(noId, backEdge.from, new Set([headerId]))) {
+        loopBodyId = noId;
+        exitId = yesId;
+        useNoBranch = true;
+    }
+    
+    if (loopBodyId) {
+        return {
+            bodyId: loopBodyId,
+            exitId: exitId,
+            useNoBranch: useNoBranch,
+            backEdgeFrom: backEdge.from
+        };
+    }
+    
+    return null;
+}
     getSuccessor(nodeId, port = 'next') {
         const outgoing = this.outgoingMap.get(nodeId) || [];
         const conn = outgoing.find(c => c.port === port);
@@ -542,120 +835,75 @@ return code;
      * Compile decision node (could be if, while, or for)
      */
 
-    compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
-        const yesId = this.getSuccessor(node.id, 'yes');
-        const noId = this.getSuccessor(node.id, 'no');
+    /**
+ * Compile decision node using dominator-based loop detection
+ */
+compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
+    const yesId = this.getSuccessor(node.id, 'yes');
+    const noId = this.getSuccessor(node.id, 'no');
     
-        // If already a loop in context
-        const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
-        if (isAlreadyLoop) {
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-                inLoopBody, inLoopHeader);
-        }
+    // If already a loop in context
+    const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+    if (isAlreadyLoop) {
+        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+            inLoopBody, inLoopHeader);
+    }
     
-        // ============================================
-        // KEY: Check for DIRECT loops vs INDIRECT loops
-        // ============================================
+    // ============================================
+    // DOMINATOR-BASED LOOP DETECTION
+    // ============================================
+    
+    if (this.isLoopHeader(node.id)) {
+        console.log(`Dominator analysis: ${node.id} is a loop header`);
         
-        const isDirectLoopYes = this.isDirectLoopHeader(node.id, yesId);
-        const isDirectLoopNo = noId ? this.isDirectLoopHeader(node.id, noId) : false;
-        const isDirectLoop = isDirectLoopYes || isDirectLoopNo;
-        
-        // Also check OLD method for backward compatibility
-        const isIndirectLoopYes = this.isLoopHeader(node.id, yesId);
-        const isIndirectLoopNo = noId ? this.isLoopHeader(node.id, noId) : false;
-        const isIndirectLoop = isIndirectLoopYes || isIndirectLoopNo;
-        
-        console.log(`Decision ${node.id}: directLoop=${isDirectLoop}, indirectLoop=${isIndirectLoop}, inLoopBody=${inLoopBody}`);
-    
-        // Case 1: DIRECT loop → compile as while/for loop
-        if (isDirectLoop) {
-            const loopBodyId = isDirectLoopYes ? yesId : noId;
-            const exitId = isDirectLoopYes ? noId : yesId;
-            const useNoBranch = !isDirectLoopYes && isDirectLoopNo;
-    
+        const loopInfo = this.getLoopInfo(node.id);
+        if (loopInfo) {
             return this.compileLoop(
                 node,
-                loopBodyId,
-                exitId,
+                loopInfo.bodyId,
+                loopInfo.exitId,
                 visitedInPath,
                 contextStack,
                 indentLevel,
-                useNoBranch,
-                false,  // We're entering a loop body
-                true   // This is a loop header
+                loopInfo.useNoBranch,
+                false,  // Not in loop body yet
+                true    // This is a loop header
             );
         }
-        
-// Case 2: We're in a loop body AND it's an INDIRECT loop → compile as if/else with break detection
-if (inLoopBody && isIndirectLoop && !isDirectLoop) {
-    console.log(`Indirect loop inside loop body → checking for break conditions`);
-    
-    // Check if either branch exits the loop
-    const yesExits = this.doesBranchExitLoop(yesId, contextStack, node.id);
-    const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
-    
-    console.log(`  ${node.id}: yesExits=${yesExits}, noExits=${noExits}`);
-    
-    // If a branch exits, use special compilation with break
-    if (yesExits || noExits) {
-        return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits, 
-                                           visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
     }
     
-    // Otherwise regular if/else
-    return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-        inLoopBody, inLoopHeader);
-}
-// Case 3: Not in loop body but indirect loop → could be outer loop
-if (!inLoopBody && isIndirectLoop) {
-    // SIMPLE CHECK: If YES branch goes directly to output→END, it's not a loop
-    // This handles edge cases like flowchart (30).json
+    // ============================================
+    // SPECIAL CASE: Output followed by END
+    // (Kept from previous fix for edge cases)
+    // ============================================
     const yesNode = this.nodes.find(n => n.id === yesId);
     if (yesNode && yesNode.type === 'output') {
         const yesNext = this.getSuccessor(yesId, 'next');
         const yesNextNode = this.nodes.find(n => n.id === yesNext);
         if (yesNextNode && yesNextNode.type === 'end') {
-            console.log(`Decision ${node.id} has YES→output→END → treating as if/else, not loop`);
+            console.log(`Decision ${node.id} has YES→output→END → treating as if/else`);
             return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
                 inLoopBody, inLoopHeader);
         }
     }
     
-    // Also check NO branch for output→END pattern
     const noNode = noId ? this.nodes.find(n => n.id === noId) : null;
     if (noNode && noNode.type === 'output') {
         const noNext = this.getSuccessor(noId, 'next');
         const noNextNode = this.nodes.find(n => n.id === noNext);
         if (noNextNode && noNextNode.type === 'end') {
-            console.log(`Decision ${node.id} has NO→output→END → treating as if/else, not loop`);
+            console.log(`Decision ${node.id} has NO→output→END → treating as if/else`);
             return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
                 inLoopBody, inLoopHeader);
         }
     }
     
-    // Otherwise proceed as normal loop
-    const loopBodyId = isIndirectLoopYes ? yesId : noId;
-    const exitId = isIndirectLoopYes ? noId : yesId;
-    const useNoBranch = !isIndirectLoopYes && isIndirectLoopNo;
-
-    return this.compileLoop(
-        node,
-        loopBodyId,
-        exitId,
-        visitedInPath,
-        contextStack,
-        indentLevel,
-        useNoBranch,
-        false,
-        true
-    );
+    // ============================================
+    // DEFAULT: Regular if/else
+    // ============================================
+    return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+        inLoopBody, inLoopHeader);
 }
-        
-        // Case 4: Not a loop at all → if/else
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-            inLoopBody, inLoopHeader);
-    }
 
     /**
  * Check if a branch leads DIRECTLY back to the decision without passing through
@@ -665,108 +913,9 @@ if (!inLoopBody && isIndirectLoop) {
  * Check if a decision is a DIRECT loop header (branches back to itself)
  * vs INDIRECT (goes through outer loop/other flow)
  */
-isDirectLoopHeader(nodeId, branchId) {
-    if (!branchId) return false;
 
-    const MAX_DEPTH = 50;
-    const visited = new Set();
 
-    const dfs = (id, depth = 0, passedThroughOtherDecision = false) => {
-        if (!id) return false;
-        if (depth > MAX_DEPTH) return false;
 
-        // Found our loop header
-        if (id === nodeId) {
-            // Direct loop: comes back WITHOUT passing through another decision
-            return !passedThroughOtherDecision;
-        }
-
-        if (visited.has(id)) return false;
-        visited.add(id);
-
-        const node = this.nodes.find(n => n.id === id);
-        let newPassedThroughOtherDecision = passedThroughOtherDecision;
-        
-        // Check if we pass through ANOTHER decision node
-        if (node && node.type === 'decision' && node.id !== nodeId) {
-            newPassedThroughOtherDecision = true;
-        }
-
-        const outgoing = this.outgoingMap.get(id) || [];
-        for (const edge of outgoing) {
-            if (dfs(edge.targetId, depth + 1, newPassedThroughOtherDecision)) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    return dfs(branchId, 0, false);
-}
-isChainedDecisionPattern(decisionId) {
-    const node = this.nodes.find(n => n.id === decisionId);
-    if (!node || node.type !== 'decision') return false;
-
-    const yesId = this.getSuccessor(decisionId, 'yes');
-    const noId = this.getSuccessor(decisionId, 'no');
-
-    // Check yes branch - if it goes to output/process and doesn't loop back
-    if (yesId) {
-        const yesNode = this.nodes.find(n => n.id === yesId);
-        if (yesNode && (yesNode.type === 'output' || yesNode.type === 'process')) {
-            // Follow the chain from output
-            const yesNext = this.getSuccessor(yesId, 'next');
-            if (yesNext && yesNext !== decisionId) {
-                // If yes branch doesn't loop back immediately, it's likely a chained pattern
-            }
-        }
-    }
-
-    // Check no branch - if it goes to another decision, it's a chain
-    if (noId) {
-        const noNode = this.nodes.find(n => n.id === noId);
-        if (noNode && noNode.type === 'decision') {
-            return true; // Classic if-elif chain pattern
-        }
-    }
-
-    return false;
-}
-/**
- * Check if a decision node is a loop header by following all paths
- */
- isLoopHeader(nodeId, branchId) {
-
-if (!branchId) return false;
-
-const MAX_DEPTH = 200;
-const visited = new Set();
-
-const dfs = (id, depth = 0) => {
-
-    if (!id) return false;
-    if (depth > MAX_DEPTH) return false;
-
-    // Real loop only if it comes back to THIS decision
-    if (id === nodeId) return true;
-
-    if (visited.has(id)) return false;
-    visited.add(id);
-
-    const outgoing = this.outgoingMap.get(id) || [];
-
-    for (const edge of outgoing) {
-        if (dfs(edge.targetId, depth + 1)) {
-            return true;
-        }
-    }
-
-    return false;
-};
-
-return dfs(branchId, 0);
-}
 
 
 // ensure increment -> header path has NO other decisions
