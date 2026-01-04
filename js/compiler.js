@@ -19,6 +19,12 @@ this.forPatternInProgress = new Set();
         this.buildMaps();
     }
 
+    
+    emitHighlight(nodeId, indentLevel) {
+        if (!this.useHighlighting) return "";
+        const indent = "    ".repeat(indentLevel);
+        return `${indent}highlight('${nodeId}')\n`;
+    }    
 // Returns true if this node is the init assignment of a detected for-loop
 isInitOfForLoop(nodeId) {
 
@@ -167,235 +173,146 @@ return headers;
     /**
      * Compile a node with context tracking
      */
-     compileNode(nodeId, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
-    if (!nodeId) return "";
+    compileNode(nodeId, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
+        if (!nodeId) return "";
     
-    const node = this.nodes.find(n => n.id === nodeId);
-    if (!node) return "";
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return "";
     
-    // ========== HANDLE END NODES FIRST ==========
-    if (node.type === 'end') {
-        const indent = "    ".repeat(indentLevel);
+        // ✅ END NODE: no per-visit highlight, no children
+        if (node.type === "end") {
+            // Do not emit highlight here – the END is highlighted once in compile()
+            return "";
+        }
+    
+        // ✅ everyone else gets highlighted on entry
         let code = "";
-        
-        // Add highlight if in execution mode
-        if (this.useHighlighting) {
-           // code += `${indent}highlight('${node.id}')\n`;
-          //  code += `${indent}# END NODE REACHED\n`;
+        code += this.emitHighlight(nodeId, indentLevel);
+    
+        // ===========================
+        // END NODE FINISHES FLOW
+        // ===========================
+        if (node.type === "end") {
+            return code; // highlight already emitted
         }
-        
-        // End nodes should STOP compilation - don't continue to any successors
-        return code;
-    }
     
-    // prevent infinite recursion by node revisits along same path
-    if (visitedInPath.has(nodeId)) {
-        return "";
-    }
-    visitedInPath.add(nodeId);
+        // ===========================
+        // cycle protection PER CONTEXT
+        // ===========================
+        if (visitedInPath.has(nodeId)) return "";
+        visitedInPath.add(nodeId);
+
     
- 
-// --- suppress for-loop init statements (like `i = x`) ---
-// but STILL continue to successors AND HIGHLIGHT
-if (this.isInitOfForLoop(nodeId)) {
-    const indent = "    ".repeat(indentLevel);
-    let highlightCode = "";
-    
-    // ADD HIGHLIGHT FOR INIT NODES
-    if (this.useHighlighting) {
-        highlightCode += `${indent}highlight('${nodeId}')\n`;
-    }
-    
-// normal skip — not a loop header
-const succ = this.getAllSuccessors(nodeId);
-let out = highlightCode;
-for (const { nodeId: nxt } of succ) {
-    // Check if this is a back edge to a loop header that's in our context
-    let isBackEdgeToCurrentLoop = false;
-    for (const ctx of contextStack) {
-        if (ctx.startsWith('loop_')) {
-            const loopHeaderId = ctx.replace('loop_', '');
-            if (nxt === loopHeaderId) {
-                isBackEdgeToCurrentLoop = true;
-                break;
+        // ===========================
+        // skip for-loop init nodes
+        // ===========================
+        if (this.isInitOfForLoop(nodeId)) {
+            const succ = this.getAllSuccessors(nodeId);
+            for (const { nodeId: nxt } of succ) {
+                code += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel, inLoopBody, inLoopHeader);
             }
+            return code;
         }
-    }
     
-    if (!isBackEdgeToCurrentLoop) {
-        out += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    }
-}
-return out;
-}
-
-// 2) any nodes explicitly skipped for this loop body (typically increments)
-// make them *control-flow transparent*: don't emit code, but STILL HIGHLIGHT
-if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
+        // ===========================
+        // skip nodes marked in nodesToSkip
+        // ===========================
+        if (this.nodesToSkip && this.nodesToSkip.has(nodeId)) {
     
-    const indent = "    ".repeat(indentLevel);
-    let highlightCode = "";
+            // if it's the synthetic loop header → handle exit/body routing
+            if (nodeId === this.loopHeaderId) {
+                const yesId = this.getSuccessor(nodeId, "yes");
+                const noId  = this.getSuccessor(nodeId, "no");
     
-    // ADD HIGHLIGHT FOR SKIPPED NODES
-    if (this.useHighlighting) {
-        highlightCode += `${indent}highlight('${nodeId}')\n`;
-    }
+                const isInThisLoop = contextStack.some(ctx => ctx === `loop_${nodeId}`);
+                const forInfo = this.detectForLoopPattern(nodeId);
     
-    // if this is the loop header produced by for-loop lowering
-    if (nodeId === this.loopHeaderId) {
-        
-    // Check if we're in THIS specific loop's context
-    const isInThisLoopContext = contextStack.some(ctx => ctx === `loop_${nodeId}`);
+                if (forInfo && (isInThisLoop || inLoopBody)) {
+                    return code; // highlight already emitted
+                }
     
-    // Check if this is a for-loop
-    const forInfo = this.detectForLoopPattern(nodeId);
+                if (isInThisLoop || inLoopBody) {
+                    return code + this.compileNode(yesId, visitedInPath, [...contextStack], indentLevel, true, false);
+                } else {
+                    return code + this.compileNode(noId, visitedInPath, [...contextStack], indentLevel, false, false);
+                }
+            }
     
-    // If this is a for-loop header AND we're reaching it from within its loop
-    // (either in context or in loop body), just highlight and stop
-    // The Python for-loop handles the iteration control
-    if (forInfo && (isInThisLoopContext || inLoopBody)) {
-        return highlightCode;  // Just highlight, don't compile branches
-    }
-    
-    // Original logic for while loops...
-    const yesId = this.getSuccessor(nodeId, 'yes');
-    const exitId = this.getSuccessor(nodeId, 'no');
-    
-    if (isInThisLoopContext || inLoopBody) {
-        return highlightCode + this.compileNode(yesId, visitedInPath, [...contextStack], indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    } else {
-        return highlightCode + this.compileNode(exitId, visitedInPath, [...contextStack], indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    }
-}
-
-// normal skip — not a loop header
-    const succ = this.getAllSuccessors(nodeId);
-    let out = highlightCode; // Start with highlight
-    for (const { nodeId: nxt } of succ) {
-        out += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    }
-    return out;
-}
-    // ================= IMPLICIT FOREVER LOOP HANDLING =================
-    
-    // Do we have implicit loop headers computed?
-    if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
-        
-        // Already lowered once → do NOT lower again → just continue to successor
-        if (this.loweredImplicitLoops.has(nodeId)) {
-            const next = this.getSuccessor(nodeId, "next");
-            return this.compileNode(next, visitedInPath, contextStack, indentLevel,
-        inLoopBody,
-        inLoopHeader);
+            // otherwise: transparent skip
+            const succ = this.getAllSuccessors(nodeId);
+            for (const { nodeId: nxt } of succ) {
+                code += this.compileNode(nxt, visitedInPath, [...contextStack], indentLevel, inLoopBody, inLoopHeader);
+            }
+            return code;
         }
-        
-        // Mark lowered so we don't recurse forever
-        this.loweredImplicitLoops.add(nodeId);
-        
-        // Emit while True loop safely
-        return this.compileImplicitForeverLoop(
-            nodeId,
-            visitedInPath,
-            contextStack,
-            indentLevel,
-        inLoopBody,
-        inLoopHeader
-        );
-    }
-    // ================================================================
     
-    const indent = "    ".repeat(indentLevel);
-    let code = "";
+
+        if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
+            if (this.loweredImplicitLoops.has(nodeId)) {
+                const next = this.getSuccessor(nodeId, "next");
+                return code + this.compileNode(next, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+            }
     
-    // Add highlight if enabled - FOR ALL NODE TYPES
-    if (this.useHighlighting) {
-        code += `${indent}highlight('${node.id}')\n`;
-    }
+            this.loweredImplicitLoops.add(nodeId);
     
-    // Handle different node types
-    switch (node.type) {
-        case 'decision':
-            return this.compileDecision(node, visitedInPath, contextStack, indentLevel,
-        inLoopBody,
-        inLoopHeader);
-            
-        case 'start':
-            // Just continue to next node
-            break;
-            
-        case 'end':
-            // Already handled at the beginning
-            break;
-            
-        case 'output':
-            code += `${indent}print(${node.text})\n`;
-            break;
-            
-        case 'input':
-            const wrap = node.dtype === 'int' ? 'int(input(' : 'input(';
-            code += `${indent}${node.varName} = ${wrap}${node.prompt})\n`;
-            //code += `${indent}${node.varName} = ${wrap}"${node.prompt}")\n`;
-            if (node.dtype === 'int') code = code.trimEnd() + ")\n";
-            break;
-            
-        default:
-            // Process, var, etc.
-            if (node.text) code += `${indent}${node.text}\n`;
-            break;
-    }
+            return code + this.compileImplicitForeverLoop(
+                nodeId,
+                visitedInPath,
+                contextStack,
+                indentLevel,
+                inLoopBody,
+                inLoopHeader
+            );
+        }
     
-    // Get next node (default 'next' port)
-    const nextNodeId = this.getSuccessor(nodeId, 'next');
+        // ===========================
+        // emit real code for node (AFTER highlight)
+        // ===========================
+        const indent = "    ".repeat(indentLevel);
     
-    // If we're in a loop context, check if next node is any loop header in the stack
-    // If so, don't follow it (it's a back edge)
-    if (contextStack.length > 0) {
-        for (const ctx of contextStack) {
-            if (ctx.startsWith('loop_')) {
-                const loopHeaderId = ctx.replace('loop_', '');
-                if (nextNodeId === loopHeaderId) {
-                    // This is a back edge to a loop header, stop here
-                    return code;
+        switch (node.type) {
+    
+            case "decision":
+                return code + this.compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+    
+            case "output":
+                code += `${indent}print(${node.text})\n`;
+                break;
+    
+            case "input":
+                const wrap = node.dtype === "int" ? "int(input(" : "input(";
+                code += `${indent}${node.varName} = ${wrap}${node.prompt})\n`;
+                if (node.dtype === "int") code = code.trimEnd() + ")\n";
+                break;
+    
+            case "process":
+            case "var":
+            case "list":
+                if (node.text) code += `${indent}${node.text}\n`;
+                break;
+    
+            case "start":
+            default:
+                break;
+        }
+    
+        // ===========================
+        // follow next unless it’s a loop back edge
+        // ===========================
+        const nextNodeId = this.getSuccessor(nodeId, "next");
+    
+        if (contextStack.some(ctx => ctx.startsWith("loop_"))) {
+            for (const ctx of contextStack) {
+                if (ctx.startsWith("loop_")) {
+                    const hdr = ctx.replace("loop_", "");
+                    if (nextNodeId === hdr) return code;
                 }
             }
         }
+    
+        return code + this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
     }
     
-    // Also check if next node is a decision that's already in the context stack
-    // This prevents infinite recursion when multiple loops share nodes
-    if (nextNodeId) {
-        const nextNode = this.nodes.find(n => n.id === nextNodeId);
-        if (nextNode && nextNode.type === 'decision') {
-            const isAlreadyInStack = contextStack.some(ctx => ctx === `loop_${nextNodeId}`);
-            if (isAlreadyInStack) {
-                // This decision is already being compiled as a loop, don't follow it
-                return code;
-            }
-        }
-        
-        // Check if next node is already visited in current context to prevent cycles
-        const nextContextId = `${nextNodeId}_${contextStack.join('_')}_${indentLevel}`;
-        if (visitedInPath.has(nextContextId)) {
-            // This node is already being compiled in this context, stop to prevent cycle
-            return code;
-        }
-    }
-    
-    // Continue compilation
-    code += this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel,
-    inLoopBody,
-    inLoopHeader);
-    
-    return code;
-}
 
 
 
