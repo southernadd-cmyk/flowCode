@@ -90,7 +90,54 @@ if (start) dfs(start.id);
 
 return headers;
 }
-
+/**
+ * Check if ALL paths from a decision eventually loop back
+ * Returns false if any path exits without looping
+ */
+isTrueLoopHeader(nodeId) {
+    const yesId = this.getSuccessor(nodeId, 'yes');
+    const noId = this.getSuccessor(nodeId, 'no');
+    
+    // Track all exit nodes (nodes that lead to END without looping back)
+    const exitNodes = new Set();
+    
+    const checkBranch = (startId, visited = new Set()) => {
+        if (!startId || visited.has(startId)) return true; // Assume loops
+        
+        visited.add(startId);
+        
+        // Found END → this is an exit path
+        const node = this.nodes.find(n => n.id === startId);
+        if (node && node.type === 'end') {
+            exitNodes.add(startId);
+            return false; // Found exit!
+        }
+        
+        // Found our loop header → loops
+        if (startId === nodeId) return true;
+        
+        // Check all successors
+        const outgoing = this.outgoingMap.get(startId) || [];
+        let allPathsLoop = outgoing.length > 0; // Default true if no outgoing
+        
+        for (const edge of outgoing) {
+            if (!checkBranch(edge.targetId, new Set([...visited]))) {
+                allPathsLoop = false;
+                // Don't break, continue to find all exits
+            }
+        }
+        
+        return allPathsLoop;
+    };
+    
+    const yesLoops = checkBranch(yesId, new Set());
+    const noLoops = noId ? checkBranch(noId, new Set()) : true;
+    
+    console.log(`isTrueLoopHeader(${nodeId}): yesLoops=${yesLoops}, noLoops=${noLoops}, exitNodes=${Array.from(exitNodes)}`);
+    
+    // True loop: BOTH branches eventually loop back
+    return yesLoops && noLoops;
+}
     buildMaps() {
         // Clear maps and cache
         this.outgoingMap.clear();
@@ -560,24 +607,37 @@ if (inLoopBody && isIndirectLoop && !isDirectLoop) {
     return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
         inLoopBody, inLoopHeader);
 }
-        // Case 3: Not in loop body but indirect loop → could be outer loop
-        if (!inLoopBody && isIndirectLoop) {
-            const loopBodyId = isIndirectLoopYes ? yesId : noId;
-            const exitId = isIndirectLoopYes ? noId : yesId;
-            const useNoBranch = !isIndirectLoopYes && isIndirectLoopNo;
-    
-            return this.compileLoop(
-                node,
-                loopBodyId,
-                exitId,
-                visitedInPath,
-                contextStack,
-                indentLevel,
-                useNoBranch,
-                false,
-                true
-            );
+// Case 3: Not in loop body but indirect loop → could be outer loop
+if (!inLoopBody && isIndirectLoop) {
+    // SIMPLE CHECK: If YES branch goes directly to END, it's not a loop
+    const yesNode = this.nodes.find(n => n.id === yesId);
+    if (yesNode && yesNode.type === 'output') {
+        const yesNext = this.getSuccessor(yesId, 'next');
+        const yesNextNode = this.nodes.find(n => n.id === yesNext);
+        if (yesNextNode && yesNextNode.type === 'end') {
+            console.log(`Decision ${node.id} has YES→output→END → treating as if/else`);
+            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
+                inLoopBody, inLoopHeader);
         }
+    }
+    
+    // Otherwise proceed as loop
+    const loopBodyId = isIndirectLoopYes ? yesId : noId;
+    const exitId = isIndirectLoopYes ? noId : yesId;
+    const useNoBranch = !isIndirectLoopYes && isIndirectLoopNo;
+
+    return this.compileLoop(
+        node,
+        loopBodyId,
+        exitId,
+        visitedInPath,
+        contextStack,
+        indentLevel,
+        useNoBranch,
+        false,
+        true
+    );
+}
         
         // Case 4: Not a loop at all → if/else
         return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
