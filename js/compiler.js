@@ -1388,7 +1388,7 @@ let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLo
 
 // Add break if this branch exits loop
 if (yesExits && !ifCode.includes('break')) {
-ifCode = ifCode.trim();
+ifCode = ifCode.replace(/\s+$/g, "");
 if (ifCode) {
 ifCode += `\n${indent}    break`;
 } else {
@@ -1407,7 +1407,7 @@ let elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,
 
 // Add break if this branch exits loop
 if (noExits && !elseCode.includes('break')) {
-elseCode = elseCode.trim();
+elseCode = elseCode.replace(/\s+$/g, "");
 if (elseCode) {
 elseCode += `\n${indent}    break`;
 } else {
