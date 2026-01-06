@@ -813,22 +813,6 @@ return code;
  compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
-    
-    // ============================================
-    // NEW: Check if we're in a loop and branches exit
-    // ============================================
-    if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_'))) {
-        // Check if branches exit the current loop
-        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
-        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
-        
-        // If any branch exits, use special loop exit decision compilation
-        if (yesExits || noExits) {
-            return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits,
-                visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
-        }
-    }
-    
         const indent = "    ".repeat(indentLevel);
     let code = "";
     
@@ -2043,21 +2027,6 @@ return null;
  compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
-    
-    // ============================================
-    // NEW: Check if we're in a loop and branches exit
-    // ============================================
-    if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_'))) {
-        // Check if branches exit the current loop
-        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
-        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
-        
-        // If any branch exits, use special loop exit decision compilation
-        if (yesExits || noExits) {
-            return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits,
-                visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
-        }
-    }
     
     // Check if this decision is part of a "find largest/smallest" pattern
     // where we have nested decisions that should stay as separate if/else blocks
