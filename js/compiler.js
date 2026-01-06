@@ -725,51 +725,55 @@ isConvergencePoint(nodeId) {
             }
         }
     // FORCE while True loop for process nodes with back edges
-if (node.type === "process" || node.type === "var") {
+// FORCE while True loop for process/var nodes with back edges,
+// BUT ONLY when we're *not already inside* a recognised loop.
+if ((node.type === "process" || node.type === "var") &&
+    !inLoopBody &&
+    !contextStack.some(ctx => ctx.startsWith("loop_") || ctx.startsWith("implicit_"))) {
+
     // Check if this node has any back edge to itself
-    const hasBackEdge = this.backEdges.some(edge => 
+    const hasBackEdge = this.backEdges.some(edge =>
         edge.to === nodeId && edge.from !== nodeId
     );
-    
+
     // Also check if any successor eventually leads back here
-    const hasLoop = this.canReach(this.getSuccessor(nodeId, 'next'), nodeId, new Set());
-    
+    const nextForLoopCheck = this.getSuccessor(nodeId, 'next');
+    const hasLoop = nextForLoopCheck
+        ? this.canReach(nextForLoopCheck, nodeId, new Set())
+        : false;
+
     if (hasBackEdge || hasLoop) {
-        // Check if we haven't already compiled this loop
         if (!this.loweredImplicitLoops.has(nodeId)) {
-            console.log(`FORCING while True loop for ${nodeId} (process with back edge)`);
+            console.log(`FORCING while True loop for ${nodeId} (top-level implicit loop)`);
             this.loweredImplicitLoops.add(nodeId);
-            
+
             const indent = "    ".repeat(indentLevel);
             let loopCode = `${indent}while True:\n`;
-            
+
             if (this.useHighlighting) {
                 loopCode += `${indent}    highlight('${nodeId}')\n`;
             }
-            
-            // Compile this node inside the loop
+
             const nodeCode = this.compileSingleNode(nodeId, indentLevel + 1);
-            
-            // Compile the rest
-            const nextId = this.getSuccessor(nodeId, "next");
             const bodyCode = this.compileNode(
-                nextId,
+                this.getSuccessor(nodeId, "next"),
                 new Set(),
                 [...contextStack, `implicit_${nodeId}`],
                 indentLevel + 1,
-                true,  // inLoopBody
-                false  // inLoopHeader
+                /* inLoopBody   */ true,
+                /* inLoopHeader */ false
             );
-            
+
             const fullBody = (nodeCode + bodyCode).trim()
                 ? nodeCode + bodyCode
                 : `${indent}    pass\n`;
-            
+
             loopCode += fullBody;
             return code + loopCode;
         }
     }
 }
+
         // ===========================
         // emit real code for node (AFTER highlight)
         // ===========================
@@ -1032,117 +1036,156 @@ return code;
 /**
  * Compile decision node using dominator-based loop detection
  */
-compileDecision(node, visitedInPath, contextStack, indentLevel, inLoopBody = false, inLoopHeader = false) {
-    const yesId = this.getSuccessor(node.id, 'yes');
-    const noId = this.getSuccessor(node.id, 'no');
-    
-    // If already a loop in context
-    const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
-    if (isAlreadyLoop) {
-        return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-            inLoopBody, inLoopHeader);
-    }
-    
-    // ============================================
-    // SIMPLE WHILE-LOOP PATTERN DETECTION
-    // ============================================
-    // Check for classic while-loop pattern BEFORE dominator analysis
-    const isSimpleWhile = this.isWhileLoopPattern(node.id);
-    
-    if (isSimpleWhile) {
-        console.log(`Simple while-loop pattern detected at ${node.id}: ${node.text}`);
-        
-        // Determine which branch is the loop body
-// Determine which branch is the loop body
-const yesLoops = this.canReach(yesId, node.id, new Set());
-const noLoops = noId ? this.canReach(noId, node.id, new Set()) : false;
-        
-        let loopBodyId, exitId, useNoBranch;
-        
-        if (yesLoops && !noLoops) {
-            // YES is loop body, NO is exit (standard while)
-            loopBodyId = yesId;
-            exitId = noId;
-            useNoBranch = false;
-        } else if (!yesLoops && noLoops) {
-            // NO is loop body, YES is exit (inverted while)
-            loopBodyId = noId;
-            exitId = yesId;
-            useNoBranch = true;
-        } else {
-            // Both or neither loop - not a simple while
-            console.log(`Not a simple while loop: both branches loop or neither loops`);
-        }
-        
-        if (loopBodyId) {
-            return this.compileLoop(
-                node,
-                loopBodyId,
-                exitId,
-                visitedInPath,
-                contextStack,
-                indentLevel,
-                useNoBranch,
-                false,
-                true
-            );
-        }
-    }
-    
-    // ============================================
-    // DOMINATOR-BASED LOOP DETECTION (for complex cases)
-    // ============================================
-    if (this.isLoopHeader(node.id)) {
-        console.log(`Dominator analysis: ${node.id} is a loop header`);
-        
-        const loopInfo = this.getLoopInfo(node.id);
-        if (loopInfo) {
-            return this.compileLoop(
-                node,
-                loopInfo.bodyId,
-                loopInfo.exitId,
-                visitedInPath,
-                contextStack,
-                indentLevel,
-                loopInfo.useNoBranch,
-                false,
-                true
-            );
-        }
-    }
-    
-    // ============================================
-    // SPECIAL CASE: Output followed by END
-    // (Kept from previous fix for edge cases)
-    // ============================================
-    const yesNode = this.nodes.find(n => n.id === yesId);
-    if (yesNode && yesNode.type === 'output') {
-        const yesNext = this.getSuccessor(yesId, 'next');
-        const yesNextNode = this.nodes.find(n => n.id === yesNext);
-        if (yesNextNode && yesNextNode.type === 'end') {
-            console.log(`Decision ${node.id} has YES→output→END → treating as if/else`);
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-                inLoopBody, inLoopHeader);
-        }
-    }
-    
-    const noNode = noId ? this.nodes.find(n => n.id === noId) : null;
-    if (noNode && noNode.type === 'output') {
-        const noNext = this.getSuccessor(noId, 'next');
-        const noNextNode = this.nodes.find(n => n.id === noNext);
-        if (noNextNode && noNextNode.type === 'end') {
-            console.log(`Decision ${node.id} has NO→output→END → treating as if/else`);
-            return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-                inLoopBody, inLoopHeader);
-        }
-    }
-    
-    // ============================================
-    // DEFAULT: Regular if/else
-    // ============================================
-    return this.compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
-        inLoopBody, inLoopHeader);
+compileDecision(node, visitedInPath, contextStack, indentLevel,
+    inLoopBody = false,
+    inLoopHeader = false) {
+const yesId = this.getSuccessor(node.id, 'yes');
+const noId  = this.getSuccessor(node.id, 'no');
+
+// If we're already inside this loop header, don't try to re-lower it
+const isAlreadyLoop = contextStack.some(ctx => ctx === `loop_${node.id}`);
+if (isAlreadyLoop) {
+return this.compileIfElse(
+node, yesId, noId,
+visitedInPath, contextStack, indentLevel,
+inLoopBody, inLoopHeader
+);
 }
+
+// ============================================
+// 1) SIMPLE WHILE-LOOP PATTERN (direct branch back)
+// ============================================
+const isSimpleWhile = this.isWhileLoopPattern(node.id);
+
+if (isSimpleWhile) {
+console.log(`Simple while-loop pattern detected at ${node.id}: ${node.text}`);
+
+const yesLoops = this.canReach(yesId, node.id, new Set());
+const noLoops  = noId ? this.canReach(noId, node.id, new Set()) : false;
+
+let loopBodyId = null;
+let exitId     = null;
+let useNoBranch = false;
+
+if (yesLoops && !noLoops) {
+// YES branch is loop body, NO is exit
+loopBodyId  = yesId;
+exitId      = noId;
+useNoBranch = false;
+} else if (!yesLoops && noLoops) {
+// NO branch is loop body, YES is exit (inverted condition)
+loopBodyId  = noId;
+exitId      = yesId;
+useNoBranch = true;
+} else {
+console.log(`Not a simple while loop at ${node.id} (both or neither branches loop)`);
+}
+
+if (loopBodyId) {
+return this.compileLoop(
+    node,
+    loopBodyId,
+    exitId,
+    visitedInPath,
+    contextStack,
+    indentLevel,
+    useNoBranch,
+    /* inLoopBody   */ false,
+    /* inLoopHeader */ true
+);
+}
+}
+
+// ============================================
+// 2) DOMINATOR-BASED LOOP DETECTION
+//    (handles complex / multi-exit loops)
+// ============================================
+if (this.isLoopHeader(node.id)) {
+console.log(`Dominator analysis: ${node.id} is a loop header`);
+
+let loopInfo = this.getLoopInfo(node.id);
+
+// Fallback for loops where getLoopInfo can't find a clean exit branch
+if (!loopInfo) {
+const backEdges = this.backEdges.filter(e => e.to === node.id);
+
+if (backEdges.length > 0) {
+    const bodyId =
+        this.getSuccessor(node.id, "yes") ||
+        this.getSuccessor(node.id, "no");
+
+    loopInfo = {
+        bodyId,
+        exitId: null,       // exits handled via break to END
+        useNoBranch: false,
+        backEdgeFrom: backEdges[0].from
+    };
+
+    console.log(
+        `Multi-exit loop fallback active for ${node.id}; ` +
+        `body starts at ${bodyId}`
+    );
+}
+}
+
+// If we have loop info with a body, LOWER IT TO A LOOP HERE
+if (loopInfo && loopInfo.bodyId) {
+return this.compileLoop(
+    node,
+    loopInfo.bodyId,
+    loopInfo.exitId ?? null,
+    visitedInPath,
+    contextStack,
+    indentLevel,
+    loopInfo.useNoBranch ?? false,
+    /* inLoopBody   */ false,
+    /* inLoopHeader */ true
+);
+}
+// If we *don't* have usable loop info, just fall through to if/else.
+}
+
+// ============================================
+// 3) SPECIAL CASES: output → END
+// ============================================
+const yesNode = this.nodes.find(n => n.id === yesId);
+if (yesNode && yesNode.type === 'output') {
+const yesNext     = this.getSuccessor(yesId, 'next');
+const yesNextNode = this.nodes.find(n => n.id === yesNext);
+if (yesNextNode && yesNextNode.type === 'end') {
+console.log(`Decision ${node.id} has YES→output→END → treating as if/else`);
+return this.compileIfElse(
+    node, yesId, noId,
+    visitedInPath, contextStack, indentLevel,
+    inLoopBody, inLoopHeader
+);
+}
+}
+
+const noNodeObj = noId ? this.nodes.find(n => n.id === noId) : null;
+if (noNodeObj && noNodeObj.type === 'output') {
+const noNext     = this.getSuccessor(noId, 'next');
+const noNextNode = this.nodes.find(n => n.id === noNext);
+if (noNextNode && noNextNode.type === 'end') {
+console.log(`Decision ${node.id} has NO→output→END → treating as if/else`);
+return this.compileIfElse(
+    node, yesId, noId,
+    visitedInPath, contextStack, indentLevel,
+    inLoopBody, inLoopHeader
+);
+}
+}
+
+// ============================================
+// 4) DEFAULT: regular if/else (NO suppression)
+// ============================================
+return this.compileIfElse(
+node, yesId, noId,
+visitedInPath, contextStack, indentLevel,
+inLoopBody, inLoopHeader
+);
+}
+
 
     /**
  * Check if a branch leads DIRECTLY back to the decision without passing through
