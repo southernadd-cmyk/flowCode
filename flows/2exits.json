@@ -1,0 +1,167 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "start",
+      "x": 200,
+      "y": 50,
+      "text": "Start",
+      "varName": "count",
+      "prompt": "\"Initialize counter\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n2",
+      "type": "input",
+      "x": 200,
+      "y": 150,
+      "text": "Set count = 0",
+      "varName": "count",
+      "prompt": "\"Enter initial value (0-100):\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n3",
+      "type": "decision",
+      "x": 200,
+      "y": 250,
+      "text": "count < 100",
+      "varName": "count",
+      "prompt": "\"Check if under limit\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n4",
+      "type": "decision",
+      "x": 200,
+      "y": 400,
+      "text": "count % 7 == 0",
+      "varName": "count",
+      "prompt": "\"Check multiple of 7\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n5",
+      "type": "decision",
+      "x": 200,
+      "y": 550,
+      "text": "count > 50",
+      "varName": "count",
+      "prompt": "\"Check if over halfway\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n6",
+      "type": "input",
+      "x": 400,
+      "y": 300,
+      "text": "Add 1",
+      "varName": "count",
+      "prompt": "\"Increment count by 1\"",
+      "dtype": "int"
+    },
+    {
+      "id": "n7",
+      "type": "input",
+      "x": 50,
+      "y": 450,
+      "text": "Special exit",
+      "varName": "result",
+      "prompt": "\"Exiting due to multiple of 7\"",
+      "dtype": "str"
+    },
+    {
+      "id": "n8",
+      "type": "input",
+      "x": 50,
+      "y": 600,
+      "text": "Mid exit",
+      "varName": "result",
+      "prompt": "\"Exiting after reaching 50\"",
+      "dtype": "str"
+    },
+    {
+      "id": "n9",
+      "type": "input",
+      "x": 400,
+      "y": 650,
+      "text": "Normal exit",
+      "varName": "result",
+      "prompt": "\"Exiting after loop completion\"",
+      "dtype": "str"
+    },
+    {
+      "id": "n10",
+      "type": "end",
+      "x": 200,
+      "y": 750,
+      "text": "End",
+      "varName": "",
+      "prompt": "\"Program finished\"",
+      "dtype": "str"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n1",
+      "port": "next",
+      "to": "n2"
+    },
+    {
+      "from": "n2",
+      "port": "next",
+      "to": "n3"
+    },
+    {
+      "from": "n3",
+      "port": "yes",
+      "to": "n4"
+    },
+    {
+      "from": "n3",
+      "port": "no",
+      "to": "n9"
+    },
+    {
+      "from": "n4",
+      "port": "yes",
+      "to": "n7"
+    },
+    {
+      "from": "n4",
+      "port": "no",
+      "to": "n5"
+    },
+    {
+      "from": "n5",
+      "port": "yes",
+      "to": "n8"
+    },
+    {
+      "from": "n5",
+      "port": "no",
+      "to": "n6"
+    },
+    {
+      "from": "n6",
+      "port": "next",
+      "to": "n3"
+    },
+    {
+      "from": "n7",
+      "port": "next",
+      "to": "n10"
+    },
+    {
+      "from": "n8",
+      "port": "next",
+      "to": "n10"
+    },
+    {
+      "from": "n9",
+      "port": "next",
+      "to": "n10"
+    }
+  ],
+  "version": "3.0"
+}
