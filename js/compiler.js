@@ -30,7 +30,6 @@ class FlowchartCompiler {
         return `${indent}highlight('${nodeId}')\n`;
     }    
 // Returns true if this node is the init assignment of a detected for-loop
-// Returns true if this node is the init assignment of a detected for-loop
 isInitOfForLoop(nodeId) {
     const node = this.nodes.find(n => n.id === nodeId);
     if (!node || (node.type !== "var" && node.type !== "process")) return false;
@@ -77,11 +76,13 @@ const dfs = (nodeId) => {
 
             if (!fromNode || !toNode) continue;
 
-            // ignore ALL decision-controlled loops
-            if (fromNode.type === "decision") continue;
-            if (toNode.type   === "decision") continue;
+            // Only ignore if the TARGET (loop header) is a decision
+            // If the header is a process/var node, it's an implicit forever loop
+            // even if the back edge comes from a decision
+            if (toNode.type === "decision") continue;
 
-            // non-decision → non-decision = implicit forever loop
+            // non-decision header = implicit forever loop
+            // (back edge can come from decision or non-decision)
             headers.add(target);
         }
     }
@@ -531,17 +532,10 @@ isConvergencePoint(nodeId) {
             // Do not emit highlight here – the END is highlighted once in compile()
             return "";
         }
-    
+
         // ✅ everyone else gets highlighted on entry
         let code = "";
         code += this.emitHighlight(nodeId, indentLevel);
-    
-        // ===========================
-        // END NODE FINISHES FLOW
-        // ===========================
-        if (node.type === "end") {
-            return code; // highlight already emitted
-        }
     
         // ============================================
         // ✅ NEW: ALLOW convergence points to be revisited
@@ -678,8 +672,10 @@ if (inLoopBody && nextNodeId) {
     let exitsCurrentLoop = true;
     
     for (const ctx of contextStack) {
-        if (ctx.startsWith('loop_')) {
-            const loopHeaderId = ctx.replace('loop_', '');
+        if (ctx.startsWith('loop_') || ctx.startsWith('implicit_')) {
+            const loopHeaderId = ctx.startsWith('loop_') 
+                ? ctx.replace('loop_', '')
+                : ctx.replace('implicit_', '');
             
             // If next leads back to OUR loop header, it's not a break
             if (this.pathLeadsTo(nextNodeId, loopHeaderId, new Set([nodeId]))) {
@@ -705,10 +701,12 @@ if (inLoopBody && nextNodeId) {
 // In compileNode method, update the back edge check section:
 
 // Normal loop back edge check - SIMPLIFIED
-if (contextStack.some(ctx => ctx.startsWith("loop_"))) {
+if (contextStack.some(ctx => ctx.startsWith("loop_") || ctx.startsWith("implicit_"))) {
     for (const ctx of contextStack) {
-        if (ctx.startsWith("loop_")) {
-            const hdr = ctx.replace("loop_", "");
+        if (ctx.startsWith("loop_") || ctx.startsWith("implicit_")) {
+            const hdr = ctx.startsWith("loop_")
+                ? ctx.replace("loop_", "")
+                : ctx.replace("implicit_", "");
             // Check if this node directly connects to the loop header
             const outgoing = this.outgoingMap.get(nodeId) || [];
             const goesToHeader = outgoing.some(edge => edge.targetId === hdr);
@@ -793,8 +791,8 @@ const bodyCode =
         new Set(), // fresh visited set to stop recursion chain explosion
         [...contextStack, `implicit_${nodeId}`],
         indentLevel + 1,
-    inLoopBody,
-    inLoopHeader
+        true,  // inLoopBody = true (we're inside the implicit loop)
+        false  // inLoopHeader = false (we're past the header)
     ) || "";
 
 const fullBody = (nodeCode + bodyCode).trim()
@@ -813,6 +811,22 @@ return code;
  compileSimpleIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
+    
+    // ============================================
+    // NEW: Check if we're in a loop and branches exit
+    // ============================================
+    if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_') || ctx.startsWith('implicit_'))) {
+        // Check if branches exit the current loop
+        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
+        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
+        
+        // If any branch exits, use special loop exit decision compilation
+        if (yesExits || noExits) {
+            return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits,
+                visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+        }
+    }
+    
         const indent = "    ".repeat(indentLevel);
     let code = "";
     
@@ -1105,11 +1119,14 @@ incrementDominatesHeader(loopHeaderId, incrementId, loopBodyId) {
 doesBranchExitLoop(startId, contextStack, currentNodeId) {
     if (!startId) return false;
     
-    // Find our loop header from context
+    // Find our loop header from context (check both loop_ and implicit_ prefixes)
     let currentLoopHeaderId = null;
     for (const ctx of contextStack) {
         if (ctx.startsWith('loop_')) {
             currentLoopHeaderId = ctx.replace('loop_', '');
+            break;
+        } else if (ctx.startsWith('implicit_')) {
+            currentLoopHeaderId = ctx.replace('implicit_', '');
             break;
         }
     }
@@ -1280,7 +1297,8 @@ const bodyCode = this.compileNode(
     new Set(),
     loopCtx,
     indentLevel + 1,
-    /* inLoopBody = */ true,true
+        /* inLoopBody = */ true,
+        /* inLoopHeader = */ true
 );
 
 // Add highlight for the increment node if we're using highlighting
@@ -1726,34 +1744,6 @@ findAllPaths(startId, targetId, avoidSet = new Set(), currentPath = []) {
     return allPaths;
 }
 /**
- * Check if loop body contains any paths that break to END
- */
-checkForBreakToEnd(startId, loopHeaderId) {
-    const stack = [startId];
-    const visited = new Set();
-    
-    while (stack.length > 0) {
-        const currentId = stack.pop();
-        if (visited.has(currentId) || currentId === loopHeaderId) continue;
-        visited.add(currentId);
-        
-        const node = this.nodes.find(n => n.id === currentId);
-        if (!node) continue;
-        
-        // Check if this node goes directly to END
-        const outgoing = this.outgoingMap.get(currentId) || [];
-        for (const edge of outgoing) {
-            const targetNode = this.nodes.find(n => n.id === edge.targetId);
-            if (targetNode && targetNode.type === 'end') {
-                return true;
-            }
-            stack.push(edge.targetId);
-        }
-    }
-    
-    return false;
-}
-/**
  * Find early exits (paths that go to END without returning to loop header)
  */
 /**
@@ -2027,6 +2017,21 @@ return null;
  compileIfElse(node, yesId, noId, visitedInPath, contextStack, indentLevel,
     inLoopBody = false,
     inLoopHeader = false) {
+    
+    // ============================================
+    // NEW: Check if we're in a loop and branches exit
+    // ============================================
+    if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_') || ctx.startsWith('implicit_'))) {
+        // Check if branches exit the current loop
+        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
+        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
+        
+        // If any branch exits, use special loop exit decision compilation
+        if (yesExits || noExits) {
+            return this.compileLoopExitDecision(node, yesId, noId, yesExits, noExits,
+                visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+        }
+    }
     
     // Check if this decision is part of a "find largest/smallest" pattern
     // where we have nested decisions that should stay as separate if/else blocks
