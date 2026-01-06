@@ -669,6 +669,11 @@ let panStartX = 0;
 let panStartY = 0;
 
 this.canvas.addEventListener("pointerdown", (e) => {
+        // CRITICAL: Check if we clicked on a dot first
+        if (e.target.classList.contains('dot')) {
+            // Let the dot's handler deal with it
+            return;
+        }
     // only pan if clicking empty canvas background
     if (e.target.id === "canvas" || e.target.id === "connections-layer") {
         isPanning = true;
@@ -1046,20 +1051,18 @@ addDot(parent, cls, portType) {
     const d = document.createElement('div'); 
     d.className = `dot ${cls}`;
     
-    // Set different cursor styles based on port type
-    if (cls.includes('out')) {
-        d.style.cursor = 'crosshair'; // Output ports are draggable
-    } else {
-        d.style.cursor = 'default'; // Input ports are not draggable
-    }
+    // Store port type as data attribute
+    d.dataset.portType = portType;
     
     d.onpointerdown = (e) => { 
         e.stopPropagation(); 
+        e.preventDefault(); // Also prevent default to stop any drag selection
         
-        // ONLY allow connections from OUTPUT ports (out, out-yes, out-no)
-        // Block connections from INPUT ports (in)
-        if (!cls.includes('out')) {
-            return; // Don't allow connections FROM input ports
+        // Only allow dragging from OUTPUT ports
+        // Input ports have portType 'in'
+        if (portType === 'in') {
+            // Still block the event from bubbling up
+            return false; // Explicitly return false to stop propagation
         }
         
         this.isConnecting = true; 
@@ -1073,6 +1076,9 @@ addDot(parent, cls, portType) {
             "d",
             `M ${start.x} ${start.y} L ${start.x} ${start.y}`
         );
+        
+        // Return true to indicate event was handled
+        return true;
     };
     
     parent.appendChild(d);
