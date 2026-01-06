@@ -324,7 +324,11 @@ if (!location.hash.startsWith("#chart=")) {
     },
 
     createNode(type, x, y) {
-
+        const validTypes = ['start', 'end', 'process', 'var', 'list', 'input', 'output', 'decision'];
+        if (!validTypes.includes(type)) {
+            console.error('Invalid node type:', type);
+            return;
+        }
 // ★ Prevent more than one START node
 if (type === "start") {
     const hasStart = this.nodes.some(n => n.type === "start");
@@ -730,42 +734,63 @@ window.addEventListener("pointerup", () => {
 };
 
         
-        window.onpointerup = (e) => {
-            if (!this.isConnecting) return;
-            this.isConnecting = false; 
-            this.dragLine.style.display = 'none';
-            
-            const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.node');
-            if (target && target.id !== this.connStart.nodeId) {
-                // Remove any existing connection from same port
-                this.connections = this.connections.filter(c => 
-                    !(c.from === this.connStart.nodeId && c.port === this.connStart.portType));
-                
-                // Add new connection
-                this.connections.push({ 
-                    from: this.connStart.nodeId, 
-                    port: this.connStart.portType, 
-                    to: target.id 
-                });
-                
-                this.drawConns(); 
-                this.updateCode();
-            }
-        };
+window.onpointerup = (e) => {
+    if (!this.isConnecting) return;
+    this.isConnecting = false; 
+    this.dragLine.style.display = 'none';
+    
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    
+    // Check if target is an input port dot
+    const targetDot = target?.closest('.dot.in');
+    const targetNode = target?.closest('.node');
+    
+    if (targetDot && targetNode && targetNode.id !== this.connStart.nodeId) {
+        // Remove any existing connection from same port
+        this.connections = this.connections.filter(c => 
+            !(c.from === this.connStart.nodeId && c.port === this.connStart.portType));
+        
+        // Add new connection
+        this.connections.push({ 
+            from: this.connStart.nodeId, 
+            port: this.connStart.portType, 
+            to: targetNode.id 
+        });
+        
+        this.drawConns(); 
+        this.updateCode();
+    }
+};
     },
 
     setupDragDrop() {
         document.querySelectorAll('.palette-item').forEach(p => 
-            p.ondragstart = (e) => e.dataTransfer.setData('type', p.dataset.type));
+            p.ondragstart = (e) => {
+                e.dataTransfer.setData('type', p.dataset.type);
+                // Also store the actual shape name for validation
+                e.dataTransfer.setData('valid', 'true');
+            });
         
         this.canvas.ondragover = (e) => e.preventDefault();
+        
         this.canvas.ondrop = (e) => {
-            const r = this.canvas.getBoundingClientRect();
-            this.createNode(
-                e.dataTransfer.getData('type'), 
-                e.clientX - r.left - 50, 
-                e.clientY - r.top - 20
-            );
+            e.preventDefault();
+            
+            // Check if this is a valid drag from the palette
+            const type = e.dataTransfer.getData('type');
+            const isValid = e.dataTransfer.getData('valid') === 'true';
+            
+            // Only create node if it's a valid type from palette
+            const validTypes = ['start', 'end', 'process', 'var', 'list', 'input', 'output', 'decision'];
+            
+            if (isValid && validTypes.includes(type)) {
+                const r = this.canvas.getBoundingClientRect();
+                // Convert screen coordinates to world coordinates
+                const worldX = (e.clientX - r.left - this.viewportX) / this.viewportScale;
+                const worldY = (e.clientY - r.top - this.viewportY) / this.viewportScale;
+                
+                this.createNode(type, worldX, worldY);
+            }
         };
     },
 
@@ -1017,27 +1042,41 @@ n.text = `${name} = [${formatted.join(", ")}]`;
     this.updateCode();
 }
 ,
-    addDot(parent, cls, portType) {
-        const d = document.createElement('div'); 
-        d.className = `dot ${cls}`;
-        d.onpointerdown = (e) => { 
-    e.stopPropagation(); 
-
-    this.isConnecting = true; 
-    this.connStart = { nodeId: parent.id, portType }; 
-
-    const start = this.getPortPos(parent.id, portType);
-
-    // show drag preview line immediately
-    this.dragLine.style.display = "block";
-    this.dragLine.setAttribute(
-        "d",
-        `M ${start.x} ${start.y} L ${start.x} ${start.y}`
-    );
-};
-
-        parent.appendChild(d);
-    },
+addDot(parent, cls, portType) {
+    const d = document.createElement('div'); 
+    d.className = `dot ${cls}`;
+    
+    // Set different cursor styles based on port type
+    if (cls.includes('out')) {
+        d.style.cursor = 'crosshair'; // Output ports are draggable
+    } else {
+        d.style.cursor = 'default'; // Input ports are not draggable
+    }
+    
+    d.onpointerdown = (e) => { 
+        e.stopPropagation(); 
+        
+        // ONLY allow connections from OUTPUT ports (out, out-yes, out-no)
+        // Block connections from INPUT ports (in)
+        if (!cls.includes('out')) {
+            return; // Don't allow connections FROM input ports
+        }
+        
+        this.isConnecting = true; 
+        this.connStart = { nodeId: parent.id, portType }; 
+        
+        const start = this.getPortPos(parent.id, portType);
+        
+        // show drag preview line immediately
+        this.dragLine.style.display = "block";
+        this.dragLine.setAttribute(
+            "d",
+            `M ${start.x} ${start.y} L ${start.x} ${start.y}`
+        );
+    };
+    
+    parent.appendChild(d);
+},
 
     saveDiagram() {
         const diagram = {
