@@ -1390,7 +1390,10 @@ let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLo
 if (yesExits && !ifCode.includes('break')) {
 ifCode = ifCode.replace(/\s+$/g, "");
 if (ifCode) {
-ifCode += `\n${indent}    break`;
+// ensure a clean line for break:
+if (!ifCode.endsWith("\n")) ifCode += "\n";
+ifCode += `${indent}    break\n`;
+
 } else {
 ifCode = `${indent}    break`;
 }
@@ -1409,7 +1412,8 @@ let elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,
 if (noExits && !elseCode.includes('break')) {
 elseCode = elseCode.replace(/\s+$/g, "");
 if (elseCode) {
-elseCode += `\n${indent}    break`;
+    if (!ifCode.endsWith("\n")) ifCode += "\n";
+    ifCode += `${indent}    break\n`;
 } else {
 elseCode = `${indent}    break`;
 }
