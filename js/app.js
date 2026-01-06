@@ -772,8 +772,12 @@ window.onpointerup = (e) => {
         document.querySelectorAll('.palette-item').forEach(p => 
             p.ondragstart = (e) => {
                 e.dataTransfer.setData('type', p.dataset.type);
-                // Also store the actual shape name for validation
                 e.dataTransfer.setData('valid', 'true');
+                
+                // Store the mouse offset within the dragged item
+                const rect = p.getBoundingClientRect();
+                e.dataTransfer.setData('offsetX', e.clientX - rect.left);
+                e.dataTransfer.setData('offsetY', e.clientY - rect.top);
             });
         
         this.canvas.ondragover = (e) => e.preventDefault();
@@ -781,18 +785,29 @@ window.onpointerup = (e) => {
         this.canvas.ondrop = (e) => {
             e.preventDefault();
             
-            // Check if this is a valid drag from the palette
             const type = e.dataTransfer.getData('type');
             const isValid = e.dataTransfer.getData('valid') === 'true';
-            
-            // Only create node if it's a valid type from palette
             const validTypes = ['start', 'end', 'process', 'var', 'list', 'input', 'output', 'decision'];
             
             if (isValid && validTypes.includes(type)) {
-                const r = this.canvas.getBoundingClientRect();
-                // Convert screen coordinates to world coordinates
-                const worldX = (e.clientX - r.left - this.viewportX) / this.viewportScale;
-                const worldY = (e.clientY - r.top - this.viewportY) / this.viewportScale;
+                const rect = this.canvas.getBoundingClientRect();
+                
+                // Debug logging
+                console.log('Drop event:', {
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    rectLeft: rect.left,
+                    rectTop: rect.top,
+                    viewportX: this.viewportX,
+                    viewportY: this.viewportY,
+                    viewportScale: this.viewportScale
+                });
+                
+                // Simple: drop at cursor position (no centering)
+                const worldX = (e.clientX - rect.left - this.viewportX) / this.viewportScale;
+                const worldY = (e.clientY - rect.top - this.viewportY) / this.viewportScale;
+                
+                console.log('Creating node at:', { worldX, worldY });
                 
                 this.createNode(type, worldX, worldY);
             }
