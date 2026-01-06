@@ -976,22 +976,42 @@ isWhileLoopPattern(decisionId) {
     const yesId = this.getSuccessor(decisionId, 'yes');
     const noId = this.getSuccessor(decisionId, 'no');
     
-    // For a while loop, one branch should loop back to the decision
-    // and the other should exit
+    // For a true while-loop, the looping branch should go DIRECTLY back
+    // without passing through other decisions
+    const yesLoops = this.canReachDirect(yesId, decisionId);
+    const noLoops = noId ? this.canReachDirect(noId, decisionId) : false;
     
-    // Check if YES branch eventually loops back (don't avoid the decision itself!)
-    const yesLoops = this.canReach(yesId, decisionId, new Set());
-    const noLoops = noId ? this.canReach(noId, decisionId, new Set()) : false;
-    
-    console.log(`isWhileLoopPattern(${decisionId}): yesId=${yesId}, noId=${noId}, yesLoops=${yesLoops}, noLoops=${noLoops}`);
-    
-    // Valid while loop patterns:
-    // 1. YES loops back, NO exits (standard while loop)
-    // 2. NO loops back, YES exits (do-while style)
+    console.log(`isWhileLoopPattern(${decisionId}): yesLoops=${yesLoops}, noLoops=${noLoops}`);
     
     return (yesLoops && !noLoops) || (!yesLoops && noId && noLoops);
 }
 
+/**
+ * Check if we can reach targetId from startId without passing through 
+ * other decision nodes (except the target itself)
+ */
+canReachDirect(startId, targetId, visited = new Set()) {
+    if (!startId || visited.has(startId)) return false;
+    if (startId === targetId) return true;
+    
+    const node = this.nodes.find(n => n.id === startId);
+    
+    // If we encounter another decision node (that's not our target), stop
+    if (node && node.type === 'decision') {
+        return false;
+    }
+    
+    visited.add(startId);
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        if (this.canReachDirect(edge.targetId, targetId, new Set([...visited]))) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 
 
@@ -1330,44 +1350,76 @@ return code;
 // 2) OTHERWISE → WHILE LOOP
 // -------------------------------
 
-// YES-branch loop → normal condition
-// NO-branch loop  → negate condition
+// Check if loop body contains any break-to-END exits
+const hasBreakToEnd = this.checkForBreakToEnd(loopBodyId, node.id);
+
 let condition = node.text;
 if (useNoBranch) condition = `not (${condition})`;
 
-code += `${indent}while ${condition}:\n`;
-
-if (this.useHighlighting) {
-    code += `${indent}    highlight('${node.id}')\n`;
-}
-
-const whileCtx = [...contextStack, `loop_${node.id}`];
-
-const bodyCode = this.compileNode(
-    loopBodyId,
-    new Set(),
-    whileCtx,
-    indentLevel + 1,true,
-    /* inLoopBody = */ true
-);
-
-code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
-
-// exit path after while
-if (exitId) {
-    code += this.compileNode(
-        exitId,
-        visitedInPath,
-        contextStack,
-        indentLevel,
-    false,
-    false
-    );
+if (hasBreakToEnd && exitId) {
+    // Use while-else structure
+    code += `${indent}while ${condition}:\n`;
+    
+    if (this.useHighlighting) {
+        code += `${indent}    highlight('${node.id}')\n`;
+    }
+    
+    const whileCtx = [...contextStack, `loop_${node.id}`];
+    const bodyCode = this.compileNode(loopBodyId, new Set(), whileCtx, indentLevel + 1, true, true);
+    code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
+    
+    // Add else clause for exit path
+    code += `${indent}else:\n`;
+    const exitCode = this.compileNode(exitId, visitedInPath, contextStack, indentLevel + 1, false, false);
+    code += exitCode || `${indent}    pass\n`;
+} else {
+    // Regular while without else
+    code += `${indent}while ${condition}:\n`;
+    
+    if (this.useHighlighting) {
+        code += `${indent}    highlight('${node.id}')\n`;
+    }
+    
+    const whileCtx = [...contextStack, `loop_${node.id}`];
+    const bodyCode = this.compileNode(loopBodyId, new Set(), whileCtx, indentLevel + 1, true, true);
+    code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
+    
+    // exit path after while (executes even after break)
+    if (exitId) {
+        code += this.compileNode(exitId, visitedInPath, contextStack, indentLevel, false, false);
+    }
 }
 
 return code;
 }
-
+/**
+ * Check if loop body contains any paths that break to END
+ */
+checkForBreakToEnd(startId, loopHeaderId) {
+    const stack = [startId];
+    const visited = new Set();
+    
+    while (stack.length > 0) {
+        const currentId = stack.pop();
+        if (visited.has(currentId) || currentId === loopHeaderId) continue;
+        visited.add(currentId);
+        
+        const node = this.nodes.find(n => n.id === currentId);
+        if (!node) continue;
+        
+        // Check if this node goes directly to END
+        const outgoing = this.outgoingMap.get(currentId) || [];
+        for (const edge of outgoing) {
+            const targetNode = this.nodes.find(n => n.id === edge.targetId);
+            if (targetNode && targetNode.type === 'end') {
+                return true;
+            }
+            stack.push(edge.targetId);
+        }
+    }
+    
+    return false;
+}
     /**
      * Detect for loop pattern:
      * Looks for: var = 0 → decision → ... → var = var + 1 → back to decision
@@ -1383,178 +1435,340 @@ return code;
  *   i = i + k  / i += k / i = i - k / i -= k
  *   numeric OR variable bounds
  */
- detectForLoopPattern(decisionId) {
-// cache already computed answers
-if (this.forPatternCache.has(decisionId)) {
-    return this.forPatternCache.get(decisionId);
-}
+detectForLoopPattern(decisionId) {
+    // cache already computed answers
+    if (this.forPatternCache.has(decisionId)) {
+        return this.forPatternCache.get(decisionId);
+    }
 
-// prevent re-entry recursion explosions
-if (this.forPatternInProgress.has(decisionId)) {
+    // prevent re-entry recursion explosions
+    if (this.forPatternInProgress.has(decisionId)) {
+        return null;
+    }
 
-return null;
+    this.forPatternInProgress.add(decisionId);
+    
+    // -------------------------------
+    // 1) Find initialisation before decision
+    // -------------------------------
+    const decisionNode = this.nodes.find(n => n.id === decisionId);
+    if (!decisionNode || !decisionNode.text) {
+        this.forPatternInProgress.delete(decisionId);
+        return null;
+    }
 
-}
+    // Extract variable name from decision condition
+    let varName = null;
+    const condMatch = decisionNode.text.match(/^\s*(\w+)\s*[<>=!]/);
+    if (!condMatch) {
+        this.forPatternInProgress.delete(decisionId);
+        return null;
+    }
+    varName = condMatch[1];
 
+    console.log(`For-loop detection for variable: ${varName} in decision: ${decisionNode.text}`);
 
+    let initNode = null;
+    let startValue = null;
 
-this.forPatternInProgress.add(decisionId);
-// -------------------------------
-// 1) Find initialisation before decision (look for any assignment to loop variable)
-// -------------------------------
-const decisionNode = this.nodes.find(n => n.id === decisionId);
-if (!decisionNode || !decisionNode.text) return null;
-
-// Extract variable name from decision condition (e.g., "x < max" → "x")
-let varName = null;
-const condMatch = decisionNode.text.match(/^\s*(\w+)\s*[<>=!]/);
-if (!condMatch) return null;
-varName = condMatch[1];
-
-console.log(`For-loop detection looking for variable: ${varName} in decision: ${decisionNode.text}`);
-
-let initNode = null;
-let startValue = null;
-
-// Search ALL nodes (not just direct predecessors) for initialization
-for (const node of this.nodes) {
-    if (node.type === "var" || node.type === "process") {
-        // Check if this node assigns to our loop variable
-        const m = node.text?.match(new RegExp(`^\\s*${varName}\\s*=\\s*([\\w\\d_]+)\\s*$`));
-        if (m) {
-            console.log(`Found potential init node: ${node.id} with text: ${node.text}`);
-            
-            // Check if this node reaches the decision (path exists)
-            if (this.pathExists(node.id, decisionId, new Set())) {
-                console.log(`Path confirmed from ${node.id} to ${decisionId}`);
-                initNode = node;
-                startValue = m[1];
-                break;
-            } else {
-                console.log(`No path from ${node.id} to ${decisionId}`);
+    // Search for initialization
+    for (const node of this.nodes) {
+        if (node.type === "var" || node.type === "process") {
+            // Check if this node assigns to our loop variable
+            const m = node.text?.match(new RegExp(`^\\s*${varName}\\s*=\\s*([\\w\\d_]+)\\s*$`));
+            if (m) {
+                console.log(`Found potential init node: ${node.id} with text: ${node.text}`);
+                
+                // Check if this node reaches the decision
+                if (this.pathExists(node.id, decisionId, new Set())) {
+                    console.log(`Path confirmed from ${node.id} to ${decisionId}`);
+                    initNode = node;
+                    startValue = m[1];
+                    break;
+                }
             }
         }
     }
-}
 
-if (!varName || !startValue) {
-    console.log(`No initialization found for variable ${varName}`);
-    return null;
-}
-
-console.log(`Found initialization: ${varName} = ${startValue} at node ${initNode?.id}`);
-
-// -------------------------------
-// 2) Parse loop condition
-// -------------------------------
-
-
-
-
-if (!decisionNode || !decisionNode.text) return null;
-
-const condition = decisionNode.text.trim();
-
-let endValue = null;
-let comparisonOp = null;
-
-const condPatterns = [
-    { re: new RegExp(`${varName}\\s*<\\s*([\\w\\d_]+)`), op: '<'  },
-    { re: new RegExp(`${varName}\\s*<=\\s*([\\w\\d_]+)`), op: '<=' },
-    { re: new RegExp(`${varName}\\s*>\\s*([\\w\\d_]+)`), op: '>'  },
-    { re: new RegExp(`${varName}\\s*>=\\s*([\\w\\d_]+)`), op: '>=' },
-];
-
-for (const p of condPatterns) {
-    const m = condition.match(p.re);
-    if (m) {
-        endValue = m[1];
-        comparisonOp = p.op;
-        break;
+    if (!varName || !startValue) {
+        console.log(`No initialization found for variable ${varName}`);
+        this.forPatternInProgress.delete(decisionId);
+        this.forPatternCache.set(decisionId, null);
+        return null;
     }
-}
 
-if (!endValue) return null;
+    // -------------------------------
+    // 2) Parse loop condition
+    // -------------------------------
+    const condition = decisionNode.text.trim();
+    let endValue = null;
+    let comparisonOp = null;
 
-// -------------------------------
-// 3) Find increment anywhere in loop body (BFS)
-// -------------------------------
-const yesId = this.getSuccessor(decisionId, 'yes');
-const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
+    const condPatterns = [
+        { re: new RegExp(`${varName}\\s*<\\s*([\\w\\d_]+)`), op: '<'  },
+        { re: new RegExp(`${varName}\\s*<=\\s*([\\w\\d_]+)`), op: '<=' },
+        { re: new RegExp(`${varName}\\s*>\\s*([\\w\\d_]+)`), op: '>'  },
+        { re: new RegExp(`${varName}\\s*>=\\s*([\\w\\d_]+)`), op: '>=' },
+    ];
 
-if (!incrementInfo) return null;
+    for (const p of condPatterns) {
+        const m = condition.match(p.re);
+        if (m) {
+            endValue = m[1];
+            comparisonOp = p.op;
+            break;
+        }
+    }
 
-let step = incrementInfo.step || 1;
+    if (!endValue) {
+        this.forPatternInProgress.delete(decisionId);
+        this.forPatternCache.set(decisionId, null);
+        return null;
+    }
 
-// -------------------------------
-// 4) Handle increasing vs decreasing loops
-// -------------------------------
-let finalStart = startValue;
-let finalEnd   = endValue;
-let finalStep  = step;
+    // -------------------------------
+    // 3) Find increment in loop body
+    // -------------------------------
+    const yesId = this.getSuccessor(decisionId, 'yes');
+    const incrementInfo = this.findIncrementNodeBFS(yesId, decisionId, varName);
 
-// --- DECREASING LOOPS (DOWNWARD) ---
-if (comparisonOp === '>' || comparisonOp === '>=') {
+    if (!incrementInfo) {
+        this.forPatternInProgress.delete(decisionId);
+        this.forPatternCache.set(decisionId, null);
+        return null;
+    }
 
-// force negative step
-finalStep = -Math.abs(step);
+    let step = incrementInfo.step || 1;
+    const incId = incrementInfo.node.id;
 
-// range() is exclusive, so:
-//   i > 0  → range(start, end, -1)        (stops before end)
-//   i >= 0 → range(start, end-1, -1)      (include zero)
-if (comparisonOp === '>=') {
-    finalEnd = `${parseInt(endValue) - 1}`;
-} else {
-    finalEnd = endValue;
-}
+    // -------------------------------
+    // 4) CRITICAL BUT BALANCED CHECK: 
+    // The increment must be on the "main path" - not in a conditional branch
+    // -------------------------------
+    const loopBodyId = this.getSuccessor(decisionId, 'yes');
+    
+    // Strategy: Check if the increment node DOMINATES the back edge
+    // For a for-loop, the increment should be on the main execution path
+    
+    // Find the main execution path (the most direct path from loop start to back edge)
+    const mainPath = this.findMainExecutionPath(loopBodyId, decisionId);
+    console.log(`Main execution path: ${mainPath ? mainPath.join(' -> ') : 'none'}`);
+    
+    if (!mainPath || !mainPath.includes(incId)) {
+        console.log(`Increment ${incId} is not on the main execution path - not a for-loop`);
+        this.forPatternInProgress.delete(decisionId);
+        this.forPatternCache.set(decisionId, null);
+        return null;
+    }
+    
+    // Check if there are alternative paths that skip the increment
+    const alternativePaths = this.findAlternativePaths(loopBodyId, decisionId, incId);
+    console.log(`Found ${alternativePaths.length} alternative paths that skip increment`);
+    
+    if (alternativePaths.length > 0) {
+        console.log(`Not a for-loop: some paths skip the increment`);
+        this.forPatternInProgress.delete(decisionId);
+        this.forPatternCache.set(decisionId, null);
+        return null;
+    }
 
-// --- INCREASING LOOPS (UPWARD) ---
-} else {
+    // -------------------------------
+    // 5) Handle increasing vs decreasing loops
+    // -------------------------------
+    let finalStart = startValue;
+    let finalEnd   = endValue;
+    let finalStep  = step;
 
-    // ensure positive step
-    finalStep = Math.abs(step);
+    // --- DECREASING LOOPS (DOWNWARD) ---
+    if (comparisonOp === '>' || comparisonOp === '>=') {
+        // force negative step
+        finalStep = -Math.abs(step);
 
-    if (comparisonOp === '<=') {
-        // include the end value
-        finalEnd = `(${endValue}) + 1`;
+        // range() is exclusive
+        if (comparisonOp === '>=') {
+            finalEnd = `${parseInt(endValue) - 1}`;
+        } else {
+            finalEnd = endValue;
+        }
     } else {
-        finalEnd = endValue;
+        // --- INCREASING LOOPS (UPWARD) ---
+        // ensure positive step
+        finalStep = Math.abs(step);
+
+        if (comparisonOp === '<=') {
+            // include the end value
+            finalEnd = `(${endValue}) + 1`;
+        } else {
+            finalEnd = endValue;
+        }
     }
+
+    // -------------------------------
+    // 6) It's a valid counted for-loop
+    // -------------------------------
+    this.forPatternInProgress.delete(decisionId);
+
+    const result = {
+        variable: varName,
+        start: finalStart,
+        end: finalEnd,
+        step: finalStep,
+        incrementNodeId: incId,
+        initNodeId: initNode?.id ?? null
+    };
+
+    console.log(`Valid for-loop detected: ${varName} from ${finalStart} to ${finalEnd} step ${finalStep}`);
+    this.forPatternCache.set(decisionId, result);
+    return result;
 }
 
-// -------------------------------
-// 5) NEW SAFETY CHECK
-// increment must flow back to THIS decision directly,
-// and MUST NOT pass through any other decision nodes
-// -------------------------------
-const incId = incrementInfo.node.id;
-const loopBodyId = this.getSuccessor(decisionId, 'yes');
-
-if (!this.incrementDominatesHeader(decisionId, incId, loopBodyId)) {
-    this.forPatternInProgress.delete(decisionId);
-    this.forPatternCache.set(decisionId, null);
+/**
+ * Find the main execution path (DFS, prefer straight line over branches)
+ */
+findMainExecutionPath(startId, targetId, visited = new Set()) {
+    if (!startId || visited.has(startId)) return null;
+    if (startId === targetId) return [startId];
+    
+    visited.add(startId);
+    
+    const node = this.nodes.find(n => n.id === startId);
+    
+    // Prefer "next" connections over "yes"/"no" branches
+    const outgoing = this.outgoingMap.get(startId) || [];
+    
+    // First try "next" connections
+    for (const edge of outgoing) {
+        if (edge.port === 'next') {
+            const path = this.findMainExecutionPath(edge.targetId, targetId, new Set([...visited]));
+            if (path) {
+                return [startId, ...path];
+            }
+        }
+    }
+    
+    // Then try other connections
+    for (const edge of outgoing) {
+        if (edge.port !== 'next') {
+            const path = this.findMainExecutionPath(edge.targetId, targetId, new Set([...visited]));
+            if (path) {
+                return [startId, ...path];
+            }
+        }
+    }
+    
     return null;
 }
 
-// -------------------------------
-// 6) otherwise it's a valid counted for-loop
-// -------------------------------
-this.forPatternInProgress.delete(decisionId);
+/**
+ * Find alternative paths that skip a required node
+ */
+findAlternativePaths(startId, targetId, mustIncludeId, visited = new Set(), currentPath = []) {
+    if (!startId || visited.has(startId)) return [];
+    if (startId === targetId) {
+        // If this path reaches target but doesn't include mustIncludeId, it's an alternative
+        if (!currentPath.includes(mustIncludeId) && !currentPath.includes(targetId)) {
+            return [[...currentPath, startId]];
+        }
+        return [];
+    }
+    
+    visited.add(startId);
+    const newPath = [...currentPath, startId];
+    const alternatives = [];
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        const paths = this.findAlternativePaths(edge.targetId, targetId, mustIncludeId, new Set([...visited]), newPath);
+        alternatives.push(...paths);
+    }
+    
+    return alternatives;
+}
 
-const result = {
-    variable: varName,
-    start: finalStart,
-    end: finalEnd,
-    step: finalStep,
-    incrementNodeId: incId,
-    initNodeId: initNode?.id ?? null
-};
 
-this.forPatternCache.set(decisionId, result);
-return result;
+findAllPaths(startId, targetId, avoidSet = new Set(), currentPath = []) {
+    if (!startId || avoidSet.has(startId) || currentPath.includes(startId)) {
+        return [];
+    }
+    
+    if (startId === targetId) {
+        return [[...currentPath, startId]];
+    }
+    
+    const newPath = [...currentPath, startId];
+    const allPaths = [];
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        const paths = this.findAllPaths(edge.targetId, targetId, avoidSet, newPath);
+        allPaths.push(...paths);
+    }
+    
+    return allPaths;
+}
+/**
+ * Check if loop body contains any paths that break to END
+ */
+checkForBreakToEnd(startId, loopHeaderId) {
+    const stack = [startId];
+    const visited = new Set();
+    
+    while (stack.length > 0) {
+        const currentId = stack.pop();
+        if (visited.has(currentId) || currentId === loopHeaderId) continue;
+        visited.add(currentId);
+        
+        const node = this.nodes.find(n => n.id === currentId);
+        if (!node) continue;
+        
+        // Check if this node goes directly to END
+        const outgoing = this.outgoingMap.get(currentId) || [];
+        for (const edge of outgoing) {
+            const targetNode = this.nodes.find(n => n.id === edge.targetId);
+            if (targetNode && targetNode.type === 'end') {
+                return true;
+            }
+            stack.push(edge.targetId);
+        }
+    }
+    
+    return false;
+}
+/**
+ * Find early exits (paths that go to END without returning to loop header)
+ */
+findEarlyExits(startId, loopHeaderId) {
+    const exits = [];
+    const stack = [{ nodeId: startId, path: [] }];
+    const visited = new Set();
+    
+    while (stack.length > 0) {
+        const current = stack.pop();
+        const nodeId = current.nodeId;
+        
+        if (visited.has(nodeId) || nodeId === loopHeaderId) continue;
+        visited.add(nodeId);
+        
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) continue;
+        
+        if (node.type === 'end') {
+            exits.push([...current.path, nodeId]);
+            continue;
+        }
+        
+        const outgoing = this.outgoingMap.get(nodeId) || [];
+        for (const edge of outgoing) {
+            stack.push({
+                nodeId: edge.targetId,
+                path: [...current.path, nodeId]
+            });
+        }
+    }
+    
+    return exits;
+}
 
-
- }
 /**
  * Check if a path exists from startId to targetId
  */
