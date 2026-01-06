@@ -57,6 +57,28 @@ const headers = new Set();
 const visited = new Set();
 const onStack = new Set();
 
+// First, identify all decision-controlled loops to exclude their nodes
+const decisionLoopNodes = new Set();
+for (const node of this.nodes) {
+    if (node.type === "decision") {
+        const yesId = this.getSuccessor(node.id, 'yes');
+        const noId = this.getSuccessor(node.id, 'no');
+        
+        // Check if this decision is a loop header (one branch loops back)
+        const yesLoops = yesId ? this.canReach(yesId, node.id, new Set()) : false;
+        const noLoops = noId ? this.canReach(noId, node.id, new Set()) : false;
+        
+        if (yesLoops || noLoops) {
+            // This is a decision-controlled loop - mark all nodes in its loop body
+            const loopBodyId = yesLoops ? yesId : noId;
+            if (loopBodyId) {
+                // Mark all nodes reachable from loop body that eventually loop back
+                this.markLoopBodyNodes(loopBodyId, node.id, decisionLoopNodes);
+            }
+        }
+    }
+}
+
 const dfs = (nodeId) => {
 
     visited.add(nodeId);
@@ -76,10 +98,11 @@ const dfs = (nodeId) => {
 
             if (!fromNode || !toNode) continue;
 
-            // Only ignore if the TARGET (loop header) is a decision
-            // If the header is a process/var node, it's an implicit forever loop
-            // even if the back edge comes from a decision
+            // Ignore if the TARGET (loop header) is a decision
             if (toNode.type === "decision") continue;
+            
+            // Ignore if target is part of a decision-controlled loop
+            if (decisionLoopNodes.has(target)) continue;
 
             // non-decision header = implicit forever loop
             // (back edge can come from decision or non-decision)
@@ -94,6 +117,25 @@ const start = this.nodes.find(n => n.type === "start");
 if (start) dfs(start.id);
 
 return headers;
+}
+
+/**
+ * Mark all nodes in a decision-controlled loop body
+ */
+markLoopBodyNodes(startId, loopHeaderId, markedSet, visited = new Set()) {
+    if (!startId || visited.has(startId) || startId === loopHeaderId) return;
+    
+    visited.add(startId);
+    markedSet.add(startId);
+    
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        // If this edge goes back to the loop header, stop here
+        if (edge.targetId === loopHeaderId) continue;
+        
+        // Otherwise, continue marking
+        this.markLoopBodyNodes(edge.targetId, loopHeaderId, markedSet, new Set([...visited]));
+    }
 }
 /**
  * Check if ALL paths from a decision eventually loop back
@@ -483,6 +525,21 @@ getLoopInfo(headerId) {
     const startNode = this.nodes.find(n => n.type === 'start');
     if (!startNode) return "# Add a Start node.";
     
+    // Validate connections point to existing nodes
+    const nodeIds = new Set(this.nodes.map(n => n.id));
+    const brokenConnections = this.connections.filter(conn => 
+        !nodeIds.has(conn.from) || !nodeIds.has(conn.to)
+    );
+    if (brokenConnections.length > 0) {
+        console.warn(`Warning: ${brokenConnections.length} connection(s) point to non-existent nodes`);
+    }
+    
+    // Check for END node (warn if missing, but don't fail)
+    const endNode = this.nodes.find(n => n.type === 'end');
+    if (!endNode) {
+        console.warn("Warning: No END node found. Generated code may be incomplete.");
+    }
+    
     this.buildMaps(); // Ensure maps are up to date
     this.implicitLoopHeaders = this.findImplicitForeverLoopHeaders();
 
@@ -599,22 +656,62 @@ isConvergencePoint(nodeId) {
             return code;
         }
     
+        // Check for implicit loops ONLY if this node is not part of a decision-controlled loop
+        // (Decision loops are handled in compileDecision, which runs before we get here for decision nodes)
         if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
-            if (this.loweredImplicitLoops.has(nodeId)) {
+            // Double-check: if this node is reachable from a decision's loop body, don't treat as implicit loop
+            // This prevents nodes like input/process in while loops from being marked as implicit loops
+            let isPartOfDecisionLoop = false;
+            
+            // Check if any decision node has a loop that includes this node
+            for (const dec of this.nodes.filter(n => n.type === "decision")) {
+                const yesId = this.getSuccessor(dec.id, 'yes');
+                const noId = this.getSuccessor(dec.id, 'no');
+                
+                // Check if YES branch loops back
+                if (yesId && this.canReach(yesId, dec.id, new Set())) {
+                    // Check if nodeId is the loop body entry point or reachable from it
+                    if (yesId === nodeId || this.canReach(yesId, nodeId, new Set([dec.id]))) {
+                        // Also check if nodeId can reach back to decision (completes the loop)
+                        if (this.canReach(nodeId, dec.id, new Set())) {
+                            isPartOfDecisionLoop = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Check if NO branch loops back
+                if (noId && this.canReach(noId, dec.id, new Set())) {
+                    // Check if nodeId is the loop body entry point or reachable from it
+                    if (noId === nodeId || this.canReach(noId, nodeId, new Set([dec.id]))) {
+                        // Also check if nodeId can reach back to decision (completes the loop)
+                        if (this.canReach(nodeId, dec.id, new Set())) {
+                            isPartOfDecisionLoop = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (isPartOfDecisionLoop) {
+                // Skip implicit loop detection, continue normal compilation
+                // The decision will handle the loop structure when we reach it
+                // Just compile this node normally and continue
+            } else if (this.loweredImplicitLoops.has(nodeId)) {
                 const next = this.getSuccessor(nodeId, "next");
                 return code + this.compileNode(next, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+            } else {
+                this.loweredImplicitLoops.add(nodeId);
+
+                return code + this.compileImplicitForeverLoop(
+                    nodeId,
+                    visitedInPath,
+                    contextStack,
+                    indentLevel,
+                    inLoopBody,
+                    inLoopHeader
+                );
             }
-    
-            this.loweredImplicitLoops.add(nodeId);
-    
-            return code + this.compileImplicitForeverLoop(
-                nodeId,
-                visitedInPath,
-                contextStack,
-                indentLevel,
-                inLoopBody,
-                inLoopHeader
-            );
         }
     
         // ===========================
@@ -772,6 +869,16 @@ compileSingleNode(nodeId, indentLevel) {
 const indent = "    ".repeat(indentLevel);
 let code = "";
 
+// ----- then compile successor chain -----
+const nextId = this.getSuccessor(nodeId, "next");
+
+// Check if this loop has any exit paths (break conditions)
+const hasExit = nextId ? this.hasExitPath(nextId, nodeId) : false;
+
+if (!hasExit) {
+    console.warn(`Warning: Implicit loop at node ${nodeId} has no exit condition - infinite loop`);
+}
+
 // while True header
 code += `${indent}while True:\n`;
 
@@ -781,9 +888,6 @@ if (this.useHighlighting) {
 
 // ----- compile the header node body once (inside loop) -----
 const nodeCode = this.compileSingleNode(nodeId, indentLevel + 1) || "";
-
-// ----- then compile successor chain -----
-const nextId = this.getSuccessor(nodeId, "next");
 
 const bodyCode =
     this.compileNode(
@@ -2148,6 +2252,31 @@ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel ,inLoopBody,
     }
 
     return code;
+}
+
+/**
+ * Check if a path from startId has any exit (reaches END without returning to loopHeaderId)
+ */
+hasExitPath(startId, loopHeaderId, visited = new Set()) {
+    if (!startId || visited.has(startId) || startId === loopHeaderId) return false;
+    
+    visited.add(startId);
+    
+    const node = this.nodes.find(n => n.id === startId);
+    if (!node) return false;
+    
+    // Found END → has exit
+    if (node.type === 'end') return true;
+    
+    // Check all successors
+    const outgoing = this.outgoingMap.get(startId) || [];
+    for (const edge of outgoing) {
+        if (this.hasExitPath(edge.targetId, loopHeaderId, new Set([...visited]))) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 }
