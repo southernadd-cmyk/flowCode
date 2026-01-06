@@ -1541,37 +1541,56 @@ detectForLoopPattern(decisionId) {
     let step = incrementInfo.step || 1;
     const incId = incrementInfo.node.id;
 
-    // -------------------------------
-    // 4) CRITICAL BUT BALANCED CHECK: 
-    // The increment must be on the "main path" - not in a conditional branch
-    // -------------------------------
-    const loopBodyId = this.getSuccessor(decisionId, 'yes');
-    
-    // Strategy: Check if the increment node DOMINATES the back edge
-    // For a for-loop, the increment should be on the main execution path
-    
-    // Find the main execution path (the most direct path from loop start to back edge)
-    const mainPath = this.findMainExecutionPath(loopBodyId, decisionId);
-    console.log(`Main execution path: ${mainPath ? mainPath.join(' -> ') : 'none'}`);
-    
-    if (!mainPath || !mainPath.includes(incId)) {
-        console.log(`Increment ${incId} is not on the main execution path - not a for-loop`);
-        this.forPatternInProgress.delete(decisionId);
-        this.forPatternCache.set(decisionId, null);
-        return null;
-    }
-    
-    // Check if there are alternative paths that skip the increment
-    const alternativePaths = this.findAlternativePaths(loopBodyId, decisionId, incId);
-    console.log(`Found ${alternativePaths.length} alternative paths that skip increment`);
-    
-    if (alternativePaths.length > 0) {
-        console.log(`Not a for-loop: some paths skip the increment`);
-        this.forPatternInProgress.delete(decisionId);
-        this.forPatternCache.set(decisionId, null);
-        return null;
-    }
+   // -------------------------------
+// 4) CRITICAL BUT BALANCED CHECK: 
+// The increment must be on the "main path" - not in a conditional branch
+// -------------------------------
+const loopBodyId = this.getSuccessor(decisionId, 'yes');
 
+// Strategy: Check if the increment node DOMINATES the back edge
+// For a for-loop, the increment should be on the main execution path
+
+// Find the main execution path (the most direct path from loop start to back edge)
+const mainPath = this.findMainExecutionPath(loopBodyId, decisionId);
+console.log(`Main execution path: ${mainPath ? mainPath.join(' -> ') : 'none'}`);
+
+if (!mainPath || !mainPath.includes(incId)) {
+    console.log(`Increment ${incId} is not on the main execution path - not a for-loop`);
+    this.forPatternInProgress.delete(decisionId);
+    this.forPatternCache.set(decisionId, null);
+    return null;
+}
+
+// Check if there are alternative paths that skip the increment
+const alternativePaths = this.findAlternativePaths(loopBodyId, decisionId, incId);
+console.log(`Found ${alternativePaths.length} alternative paths that skip increment`);
+
+if (alternativePaths.length > 0) {
+    console.log(`Not a for-loop: some paths skip the increment`);
+    this.forPatternInProgress.delete(decisionId);
+    this.forPatternCache.set(decisionId, null);
+    return null;
+}
+
+// ============================================
+// NEW: Check for early exits (break/return to END)
+// ============================================
+const earlyExits = this.findEarlyExits(loopBodyId, decisionId);
+console.log(`For-loop check: Found ${earlyExits.length} early exits from loop body ${loopBodyId}`);
+
+// Log the early exit paths for debugging
+for (const exitPath of earlyExits) {
+    console.log(`  Early exit path: ${exitPath.join(' -> ')}`);
+}
+
+// True for-loops should NOT have early exits to END
+// (they only exit when the loop condition becomes false)
+if (earlyExits.length > 0) {
+    console.log(`Decision ${decisionId}: REJECTED as for-loop - has ${earlyExits.length} early exit(s) to END`);
+    this.forPatternInProgress.delete(decisionId);
+    this.forPatternCache.set(decisionId, null);
+    return null;
+}
     // -------------------------------
     // 5) Handle increasing vs decreasing loops
     // -------------------------------
@@ -1737,6 +1756,9 @@ checkForBreakToEnd(startId, loopHeaderId) {
 /**
  * Find early exits (paths that go to END without returning to loop header)
  */
+/**
+ * Find early exits (paths that go to END without returning to loop header)
+ */
 findEarlyExits(startId, loopHeaderId) {
     const exits = [];
     const stack = [{ nodeId: startId, path: [] }];
@@ -1768,7 +1790,6 @@ findEarlyExits(startId, loopHeaderId) {
     
     return exits;
 }
-
 /**
  * Check if a path exists from startId to targetId
  */
