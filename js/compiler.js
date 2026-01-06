@@ -118,7 +118,33 @@ if (start) dfs(start.id);
 
 return headers;
 }
-
+/**
+ * Check if there are decision nodes between startId and when it loops back
+ */
+hasDecisionInLoopPath(loopHeaderId) {
+    const visited = new Set();
+    const stack = [this.getSuccessor(loopHeaderId, 'next')];
+    
+    while (stack.length > 0) {
+        const currentId = stack.pop();
+        if (!currentId || visited.has(currentId) || currentId === loopHeaderId) continue;
+        visited.add(currentId);
+        
+        const node = this.nodes.find(n => n.id === currentId);
+        if (node && node.type === 'decision') {
+            return true;
+        }
+        
+        const outgoing = this.outgoingMap.get(currentId) || [];
+        for (const edge of outgoing) {
+            // If this edge goes back to the loop header, skip it
+            if (edge.targetId === loopHeaderId) continue;
+            stack.push(edge.targetId);
+        }
+    }
+    
+    return false;
+}
 /**
  * Mark all nodes in a decision-controlled loop body
  */
@@ -659,50 +685,35 @@ isConvergencePoint(nodeId) {
         // Check for implicit loops ONLY if this node is not part of a decision-controlled loop
         // (Decision loops are handled in compileDecision, which runs before we get here for decision nodes)
         if (this.implicitLoopHeaders && this.implicitLoopHeaders.has(nodeId)) {
-            // Double-check: if this node is reachable from a decision's loop body, don't treat as implicit loop
-            // This prevents nodes like input/process in while loops from being marked as implicit loops
-            let isPartOfDecisionLoop = false;
-            
-            // Check if any decision node has a loop that includes this node
-            for (const dec of this.nodes.filter(n => n.type === "decision")) {
-                const yesId = this.getSuccessor(dec.id, 'yes');
-                const noId = this.getSuccessor(dec.id, 'no');
+            // NEW: Check if this is a multi-exit while True loop (has decisions in loop path)
+            if (this.hasDecisionInLoopPath(nodeId)) {
+                console.log(`Multi-exit while True loop detected at ${nodeId}`);
                 
-                // Check if YES branch loops back
-                if (yesId && this.canReach(yesId, dec.id, new Set())) {
-                    // Check if nodeId is the loop body entry point or reachable from it
-                    if (yesId === nodeId || this.canReach(yesId, nodeId, new Set([dec.id]))) {
-                        // Also check if nodeId can reach back to decision (completes the loop)
-                        if (this.canReach(nodeId, dec.id, new Set())) {
-                            isPartOfDecisionLoop = true;
-                            break;
-                        }
-                    }
+                if (this.loweredImplicitLoops.has(nodeId)) {
+                    const next = this.getSuccessor(nodeId, "next");
+                    return code + this.compileNode(next, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
+                } else {
+                    this.loweredImplicitLoops.add(nodeId);
+                    
+                    // Use the SAME compileImplicitForeverLoop method - it will work!
+                    // The decisions inside will generate break statements when they exit to END
+                    return code + this.compileImplicitForeverLoop(
+                        nodeId,
+                        visitedInPath,
+                        contextStack,
+                        indentLevel,
+                        inLoopBody,
+                        inLoopHeader
+                    );
                 }
-                
-                // Check if NO branch loops back
-                if (noId && this.canReach(noId, dec.id, new Set())) {
-                    // Check if nodeId is the loop body entry point or reachable from it
-                    if (noId === nodeId || this.canReach(noId, nodeId, new Set([dec.id]))) {
-                        // Also check if nodeId can reach back to decision (completes the loop)
-                        if (this.canReach(nodeId, dec.id, new Set())) {
-                            isPartOfDecisionLoop = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (isPartOfDecisionLoop) {
-                // Skip implicit loop detection, continue normal compilation
-                // The decision will handle the loop structure when we reach it
-                // Just compile this node normally and continue
-            } else if (this.loweredImplicitLoops.has(nodeId)) {
+            } 
+            // Rest of the existing logic for other implicit loops
+            else if (this.loweredImplicitLoops.has(nodeId)) {
                 const next = this.getSuccessor(nodeId, "next");
                 return code + this.compileNode(next, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
             } else {
                 this.loweredImplicitLoops.add(nodeId);
-
+        
                 return code + this.compileImplicitForeverLoop(
                     nodeId,
                     visitedInPath,
@@ -713,7 +724,52 @@ isConvergencePoint(nodeId) {
                 );
             }
         }
+    // FORCE while True loop for process nodes with back edges
+if (node.type === "process" || node.type === "var") {
+    // Check if this node has any back edge to itself
+    const hasBackEdge = this.backEdges.some(edge => 
+        edge.to === nodeId && edge.from !== nodeId
+    );
     
+    // Also check if any successor eventually leads back here
+    const hasLoop = this.canReach(this.getSuccessor(nodeId, 'next'), nodeId, new Set());
+    
+    if (hasBackEdge || hasLoop) {
+        // Check if we haven't already compiled this loop
+        if (!this.loweredImplicitLoops.has(nodeId)) {
+            console.log(`FORCING while True loop for ${nodeId} (process with back edge)`);
+            this.loweredImplicitLoops.add(nodeId);
+            
+            const indent = "    ".repeat(indentLevel);
+            let loopCode = `${indent}while True:\n`;
+            
+            if (this.useHighlighting) {
+                loopCode += `${indent}    highlight('${nodeId}')\n`;
+            }
+            
+            // Compile this node inside the loop
+            const nodeCode = this.compileSingleNode(nodeId, indentLevel + 1);
+            
+            // Compile the rest
+            const nextId = this.getSuccessor(nodeId, "next");
+            const bodyCode = this.compileNode(
+                nextId,
+                new Set(),
+                [...contextStack, `implicit_${nodeId}`],
+                indentLevel + 1,
+                true,  // inLoopBody
+                false  // inLoopHeader
+            );
+            
+            const fullBody = (nodeCode + bodyCode).trim()
+                ? nodeCode + bodyCode
+                : `${indent}    pass\n`;
+            
+            loopCode += fullBody;
+            return code + loopCode;
+        }
+    }
+}
         // ===========================
         // emit real code for node (AFTER highlight)
         // ===========================
@@ -775,7 +831,7 @@ if (inLoopBody && nextNodeId) {
                 : ctx.replace('implicit_', '');
             
             // If next leads back to OUR loop header, it's not a break
-            if (this.pathLeadsTo(nextNodeId, loopHeaderId, new Set([nodeId]))) {
+            if (this.pathLeadsTo(nextNodeId, loopHeaderId, new Set())) {
                 exitsCurrentLoop = false;
                 break;
             }
@@ -798,12 +854,20 @@ if (inLoopBody && nextNodeId) {
 // In compileNode method, update the back edge check section:
 
 // Normal loop back edge check - SIMPLIFIED
+// In compileNode, in the back edge check section:
 if (contextStack.some(ctx => ctx.startsWith("loop_") || ctx.startsWith("implicit_"))) {
     for (const ctx of contextStack) {
         if (ctx.startsWith("loop_") || ctx.startsWith("implicit_")) {
             const hdr = ctx.startsWith("loop_")
                 ? ctx.replace("loop_", "")
                 : ctx.replace("implicit_", "");
+            
+            // Check if this node IS the loop header
+            if (nodeId === hdr) {
+                console.log(`Node ${nodeId} is the loop header - stopping`);
+                return code; // Stop here
+            }
+            
             // Check if this node directly connects to the loop header
             const outgoing = this.outgoingMap.get(nodeId) || [];
             const goesToHeader = outgoing.some(edge => edge.targetId === hdr);
