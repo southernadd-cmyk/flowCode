@@ -1017,6 +1017,7 @@ return code;
 
     // Compile NO branch
     if (noId) {
+        if (!code.endsWith("\n")) code += "\n";
         code += `${indent}else:\n`;
         const elseContext = [...contextStack, `else_${node.id}`];
         const elseVisited = new Set([...visitedInPath]);
@@ -1388,7 +1389,7 @@ let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLo
 
 // Add break if this branch exits loop
 if (yesExits && !ifCode.includes('break')) {
-ifCode = ifCode.replace(/\s+$/g, "");
+    ifCode = ifCode.replace(/\n+$/g, "\n");
 if (ifCode) {
 // ensure a clean line for break:
 if (!ifCode.endsWith("\n")) ifCode += "\n";
@@ -1410,14 +1411,15 @@ let elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,
 
 // Add break if this branch exits loop
 if (noExits && !elseCode.includes('break')) {
-elseCode = elseCode.replace(/\s+$/g, "");
-if (elseCode) {
-    if (!ifCode.endsWith("\n")) ifCode += "\n";
-    ifCode += `${indent}    break\n`;
-} else {
-elseCode = `${indent}    break`;
+    elseCode = elseCode.replace(/\n+$/g, "\n");
+
+    if (!elseCode.endsWith("\n")) {
+        elseCode += "\n";
+    }
+
+    elseCode += `${indent}    break\n`;
 }
-}
+
 
 code += elseCode || `${indent}    pass\n`;
 }
@@ -2293,6 +2295,7 @@ return null;
                 const elseVisited = visitedInPath;
                 const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
                 elseVisited.add(elseDecisionContextId);
+                if (!code.endsWith("\n")) code += "\n";
 
                 code += `${indent}else:\n`;
                 const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,inLoopBody,inLoopHeader);
@@ -2307,7 +2310,7 @@ return null;
             const elseVisited = visitedInPath;
             const elseDecisionContextId = `${node.id}_${elseContext.join('_')}_${indentLevel + 1}`;
             elseVisited.add(elseDecisionContextId);
-
+            if (!code.endsWith("\n")) code += "\n";
             code += `${indent}else:\n`;
             const elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1,inLoopBody,inLoopHeader);
             code += elseCode || `${indent}    pass\n`;
@@ -2353,7 +2356,7 @@ compileElifChain(elifNode, visitedInPath, contextStack, indentLevel ,inLoopBody,
             currentElif = nextNode;
             continue;
         }
-
+        if (!code.endsWith("\n")) code += "\n";
         // Final else clause
         code += `${indent}else:\n`;
         const elseCode = this.compileNode(elifNoId, visitedInPath, contextStack, indentLevel + 1,inLoopBody,inLoopHeader);
