@@ -18,6 +18,20 @@ screenFromWorld(x, y) {
     };
 }
 ,
+ mapExecLineToUserLine(execCode, userCode, execLine) {
+
+    const execLines = execCode.split("\n");
+
+    let visibleLine = execLine;
+
+    for (let i = 0; i < execLine - 1; i++) {
+        if (execLines[i].trim().startsWith("highlight(")) {
+            visibleLine -= 1;
+        }
+    }
+
+    return visibleLine;
+},
 exportPython() {
     const code = document.getElementById("code-python").innerText || "";
 
@@ -633,8 +647,30 @@ try {
     );
     await this.skulptTask;
 } catch (e) {
-    if (!this.cancelExecution) this.log(String(e));
+
+    let pyLine = null;
+
+    if (e.traceback && e.traceback.length > 0) {
+        pyLine = e.traceback[0].lineno;
+
+        // 🔥 adjust for highlight lines
+        const userLine = this.mapExecLineToUserLine(
+            this.fullExecCode,
+            document.getElementById('code-python').innerText,
+            pyLine
+        );
+
+this.log(
+    "Error on line " + userLine + "\n" +
+    (e.tp$name || "Error") + ": " + e.message
+);
+
+        return;
+    }
+
+    this.log(e.toString());
 }
+
 
 this.isRunning = false;
 document.querySelectorAll('.node').forEach(n => n.classList.remove('running'));
