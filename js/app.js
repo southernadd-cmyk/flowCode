@@ -977,7 +977,7 @@ if (node.text && node.text.includes("=")) {
     }
 }
 
-const length = values.length || 3;
+const length = values.length || 0;
 
 // build initial element inputs
 let elementsHtml = "";
@@ -1233,4 +1233,5 @@ addDot(parent, cls, portType) {
             this.updateCode(); 
         } 
     }
+
 };
