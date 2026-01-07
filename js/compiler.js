@@ -9,7 +9,8 @@ class FlowchartCompiler {
         this.nodesToSkip = new Set();
         this.forPatternCache = new Map();
         this.forPatternInProgress = new Set();
-        
+        this.insertedBreak = false;
+
         // Dominator analysis
         this.dominators = new Map();           // nodeId -> Set of dominators
         this.immediateDominator = new Map();   // nodeId -> immediate dominator ID
@@ -547,6 +548,7 @@ getLoopInfo(headerId) {
  */
  compile() {
     this.forPatternCache.clear();
+    this.insertedBreak = false;
     this.forPatternInProgress.clear();
     const startNode = this.nodes.find(n => n.type === 'start');
     if (!startNode) return "# Add a Start node.";
@@ -1401,15 +1403,18 @@ let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLo
 
 // Add break if this branch exits loop
 
-if (yesExits && !ifCode.includes('break')) {
+if (yesExits && !this.insertedBreak) {
+
     ifCode = ifCode.replace(/\n+$/g, "\n");
     if (ifCode) {
         // ensure a clean line for break:
         if (!ifCode.endsWith("\n")) ifCode += "\n";
         ifCode += `${indent}    break\n`;
+        this.insertedBreak = true;
     } else {
         // FIX: add the newline here
         ifCode = `${indent}    break\n`;
+        this.insertedBreak = true;
     }
 }
 
@@ -1424,7 +1429,7 @@ const elseVisited = new Set([...visitedInPath]);
 let elseCode = this.compileNode(noId, elseVisited, elseContext, indentLevel + 1, inLoopBody, inLoopHeader);
 
 // Add break if this branch exits loop
-if (noExits && !elseCode.includes('break')) {
+if (noExits && !this.insertedBreak) {
     elseCode = elseCode.replace(/\n+$/g, "\n");
 
     if (!elseCode.endsWith("\n")) {
@@ -1432,6 +1437,8 @@ if (noExits && !elseCode.includes('break')) {
     }
 
     elseCode += `${indent}    break\n`;
+    this.insertedBreak = true;
+
 }
 
 
