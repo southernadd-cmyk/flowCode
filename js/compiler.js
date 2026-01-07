@@ -1618,6 +1618,7 @@ if (hasBreakToEnd && exitId) {
     code += bodyCode.trim() ? bodyCode : `${indent}    pass\n`;
     
     // Add else clause for exit path
+    if (!code.endsWith("\n")) code += "\n";
     code += `${indent}else:\n`;
     const exitCode = this.compileNode(exitId, visitedInPath, contextStack, indentLevel + 1, false, false);
     code += exitCode || `${indent}    pass\n`;
