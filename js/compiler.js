@@ -813,47 +813,8 @@ if ((node.type === "process" || node.type === "var") &&
 // ===========================
 const nextNodeId = this.getSuccessor(nodeId, "next");
 
-// BREAK DETECTION: If we're in a loop body and next goes to END
-if (inLoopBody && nextNodeId) {
-    const nextNode = this.nodes.find(n => n.id === nextNodeId);
-    
-    // Case: Next is END → emit break and stop
-    if (nextNode && nextNode.type === "end") {
-        const indent = "    ".repeat(indentLevel);
-        code += `${indent}break\n`;
-        return code;  // Don't follow to END
-    }
-    
-    // Case: Check if this path exits our current loop
-    // (doesn't go back to any loop header in context)
-    let exitsCurrentLoop = true;
-    
-    for (const ctx of contextStack) {
-        if (ctx.startsWith('loop_') || ctx.startsWith('implicit_')) {
-            const loopHeaderId = ctx.startsWith('loop_') 
-                ? ctx.replace('loop_', '')
-                : ctx.replace('implicit_', '');
-            
-            // If next leads back to OUR loop header, it's not a break
-            if (this.pathLeadsTo(nextNodeId, loopHeaderId, new Set())) {
-                exitsCurrentLoop = false;
-                break;
-            }
-            
-            // Also check if next IS our loop header
-            if (nextNodeId === loopHeaderId) {
-                exitsCurrentLoop = false;
-                break;
-            }
-        }
-    }
-    
-    if (exitsCurrentLoop) {
-        const indent = "    ".repeat(indentLevel);
-        code += `${indent}break\n`;
-        return code;  // Don't follow exit path
-    }
-}
+
+
 
 // In compileNode method, update the back edge check section:
 
@@ -989,8 +950,21 @@ return code;
     // ============================================
     if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_') || ctx.startsWith('implicit_'))) {
         // Check if branches exit the current loop
-        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
-        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
+        const loopCtx = [...contextStack]
+        .reverse()
+        .find(ctx =>
+            ctx.startsWith('loop_') || ctx.startsWith('implicit_')
+        );
+    
+        let headerId = null;
+        if (loopCtx) {
+            headerId = loopCtx.replace('loop_', '').replace('implicit_', '');
+        }
+        
+        const yesExits = headerId ? this.reachesEndWithoutReturningToHeader(yesId, headerId) : false;
+        const noExits  = headerId ? this.reachesEndWithoutReturningToHeader(noId,  headerId) : false;
+        
+
         
         // If any branch exits, use special loop exit decision compilation
         if (yesExits || noExits) {
@@ -1374,6 +1348,44 @@ doesBranchExitLoop(startId, contextStack, currentNodeId) {
     
     return false;
 }
+
+// Does 'fromId' reach END without coming back to loop header 'headerId'?
+reachesEndWithoutReturningToHeader(fromId, headerId, visited = new Set()) {
+    if (!fromId || visited.has(fromId)) return false;
+    visited.add(fromId);
+
+    const node = this.nodes.find(n => n.id === fromId);
+    if (!node) return false;
+
+    // If we reach END → success
+    if (node.type === "end") return true;
+
+    // If we come back to the header → not an exit
+    if (fromId === headerId) return false;
+
+    // Follow all successors depending on node type
+    const succs = [];
+
+    if (node.type === "decision") {
+        const y = this.getSuccessor(fromId, "yes");
+        const n = this.getSuccessor(fromId, "no");
+        if (y) succs.push(y);
+        if (n) succs.push(n);
+    } else {
+        const next = this.getSuccessor(fromId, "next");
+        if (next) succs.push(next);
+    }
+
+    // Search each successor
+    for (const s of succs) {
+        if (this.reachesEndWithoutReturningToHeader(s, headerId, visited)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Compile a decision inside loop where branches might exit with break
  */
@@ -2240,8 +2252,21 @@ return null;
     // ============================================
     if (inLoopBody || contextStack.some(ctx => ctx.startsWith('loop_') || ctx.startsWith('implicit_'))) {
         // Check if branches exit the current loop
-        const yesExits = yesId ? this.doesBranchExitLoop(yesId, contextStack, node.id) : false;
-        const noExits = noId ? this.doesBranchExitLoop(noId, contextStack, node.id) : false;
+        const loopCtx = [...contextStack]
+        .reverse()
+        .find(ctx =>
+            ctx.startsWith('loop_') || ctx.startsWith('implicit_')
+        );
+    
+        
+        let headerId = null;
+        if (loopCtx) {
+            headerId = loopCtx.replace('loop_', '').replace('implicit_', '');
+        }
+        
+        const yesExits = headerId ? this.reachesEndWithoutReturningToHeader(yesId, headerId) : false;
+        const noExits  = headerId ? this.reachesEndWithoutReturningToHeader(noId,  headerId) : false;
+        
         
         // If any branch exits, use special loop exit decision compilation
         if (yesExits || noExits) {
