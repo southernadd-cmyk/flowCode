@@ -1400,17 +1400,19 @@ const ifVisited = new Set([...visitedInPath]);
 let ifCode = this.compileNode(yesId, ifVisited, ifContext, indentLevel + 1, inLoopBody, inLoopHeader);
 
 // Add break if this branch exits loop
+
 if (yesExits && !ifCode.includes('break')) {
     ifCode = ifCode.replace(/\n+$/g, "\n");
-if (ifCode) {
-// ensure a clean line for break:
-if (!ifCode.endsWith("\n")) ifCode += "\n";
-ifCode += `${indent}    break\n`;
+    if (ifCode) {
+        // ensure a clean line for break:
+        if (!ifCode.endsWith("\n")) ifCode += "\n";
+        ifCode += `${indent}    break\n`;
+    } else {
+        // FIX: add the newline here
+        ifCode = `${indent}    break\n`;
+    }
+}
 
-} else {
-ifCode = `${indent}    break`;
-}
-}
 
 code += ifCode || `${indent}    pass\n`;
 
