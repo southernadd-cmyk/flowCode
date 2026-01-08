@@ -1,4 +1,229 @@
 window.FlowCode = window.FlowCode || {};
+const ELBOW_GAP = 35;   // minimum distance from ports
+const GRID = 10;       // soft snap grid
+
+function snap(v) {
+    return Math.round(v / GRID) * GRID;
+}
+
+function clampElbow(v, a, b) {
+    const min = Math.min(a, b) + ELBOW_GAP;
+    const max = Math.max(a, b) - ELBOW_GAP;
+    return Math.min(max, Math.max(min, v));
+}
+
+function rectIntersectsVertical(x, y1, y2, rect) {
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    return (
+        x >= rect.x &&
+        x <= rect.x + rect.w &&
+        maxY >= rect.y &&
+        minY <= rect.y + rect.h
+    );
+}
+
+function rectIntersectsHorizontal(y, x1, x2, rect) {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    return (
+        y >= rect.y &&
+        y <= rect.y + rect.h &&
+        maxX >= rect.x &&
+        minX <= rect.x + rect.w
+    );
+}
+
+function orthogonalSmart(p1, p2, nodes) {
+    const GAP = 30;  // Increased gap for better clearance
+    const MIN_SEGMENT = 40; // Minimum segment length for clean elbows
+    
+    // Helper: check if a point is too close to any node
+    function pointTooCloseToNode(x, y, excludeNodeId = null) {
+        for (const node of nodes) {
+            if (excludeNodeId && node.id === excludeNodeId) continue;
+            
+            const d = {
+                start:    { w: 95,  h: 40 },
+                end:      { w: 95,  h: 40 },
+                process:  { w: 120, h: 50 },
+                var:      { w: 120, h: 50 },
+                list:     { w: 140, h: 50 },
+                input:    { w: 130, h: 50 },
+                output:   { w: 130, h: 50 },
+                decision: { w: 130, h: 110 }
+            }[node.type] || { w: 120, h: 50 };
+            
+            // Add padding for clearance
+            const padding = 15;
+            const rect = {
+                x: node.x - padding,
+                y: node.y - padding,
+                w: d.w + padding * 2,
+                h: d.h + padding * 2
+            };
+            
+            if (x >= rect.x && x <= rect.x + rect.w && 
+                y >= rect.y && y <= rect.y + rect.h) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Helper: check if a segment intersects any node
+    function segmentIntersectsNode(x1, y1, x2, y2, excludeNodeId = null) {
+        for (const node of nodes) {
+            if (excludeNodeId && node.id === excludeNodeId) continue;
+            
+            const d = {
+                start:    { w: 95,  h: 40 },
+                end:      { w: 95,  h: 40 },
+                process:  { w: 120, h: 50 },
+                var:      { w: 120, h: 50 },
+                list:     { w: 140, h: 50 },
+                input:    { w: 130, h: 50 },
+                output:   { w: 130, h: 50 },
+                decision: { w: 130, h: 110 }
+            }[node.type] || { w: 120, h: 50 };
+            
+            const rect = { x: node.x, y: node.y, w: d.w, h: d.h };
+            
+            // Check horizontal segment
+            if (Math.abs(y1 - y2) < 1) { // horizontal
+                if (rectIntersectsHorizontal(y1, x1, x2, rect)) return true;
+            }
+            // Check vertical segment
+            else if (Math.abs(x1 - x2) < 1) { // vertical
+                if (rectIntersectsVertical(x1, y1, y2, rect)) return true;
+            }
+        }
+        return false;
+    }
+    
+    // Simple downward flow (most common case)
+    if (p2.y > p1.y + GAP) {
+        const midY = p1.y + GAP + (p2.y - p1.y - GAP * 2) / 2;
+        const elbowX = p1.x;
+        
+        // Try simple L-shaped route first
+        const path1 = `
+            M ${p1.x} ${p1.y}
+            V ${midY}
+            H ${p2.x}
+            V ${p2.y}
+        `;
+        
+        // Check if this simple path is clear
+        if (!segmentIntersectsNode(p1.x, p1.y, p1.x, midY) &&
+            !segmentIntersectsNode(p1.x, midY, p2.x, midY) &&
+            !segmentIntersectsNode(p2.x, midY, p2.x, p2.y)) {
+            return path1.replace(/\s+/g, ' ');
+        }
+        
+        // Try alternative with longer vertical first
+        const altMidY = Math.max(p1.y + GAP * 2, p2.y - GAP * 2);
+        const path2 = `
+            M ${p1.x} ${p1.y}
+            V ${altMidY}
+            H ${p2.x}
+            V ${p2.y}
+        `;
+        
+        if (!segmentIntersectsNode(p1.x, p1.y, p1.x, altMidY) &&
+            !segmentIntersectsNode(p1.x, altMidY, p2.x, altMidY) &&
+            !segmentIntersectsNode(p2.x, altMidY, p2.x, p2.y)) {
+            return path2.replace(/\s+/g, ' ');
+        }
+    }
+    
+    // Target is above source (loopback)
+    if (p2.y < p1.y) {
+        const dir = p1.x < p2.x ? -1 : 1;
+        
+        // Try multiple lanes with increasing distance
+        for (let lane = 0; lane < 5; lane++) {
+            const laneX = p1.x + dir * (80 + lane * 60);
+            const detourY = p1.y + GAP * 2;
+            
+            // Check all segments for clearance
+            const segments = [
+                [p1.x, p1.y, p1.x, p1.y + GAP],
+                [p1.x, p1.y + GAP, laneX, p1.y + GAP],
+                [laneX, p1.y + GAP, laneX, p2.y - GAP],
+                [laneX, p2.y - GAP, p2.x, p2.y - GAP],
+                [p2.x, p2.y - GAP, p2.x, p2.y]
+            ];
+            
+            let clear = true;
+            for (const [x1, y1, x2, y2] of segments) {
+                if (segmentIntersectsNode(x1, y1, x2, y2)) {
+                    clear = false;
+                    break;
+                }
+            }
+            
+            if (clear) {
+                return `
+                    M ${p1.x} ${p1.y}
+                    V ${p1.y + GAP}
+                    H ${laneX}
+                    V ${p2.y - GAP}
+                    H ${p2.x}
+                    V ${p2.y}
+                `.replace(/\s+/g, ' ');
+            }
+        }
+    }
+    
+    // Target is at similar height (sideways flow)
+    if (Math.abs(p2.y - p1.y) < GAP * 2) {
+        const midX = (p1.x + p2.x) / 2;
+        
+        // Try U-shaped route
+        const detourY = Math.min(p1.y, p2.y) - GAP * 2;
+        
+        if (detourY > 0 && 
+            !segmentIntersectsNode(p1.x, p1.y, p1.x, detourY) &&
+            !segmentIntersectsNode(p1.x, detourY, p2.x, detourY) &&
+            !segmentIntersectsNode(p2.x, detourY, p2.x, p2.y)) {
+            return `
+                M ${p1.x} ${p1.y}
+                V ${detourY}
+                H ${p2.x}
+                V ${p2.y}
+            `.replace(/\s+/g, ' ');
+        }
+        
+        // Try downward U-shaped route
+        const detourY2 = Math.max(p1.y, p2.y) + GAP * 2;
+        if (!segmentIntersectsNode(p1.x, p1.y, p1.x, detourY2) &&
+            !segmentIntersectsNode(p1.x, detourY2, p2.x, detourY2) &&
+            !segmentIntersectsNode(p2.x, detourY2, p2.x, p2.y)) {
+            return `
+                M ${p1.x} ${p1.y}
+                V ${detourY2}
+                H ${p2.x}
+                V ${p2.y}
+            `.replace(/\s+/g, ' ');
+        }
+    }
+    
+    // Fallback: Z-shaped route with good clearance
+    const midY1 = p1.y + GAP;
+    const midY2 = p2.y - GAP;
+    const midX = (p1.x + p2.x) / 2;
+    
+    return `
+        M ${p1.x} ${p1.y}
+        V ${midY1}
+        H ${midX}
+        V ${midY2}
+        H ${p2.x}
+        V ${p2.y}
+    `.replace(/\s+/g, ' ');
+}
+
 window. App = {
     nodes: [], connections: [], nextId: 1, isRunning: false,
     isConnecting: false, connStart: null, fullExecCode: "",
@@ -158,36 +383,12 @@ exportRoot.style.isolation = "isolate";
     svg.appendChild(defs);
     stage.appendChild(svg);
 
-    // Manhattan router (same shape as your drawConns, but in LOCAL coords)
-    function orthogonal(p1, p2) {
-        const GAP = 25;
-        const SIDE = 90;
 
-        if (p2.y >= p1.y) {
-            const y1 = p1.y + GAP;
-            const midY = (y1 + (p2.y - GAP)) / 2;
 
-            return `
-                M ${p1.x} ${p1.y}
-                V ${y1}
-                V ${midY}
-                H ${p2.x}
-                V ${p2.y - GAP}
-                V ${p2.y}
-            `.replace(/\s+/g, " ");
-        }
 
-        const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
 
-        return `
-            M ${p1.x} ${p1.y}
-            V ${p1.y + GAP}
-            H ${sideX}
-            V ${p2.y - GAP}
-            H ${p2.x}
-            V ${p2.y}
-        `.replace(/\s+/g, " ");
-    }
+
+
 
     // 4) Clone node DOM into export stage at translated positions
     //    (Keeps your shapes/styles exactly as the app renders them)
@@ -219,7 +420,8 @@ exportRoot.style.isolation = "isolate";
         const p2 = toLocal(p2w.x, p2w.y);
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", orthogonal(p1, p2));
+        path.setAttribute("d", orthogonalSmart(p1, p2, this.nodes));
+
         path.setAttribute("fill", "none");
 
         const stroke =
@@ -646,7 +848,47 @@ const id = `n${this.nextId++}`;
 },
 
 drawConns() {
-
+function cleanPath(pathStr) {
+        // Remove duplicate consecutive H/V commands and very short segments
+        const commands = pathStr.match(/[A-Z][^A-Z]*/g);
+        if (!commands) return pathStr;
+        
+        const cleaned = [];
+        let lastX = 0, lastY = 0;
+        
+        for (let i = 0; i < commands.length; i++) {
+            const cmd = commands[i];
+            const type = cmd[0];
+            const coords = cmd.slice(1).trim().split(/[\s,]+/).map(parseFloat);
+            
+            if (type === 'M') {
+                lastX = coords[0];
+                lastY = coords[1];
+                cleaned.push(cmd);
+            } 
+            else if (type === 'V') {
+                const y = coords[0];
+                // Skip if this vertical move is tiny
+                if (Math.abs(y - lastY) > 15) {
+                    cleaned.push(cmd);
+                    lastY = y;
+                }
+            }
+            else if (type === 'H') {
+                const x = coords[0];
+                // Skip if this horizontal move is tiny
+                if (Math.abs(x - lastX) > 15) {
+                    cleaned.push(cmd);
+                    lastX = x;
+                }
+            }
+            else {
+                cleaned.push(cmd);
+            }
+        }
+        
+        return cleaned.join(' ');
+    }
 // Remove old labels
 document.querySelectorAll('.conn-label').forEach(l => l.remove());
 
@@ -656,44 +898,6 @@ this.svgLayer.innerHTML = "";
 this.svgLayer.appendChild(d);
 this.svgLayer.appendChild(this.dragLine);
 
-// Manhattan router
-function orthogonal(p1, p2) {
-
-    const GAP = 25;   // spacing away from shapes
-    const SIDE = 90;  // width for loopbacks
-
-    // ---------- NORMAL DOWNWARD FLOW ----------
-    if (p2.y >= p1.y) {
-
-        // go straight down a bit to clear node
-        const y1 = p1.y + GAP;
-
-        // midpoint between source and target
-        const midY = (y1 + p2.y - GAP) / 2;
-
-        return `
-            M ${p1.x} ${p1.y}
-            V ${y1}
-            V ${midY}
-            H ${p2.x}
-            V ${p2.y - GAP}
-            V ${p2.y}
-        `.replace(/\s+/g, ' ');
-    }
-
-    // ---------- LOOPBACK / TARGET ABOVE ----------
-    // route sideways, then up, then across
-    const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
-
-    return `
-        M ${p1.x} ${p1.y}
-        V ${p1.y + GAP}
-        H ${sideX}
-        V ${p2.y - GAP}
-        H ${p2.x}
-        V ${p2.y}
-    `.replace(/\s+/g, ' ');
-}
 
 // Draw each connection
 this.connections.forEach(c => {
@@ -707,9 +911,14 @@ const p1 = this.screenFromWorld(p1w.x, p1w.y);
 const p2 = this.screenFromWorld(p2w.x, p2w.y);
 
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 
-    const dStr = orthogonal(p1, p2);
+
+// CHANGE IT TO:
+let dStr = orthogonalSmart(p1, p2, this.nodes);
+dStr = cleanPath(dStr);  // Add this line
+
+const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+path.setAttribute('d', dStr);
 
     path.setAttribute('d', dStr);
 
