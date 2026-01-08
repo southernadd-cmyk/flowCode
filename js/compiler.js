@@ -923,29 +923,29 @@ if (contextStack.some(ctx => ctx.startsWith("loop_") || ctx.startsWith("implicit
 
 // For convergence points: compile successors first, then mark as compiled
 // This ensures successors are only compiled once, even if multiple paths reach the convergence point
+// In the compileNode method, modify the convergence point logic:
 if (isConvergencePoint) {
-    // If this convergence point should be skipped during elif chain compilation,
-    // just return the node code (don't compile successors - they'll be compiled after the chain)
-    if (this.skipConvergencePoints && this.skipConvergencePoints.has(nodeId)) {
-        console.log(`Skipping successors of convergence point ${nodeId} during elif chain compilation`);
-        return code; // Return node code only, successors will be compiled after the chain
+    // For output nodes that are convergence points, we should still compile them
+    // because they might be reached from different logical paths
+    if (node.type === "output" && this.compiledConvergencePoints.has(nodeId)) {
+        // For output nodes, we want to compile them again when reached from different paths
+        // because they represent different logical outcomes
+        // Don't return empty - instead, just compile the node code without successors
+        console.log(`Recompiling output convergence point: ${nodeId} from different path`);
+        // Still add highlight
+        code += this.emitHighlight(nodeId, indentLevel);
+        
+        // Compile the output node
+        const indent = "    ".repeat(indentLevel);
+        code += `${indent}print(${node.text})\n`;
+        
+        // But don't compile successors again (they're already compiled)
+        return code;
     }
     
-    if (!this.compiledConvergencePoints.has(nodeId)) {
-        // First time visiting this convergence point - compile successors
-        if (nextNodeId) {
-            const successorCode = this.compileNode(nextNodeId, visitedInPath, contextStack, indentLevel, inLoopBody, inLoopHeader);
-            // Mark as compiled AFTER compiling successors
-            this.compiledConvergencePoints.add(nodeId);
-            return code + successorCode;
-        } else {
-            // No successor, just mark as compiled
-            this.compiledConvergencePoints.add(nodeId);
-            return code;
-        }
-    } else {
-        // Already compiled - return empty to skip this path entirely
-        // (the node code and successors were already compiled by the first path)
+    // For non-output convergence points, check if already compiled
+    if (this.compiledConvergencePoints.has(nodeId)) {
+        console.log(`Skipping already compiled convergence point: ${nodeId}`);
         return "";
     }
 }
@@ -2820,5 +2820,6 @@ hasExitPath(startId, loopHeaderId, visited = new Set()) {
     
     return false;
 }
+
 
 }
