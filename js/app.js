@@ -69,74 +69,228 @@ exportJSON() {
 ,   
 
 async exportImage() {
-
-if (this.nodes.length === 0) {
-    alert("Nothing to export.");
-    return;
-}
-
-const canvasEl = document.getElementById("canvas");
-
-// 1️⃣ Save user viewport
-const oldScale = this.viewportScale;
-const oldX = this.viewportX;
-const oldY = this.viewportY;
-
-// 2️⃣ Compute bounding box of all nodes
-let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-this.nodes.forEach(n => {
-    minX = Math.min(minX, n.x);
-    minY = Math.min(minY, n.y);
-    maxX = Math.max(maxX, n.x + 180);  // rough width
-    maxY = Math.max(maxY, n.y + 120);  // rough height
-});
-
-// 3️⃣ Reset viewport (no CSS transform)
-this.viewportScale = 1;
-this.viewportX = -minX + 30;
-this.viewportY = -minY + 30;
-this.applyViewportTransform();
-
-// 4️⃣ Redraw connectors at real coordinates
-this.drawConns();
-document.getElementById("zoombox").style.display = "none";
-// 5️⃣ wait for layout/paint
-await new Promise(r => requestAnimationFrame(r));
-
-// 6️⃣ Capture
-const canvas = await html2canvas(canvasEl, {
-    backgroundColor: "#ffffff",
-    scale: 2
-});
-
-// 7️⃣ Restore user view
-this.viewportScale = oldScale;
-this.viewportX = oldX;
-this.viewportY = oldY;
-this.applyViewportTransform();
-this.drawConns();
-document.getElementById("zoombox").style.display = "block";
-// 8️⃣ Download
-canvas.toBlob(blob => {
-    if (!blob) {
-        const url = canvas.toDataURL("image/png");
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "flowchart.png";
-        a.click();
+    if (this.nodes.length === 0) {
+        alert("Nothing to export.");
         return;
     }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "flowchart.png";
-    a.click();
-    URL.revokeObjectURL(url);
-});
-}
-,
+    // --- Node dimensions must match your CSS + getPortPos dims ---
+    const DIMS = {
+        start:    { w: 95,  h: 40 },
+        end:      { w: 95,  h: 40 },
+        process:  { w: 120, h: 50 },
+        var:      { w: 120, h: 50 },
+        list:     { w: 140, h: 50 },
+        input:    { w: 130, h: 50 },
+        output:   { w: 130, h: 50 },
+        decision: { w: 130, h: 110 }
+    };
+
+    const PAD = 40;
+
+    // 1) Compute accurate WORLD bounding box (not viewport/screen)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const n of this.nodes) {
+        const d = DIMS[n.type] || { w: 120, h: 50 };
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + d.w);
+        maxY = Math.max(maxY, n.y + d.h);
+    }
+
+    const width  = Math.ceil((maxX - minX) + PAD * 2);
+    const height = Math.ceil((maxY - minY) + PAD * 2);
+
+    // Map WORLD -> EXPORT-LOCAL coords
+    const toLocal = (x, y) => ({
+        x: (x - minX) + PAD,
+        y: (y - minY) + PAD
+    });
+
+    // 2) Build an off-screen export container (so nothing is clipped)
+    const exportRoot = document.createElement("div");
+    exportRoot.style.position = "fixed";
+    exportRoot.style.left = "-100000px";
+    exportRoot.style.top = "0";
+    exportRoot.style.width = width + "px";
+    exportRoot.style.height = height + "px";
+    exportRoot.style.background = "#ffffff";
+    exportRoot.style.overflow = "hidden";
+    exportRoot.style.zIndex = "-1";
+	exportRoot.style.transform = "none";
+exportRoot.style.filter = "none";
+exportRoot.style.contain = "none";
+exportRoot.style.willChange = "auto";
+exportRoot.style.zoom = "1";
+exportRoot.style.isolation = "isolate";
+
+    // A relative stage so absolute children place correctly
+    const stage = document.createElement("div");
+    stage.style.position = "relative";
+    stage.style.width = "100%";
+    stage.style.height = "100%";
+    exportRoot.appendChild(stage);
+
+    // 3) Create SVG connector layer for export
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.style.position = "absolute";
+    svg.style.left = "0";
+    svg.style.top = "0";
+    svg.style.pointerEvents = "none";
+
+    // Arrowhead defs (match your existing marker usage)
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id", "arrowhead_export");
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "7");
+    marker.setAttribute("refX", "10");
+    marker.setAttribute("refY", "3.5");
+    marker.setAttribute("orient", "auto");
+    const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    arrowPath.setAttribute("d", "M 0 0 L 10 3.5 L 0 7 z");
+    arrowPath.setAttribute("fill", "#444");
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    stage.appendChild(svg);
+
+    // Manhattan router (same shape as your drawConns, but in LOCAL coords)
+    function orthogonal(p1, p2) {
+        const GAP = 25;
+        const SIDE = 90;
+
+        if (p2.y >= p1.y) {
+            const y1 = p1.y + GAP;
+            const midY = (y1 + (p2.y - GAP)) / 2;
+
+            return `
+                M ${p1.x} ${p1.y}
+                V ${y1}
+                V ${midY}
+                H ${p2.x}
+                V ${p2.y - GAP}
+                V ${p2.y}
+            `.replace(/\s+/g, " ");
+        }
+
+        const sideX = p1.x < p2.x ? p1.x - SIDE : p1.x + SIDE;
+
+        return `
+            M ${p1.x} ${p1.y}
+            V ${p1.y + GAP}
+            H ${sideX}
+            V ${p2.y - GAP}
+            H ${p2.x}
+            V ${p2.y}
+        `.replace(/\s+/g, " ");
+    }
+
+    // 4) Clone node DOM into export stage at translated positions
+    //    (Keeps your shapes/styles exactly as the app renders them)
+    for (const n of this.nodes) {
+        const liveEl = document.getElementById(n.id);
+        if (!liveEl) continue;
+
+        const clone = liveEl.cloneNode(true);
+
+        // Remove transient UI states from export
+        clone.classList.remove("running");
+        clone.classList.remove("selected");
+
+        const p = toLocal(n.x, n.y);
+        clone.style.position = "absolute";
+        clone.style.left = p.x + "px";
+        clone.style.top = p.y + "px";
+
+        stage.appendChild(clone);
+    }
+
+    // 5) Draw connectors into export SVG (from WORLD ports -> LOCAL coords)
+    //    Use your existing getPortPos() which returns WORLD positions.
+    for (const c of this.connections) {
+        const p1w = this.getPortPos(c.from, c.port);  // world
+        const p2w = this.getPortPos(c.to, "in");      // world
+
+        const p1 = toLocal(p1w.x, p1w.y);
+        const p2 = toLocal(p2w.x, p2w.y);
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", orthogonal(p1, p2));
+        path.setAttribute("fill", "none");
+
+        const stroke =
+            c.port === "yes" ? "#16a34a" :
+            c.port === "no"  ? "#dc2626" :
+                               "#444";
+
+        path.setAttribute("stroke", stroke);
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("marker-end", "url(#arrowhead_export)");
+
+        svg.appendChild(path);
+
+        // Optional YES/NO labels (simple SVG text so it exports cleanly)
+        if (c.port === "yes" || c.port === "no") {
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            t.setAttribute("x", (p1.x + 10).toString());
+            t.setAttribute("y", (p1.y + 18).toString());
+            t.setAttribute("font-size", "14");
+            t.setAttribute("font-family", "sans-serif");
+            t.setAttribute("font-weight", "700");
+            t.setAttribute("fill", stroke);
+            t.textContent = c.port.toUpperCase();
+            svg.appendChild(t);
+        }
+    }
+
+    // Attach off-screen DOM
+    document.documentElement.appendChild(exportRoot);
+
+    try {
+        // Allow fonts/layout to settle (important for html2canvas reliability)
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const canvas = await html2canvas(exportRoot, {
+    backgroundColor: "#ffffff",
+    scale: 2,
+    useCORS: true,
+    width: width,
+    height: height,
+    windowWidth: width,
+    windowHeight: height
+        });
+
+        // Download
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                const url = canvas.toDataURL("image/png");
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "flowchart.png";
+                a.click();
+                return;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "flowchart.png";
+            a.click();
+            URL.revokeObjectURL(url);
+        }, "image/png");
+    } finally {
+        exportRoot.remove();
+    }
+},
+
+
+
 
 openSaveOptions() {
     const modal = new bootstrap.Modal(
